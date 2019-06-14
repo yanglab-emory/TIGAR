@@ -19,3 +19,7 @@ TIGAR accept GT format like 0/0 or 0|0.
 |   1   | 100 | rs1 |  C  |  T  |   0.01  |
 
 #### 3. PED
+
+| FAM_ID | IND_ID | FAT_ID | MOT_ID | COV1 | COV2 | PHENO |
+|:------:|:------:|:------:|:------:|:----:|:----:|:-----:|
+|   11A  |   11A  |    X   |    X   |   1  |  0.2 |  0.3  |
