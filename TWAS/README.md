@@ -1,4 +1,4 @@
-#### 1. Association Study
+#### 1. Association Study 
 
 
 #### 2. Summary Statistics
