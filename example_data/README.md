@@ -1,4 +1,6 @@
 ### Input file format
+The example data provided here are generated artificially.
+
 
 #### 1. Gene Expression File (Gene_Exp_combination.txt)
 | CHROM | GeneStart | GeneEnd | TargetID/GeneID | GeneName | sample1 |
