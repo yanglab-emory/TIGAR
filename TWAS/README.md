@@ -2,3 +2,4 @@
 
 
 #### 2. Summary Statistics
+- covariance matrix calculation
