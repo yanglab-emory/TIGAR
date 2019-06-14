@@ -8,6 +8,3 @@
 ## Reference
 - Elastic Net: https://github.com/hakyimlab/PrediXcan  
 - DPR: https://github.com/biostatpzeng/DPR
-
-
-
