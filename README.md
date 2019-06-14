@@ -12,7 +12,8 @@ TABIX, Python 3.5 and the following python libraries are required for running TI
    - multiprocess
 
 
-### Example Usage (more details are available in the TIGAR_Manual.pdf)
+### Example Usage 
+- More details are available in the TIGAR_Manual.pdf
 - Train gene expression imputation model
 ```
 ./TIGAR_Model_Train.sh --model DPR \
