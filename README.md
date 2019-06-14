@@ -2,12 +2,15 @@
 "TIGAR" standing for Transcriptome-Intergrated Genetic Association Resource, which is developed using Python and BASH scripts.TIGAR can fit both Elastic-Net and nonparametric Beyesian model(Dirichlet Process Regression, i.e. DPR), impute transcriptomic data, and conduct genetic association studies using both individual-level and summary-level GWAS data for univariate and multivariate phenotypes.
 
 ### Software
-1. python 3.5 
+
+TABIX, Python 3.5 and the following python libraries are required for running TIGAR
+1. TABIX: http://www.htslib.org/doc/tabix.html 
+2. python 3.5 
    - dfply
    - io
    - subprocess
    - multiprocess
-2. TABIX
+
 
 ### Example Usage
 - Model Train and Prediction
