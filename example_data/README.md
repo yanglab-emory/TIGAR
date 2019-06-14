@@ -9,7 +9,7 @@
 
 | CHROM | POS |  ID | REF | ALT | QUAL | FILTER | INFO | FORMAT |  sample1 |
 |:-----:|:---:|:---:|:---:|:---:|:----:|:------:|:----:|:------:|:--------:|
-|   1   | 100 | rs1 |  C  |  T  |   .  |  PASS  |   .  |  GT:DS | 0|0:0.01 |
+|   1   | 100 | rs1 |  C  |  T  |   .  |  PASS  |   .  |  GT:DS | 0/0:0.01 |
 
 - dosages
 
