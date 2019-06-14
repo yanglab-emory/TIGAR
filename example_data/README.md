@@ -3,16 +3,30 @@
 |:-----:|:---------:|:-------:|:---------------:|:--------:|:-------:|
 |   1   |    100    |   200   |     ENSG0000    |     X    |   0.2   |
 
+- CHROM :
+- GeneStart :
+- GeneEnd :
+- TargetID/GeneID :
+- sample1 :
+
 #### 2. Genotype File
-- vcf  
+1) vcf  
 
 | CHROM | POS |  ID | REF | ALT | QUAL | FILTER | INFO | FORMAT |  sample1 |
 |:-----:|:---:|:---:|:---:|:---:|:----:|:------:|:----:|:------:|:--------:|
 |   1   | 100 | rs1 |  C  |  T  |   .  |  PASS  |   .  |  GT:DS | 0/0:0.01 |
 
-TIGAR accept GT format like 0/0 or 0|0.
+- CHROM :
+- POS :
+- ID :
+- REF :
+- ALT :
+- QUAL :
+- FILTER :
+- INFO :
+- FORMAT : TIGAR accept GT format like 0/0 or 0|0.
 
-- dosages
+2) dosages
 
 | CHROM | POS |  ID | REF | ALT | sample1 |
 |:-----:|:---:|:---:|:---:|:---:|:-------:|
@@ -23,3 +37,21 @@ TIGAR accept GT format like 0/0 or 0|0.
 | FAM_ID | IND_ID | FAT_ID | MOT_ID | COV1 | COV2 | PHENO |
 |:------:|:------:|:------:|:------:|:----:|:----:|:-----:|
 |   11A  |   11A  |    X   |    X   |   1  |  0.2 |  0.3  |
+
+- FAM_ID
+- IND_ID
+- FAT_ID
+- MOT_ID
+- COV1
+- COV2
+- PHENO
+
+
+
+
+
+
+
+
+
+
