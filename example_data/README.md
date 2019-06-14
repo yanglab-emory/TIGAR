@@ -1,4 +1,4 @@
-#### 1. Gene Expression File
+#### 1. Gene Expression File (Gene_Exp_combination.txt)
 | CHROM | GeneStart | GeneEnd | TargetID/GeneID | GeneName | sample1 |
 |:-----:|:---------:|:-------:|:---------------:|:--------:|:-------:|
 |   1   |    100    |   200   |     ENSG0000    |     X    |   0.2   |
