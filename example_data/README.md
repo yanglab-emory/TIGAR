@@ -22,14 +22,14 @@ The example data provided here are generated artificially.
 |:-----:|:---:|:---:|:---:|:---:|:-------:|
 |   1   | 100 | rs1 |  C  |  T  |   0.01  |
 
-#### 3. PED 
+#### 3. PED File
 - http://zzz.bwh.harvard.edu/plink/data.shtml#ped
 
 | FAM_ID | IND_ID | FAT_ID | MOT_ID | SEX  | PHENO | COV |
 |:------:|:------:|:------:|:------:|:----:|:----:|:-----:|
 |   11A  |   11A  |    X   |    X   |   1  |  0.2 |  0.3  |
 
-#### 4.Zscore
+#### 4.Zscore File
 
 
 
