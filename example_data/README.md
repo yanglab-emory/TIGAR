@@ -38,13 +38,13 @@
 |:------:|:------:|:------:|:------:|:----:|:----:|:-----:|
 |   11A  |   11A  |    X   |    X   |   1  |  0.2 |  0.3  |
 
-- FAM_ID
-- IND_ID
-- FAT_ID
-- MOT_ID
-- COV1
-- COV2
-- PHENO
+- FAM_ID ：
+- IND_ID ：
+- FAT_ID ：
+- MOT_ID ：
+- COV1 ：
+- COV2 ：
+- PHENO ：
 
 
 
