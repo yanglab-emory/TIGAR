@@ -9,7 +9,7 @@ The example data provided here are generated artificially.
 
 
 #### 2. Genotype File
-1) vcf 
+1) vcf file
 - http://www.internationalgenome.org/wiki/Analysis/Variant%20Call%20Format/vcf-variant-call-format-version-40/
 
 | CHROM | POS |  ID | REF | ALT | QUAL | FILTER | INFO | FORMAT |  sample1 |
@@ -25,14 +25,15 @@ The example data provided here are generated artificially.
 #### 3. PED File
 - http://zzz.bwh.harvard.edu/plink/data.shtml#ped
 
-| FAM_ID | IND_ID | FAT_ID | MOT_ID | SEX  | PHENO | COV |
-|:------:|:------:|:------:|:------:|:----:|:----:|:-----:|
-|   11A  |   11A  |    X   |    X   |   1  |  0.2 |  0.3  |
+| FAM_ID | IND_ID | FAT_ID | MOT_ID | SEX | PHENO | COV |
+|:------:|:------:|:------:|:------:|:---:|:-----:|:---:|
+|   11A  |   11A  |    X   |    X   |  1  |  0.2  | 0.3 |
 
 #### 4.Zscore File
 
-
-
+| CHROM | POS | REF | ALT | Zscore |
+|:-----:|:---:|:---:|:---:|:------:|
+|   1   | 100 |  C  |  T  |  0.01  |
 
 
 
