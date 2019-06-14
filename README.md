@@ -5,6 +5,24 @@
 - python 3.5 
 - TABIX
 
+## Usage Example
+- Model Train and Prediction
+```
+./TIGAR_Model_Train.sh --model DPR \
+--Gene_Exp ${Gene_Exp_path} --train_sample ${train_sample_path} \
+--chr 1 --train_dir ${train_dir} \
+--geno_train vcf --FT DS \
+--pred y \
+--geno_test dosages --FP DS \
+--out ${out_prefix}
+```
+- TWAS
+```
+./TIGAR_TWAS.sh --asso 1 \
+--Gene_EXP ${Gene_Exp_path} --PED ${PED} --Asso_Info ${asso_Info} \
+--out ${out_prefix}
+```
+
 ## Reference
 - Elastic Net: https://github.com/hakyimlab/PrediXcan  
 - DPR: https://github.com/biostatpzeng/DPR
