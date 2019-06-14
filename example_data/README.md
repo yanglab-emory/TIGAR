@@ -1,9 +1,9 @@
-#### Gene Expression File
+#### 1. Gene Expression File
 | CHROM | GeneStart | GeneEnd | TargetID/GeneID | GeneName | sample1 |
 |:-----:|:---------:|:-------:|:---------------:|:--------:|:-------:|
 |   1   |    100    |   200   |     ENSG0000    |     X    |   0.2   |
 
-#### Genotype File
+#### 2. Genotype File
 - vcf  
 
 | CHROM | POS |  ID | REF | ALT | QUAL | FILTER | INFO | FORMAT |  sample1 |
@@ -18,4 +18,4 @@ TIGAR accept GT format like 0/0 or 0|0.
 |:-----:|:---:|:---:|:---:|:---:|:-------:|
 |   1   | 100 | rs1 |  C  |  T  |   0.01  |
 
-#### PED
+#### 3. PED
