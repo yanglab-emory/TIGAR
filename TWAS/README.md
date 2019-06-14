@@ -4,7 +4,6 @@
 
 
 #### 2. Association Study with Summary-level GWAS Data
-- covariance matrix calculation
 
 
 #### 3. Generate reference genotype covariance file
