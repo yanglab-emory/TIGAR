@@ -22,7 +22,7 @@ TABIX, Python 3.5 and the following python libraries are required for running TI
 --out ${out_prefix}
 ```
 
-- Prediction GReX
+- Predict GReX
 ```
 
 ```
