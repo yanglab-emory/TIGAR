@@ -29,7 +29,7 @@ The example data provided here are generated artificially.
 |:------:|:------:|:------:|:------:|:----:|:----:|:-----:|
 |   11A  |   11A  |    X   |    X   |   1  |  0.2 |  0.3  |
 
-
+#### 4.Zscore
 
 
 
