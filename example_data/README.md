@@ -1,3 +1,5 @@
+### Input file format
+
 #### 1. Gene Expression File (Gene_Exp_combination.txt)
 | CHROM | GeneStart | GeneEnd | TargetID/GeneID | GeneName | sample1 |
 |:-----:|:---------:|:-------:|:---------------:|:--------:|:-------:|
