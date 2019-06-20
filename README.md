@@ -3,7 +3,11 @@
 
 ### Software
 
-- Please add the executable file "Model_Train/DPR" to your linux ${PATH} directory
+- Please add the executable file `Model_Train/DPR` to your linux `${PATH}` directory. Assuming `~/bin/` is a directory added to your `${PATH}` environmental variable, you can accomodate the following example command
+
+```
+cp ./TIGAR/Model_Train/DPR ~/bin/
+```
 
 - TABIX, Python 3.5 and the following python libraries are required for running TIGAR
 1. TABIX: http://www.htslib.org/doc/tabix.html 
