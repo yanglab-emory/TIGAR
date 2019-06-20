@@ -3,7 +3,7 @@
 
 ### Software
 
-- Please add the executable file "Model_Train/DPR tool" to your linux ${PATH} directory
+- Please add the executable file "Model_Train/DPR" to your linux ${PATH} directory
 
 - TABIX, Python 3.5 and the following python libraries are required for running TIGAR
 1. TABIX: http://www.htslib.org/doc/tabix.html 
