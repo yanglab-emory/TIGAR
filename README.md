@@ -3,7 +3,7 @@
 
 ### Software
 
-- Please add the executable file `Model_Train/DPR` to your linux `${PATH}` directory. Assuming `~/bin/` is a directory added to your `${PATH}` environmental variable, you can accomodate the following example command
+- Please add the executable file `./TIGAR/Model_Train/DPR` to your linux `${PATH}` directory. Assuming `~/bin/` is a directory added to your `${PATH}` environmental variable, you can accomodate the following example command
 
 ```
 cp ./TIGAR/Model_Train/DPR ~/bin/
