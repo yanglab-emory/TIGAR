@@ -68,8 +68,19 @@ Example data provided here are generated artificially. All input files are tab d
 ### Example Usage 
 - More details are available in the TIGAR_Manual.pdf
 - Train gene expression imputation model
+
+Train DPR imputation model
 ```
 ./Model_Train/TIGAR_Model_Train.sh --model DPR \
+--Gene_Exp ${Gene_Exp_path} --train_sample ${train_sample_path} \
+--chr 1 --train_dir ${train_dir} \
+--geno_train vcf --FT DS \
+--out ${out_prefix}
+```
+
+Train Elastic-Net imputation model
+```
+./Model_Train/TIGAR_Model_Train.sh --model elastic_net \
 --Gene_Exp ${Gene_Exp_path} --train_sample ${train_sample_path} \
 --chr 1 --train_dir ${train_dir} \
 --geno_train vcf --FT DS \
