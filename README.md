@@ -9,9 +9,10 @@
 cp ./TIGAR/Model_Train/DPR ~/bin/
 ```
 
-- TABIX, Python 3.5 and the following python libraries are required for running TIGAR
+- TABIX, BGZIP, Python 3.5 and the following python libraries are required for running TIGAR
 1. TABIX: http://www.htslib.org/doc/tabix.html 
-2. python 3.5 
+2. BGZIP: http://www.htslib.org/doc/bgzip.html
+3. python 3.5 
    - dfply
    - io
    - subprocess
