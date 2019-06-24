@@ -18,29 +18,6 @@ cp ./TIGAR/Model_Train/DPR ~/bin/
    - subprocess
    - multiprocess
 
-### Example Usage 
-- More details are available in the TIGAR_Manual.pdf
-- Train gene expression imputation model
-```
-./TIGAR_Model_Train.sh --model DPR \
---Gene_Exp ${Gene_Exp_path} --train_sample ${train_sample_path} \
---chr 1 --train_dir ${train_dir} \
---geno_train vcf --FT DS \
---out ${out_prefix}
-```
-
-- Predict GReX
-```
-
-```
-
-- TWAS
-```
-./TIGAR_TWAS.sh --asso 1 \
---Gene_EXP ${Gene_Exp_path} --PED ${PED} --Asso_Info ${asso_Info} \
---out ${out_prefix}
-```
-
 ### Input file format
 Example data provided here are generated artificially. All input files are tab delimited text files.
 
@@ -82,6 +59,30 @@ Example data provided here are generated artificially. All input files are tab d
 | CHROM | Start | End | File |
 |:-----:|:---------:|:-------:|:---------------:|
 |   1   |    100    | 20000   |  CHR1.vcf.gz    |
+
+
+### Example Usage 
+- More details are available in the TIGAR_Manual.pdf
+- Train gene expression imputation model
+```
+./TIGAR_Model_Train.sh --model DPR \
+--Gene_Exp ${Gene_Exp_path} --train_sample ${train_sample_path} \
+--chr 1 --train_dir ${train_dir} \
+--geno_train vcf --FT DS \
+--out ${out_prefix}
+```
+
+- Predict GReX
+```
+
+```
+
+- TWAS
+```
+./TIGAR_TWAS.sh --asso 1 \
+--Gene_EXP ${Gene_Exp_path} --PED ${PED} --Asso_Info ${asso_Info} \
+--out ${out_prefix}
+```
 
 ### Reference
 - Elastic Net: https://github.com/hakyimlab/PrediXcan  
