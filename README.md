@@ -42,7 +42,7 @@ cp ./TIGAR/Model_Train/DPR ~/bin/
 ```
 
 ### Input file format
-The example data provided here are generated artificially.
+Example data provided here are generated artificially. All input files are tab delimited text files.
 
 
 #### 1. Gene Expression File (Gene_Exp_combination.txt)
