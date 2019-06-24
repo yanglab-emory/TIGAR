@@ -56,9 +56,7 @@ Example data provided here are generated artificially. All input files are tab d
 |   1   | 100 |  C  |  T  |  0.01  |
 
 #### 5. Genome block annotation file
-- Input file of genome block annotation is required for generating reference genotype covaraince file. Example block annotation file for European samples is provided `./TIGAR/example_data/block_annotation_EUR.txt`. 
-
-- The block annotation file is a tab delimited text file with head row of `CHROM Start End File`, denoting the chromosome number, starting position, ending position, and corresponding reference VCF file name under specified `--geno_path`. Reference VCF files shall be of one per chromosome, or one for the whole genome-wide variants. 
+- The block annotation file is a tab delimited text file with head row of `CHROM Start End File`, denoting the chromosome number, starting position, ending position, and corresponding reference VCF file name under specified `--geno_path`. Reference VCF files shall be of one per chromosome, or one for the whole genome-wide variants. Example block annotation file for European samples is provided `./TIGAR/example_data/block_annotation_EUR.txt`. 
 
 | CHROM | Start | End | File |
 |:-----:|:---------:|:-------:|:---------------:|
