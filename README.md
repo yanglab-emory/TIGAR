@@ -56,7 +56,7 @@ Example data provided here are generated artificially. All input files are tab d
 |   1   | 100 |  C  |  T  |  0.01  |
 
 #### 5. Genome block annotation file
-- Example genome block annotation file for European samples are provided `./TIGAR/example_data/block_annotation_EUR.txt`. 
+- Example genome block annotation file for European samples are provided `./TIGAR/example_data/block_annotation_EUR.txt`. Four columns denote the chromosome number, starting position, ending position, and corresponding VCF file name under `--geno_path`.
 
 | CHROM | Start | End | File |
 |:-----:|:---------:|:-------:|:---------------:|
