@@ -82,6 +82,7 @@ Example data provided here are generated artificially. All input files are tab d
 ```
 
 - TWAS
+
 Using individual-level GWAS data
 ```
 ./TWAS/TIGAR_TWAS.sh --asso 1 \
