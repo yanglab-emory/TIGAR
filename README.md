@@ -69,7 +69,7 @@ Example data provided here are generated artificially. All input files are tab d
 - More details are available in the TIGAR_Manual.pdf
 - Train gene expression imputation model
 ```
-./TIGAR_Model_Train.sh --model DPR \
+./Model_Train/TIGAR_Model_Train.sh --model DPR \
 --Gene_Exp ${Gene_Exp_path} --train_sample ${train_sample_path} \
 --chr 1 --train_dir ${train_dir} \
 --geno_train vcf --FT DS \
@@ -82,9 +82,26 @@ Example data provided here are generated artificially. All input files are tab d
 ```
 
 - TWAS
+Using individual-level GWAS data
 ```
-./TIGAR_TWAS.sh --asso 1 \
+./TWAS/TIGAR_TWAS.sh --asso 1 \
 --Gene_EXP ${Gene_Exp_path} --PED ${PED} --Asso_Info ${asso_Info} \
+--out ${out_prefix}
+```
+
+Using summary-level GWAS data
+```
+./TWAS/TIGAR_TWAS.sh --asso 2 \
+--Gene_EXP ${Gene_Exp_path} --Zscore ${Zscore} --Weight ${Weight} \
+--Covar ${Ref_Covariance_file} --chr 22 \
+--out ${out_prefix}
+```
+
+Generate reference covariance files
+```
+./TWAS/covar_calculation.sh --block ${block_annotation} \
+--geno_path ${geno_path} --geno vcf \
+--chr 22 --Format GT \
 --out ${out_prefix}
 ```
 
