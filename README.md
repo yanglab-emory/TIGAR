@@ -54,9 +54,9 @@ Two columns with the first column specifying the Phenotype (P) and Covariate var
 
 |P|PHENO|
 |:-----:|:---:|
-|C|PC1|
-|C|PC2|
-|C|AGE|
+|C|COV1|
+|C|COV2|
+|C|SEX|
 
 #### 5.Zscore File
 
