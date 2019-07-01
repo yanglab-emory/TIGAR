@@ -53,11 +53,8 @@ Example data provided here are generated artificially. All input files are tab d
 Two columns with the first column specifying the Phenotype and Covariate variables from the PED file, and the second column specifying the corresponding variable names in the PED file. 
 
 |P|PHENO|
-|:-----:|:---:|
 |C|PC1|
-|:-----:|:---:|
 |C|PC2|
-|:-----:|:---:|
 |C|AGE|
 
 #### 5.Zscore File
