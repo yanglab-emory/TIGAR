@@ -45,12 +45,12 @@ Example data provided here are generated artificially. All input files are tab d
 #### 3. PED File
 - http://zzz.bwh.harvard.edu/plink/data.shtml#ped
 
-| FAM_ID | IND_ID | FAT_ID | MOT_ID | SEX | PHENO | COV |
-|:------:|:------:|:------:|:------:|:---:|:-----:|:---:|
-|   11A  |   11A  |    X   |    X   |  1  |  0.2  | 0.3 |
+| FAM_ID | IND_ID | FAT_ID | MOT_ID | SEX | PHENO | COV1 | COV...|
+|:------:|:------:|:------:|:------:|:---:|:-----:|:---:|:---:|
+|   11A  |   11A  |    X   |    X   |  1  |  0.2  | 0.3 |...|
 
 #### 4. Asso_Info file
-Two columns with the first column specifying the Phenotype and Covariate variables from the PED file, and the second column specifying the corresponding variable names in the PED file. 
+Two columns with the first column specifying the Phenotype (P) and Covariate variables (C) from the PED file, and the second column specifying the corresponding variable names in the PED file. The variables specified in the `Asso_Info.txt` file will be used in TWAS.
 
 |P|PHENO|
 |:-----:|:---:|
