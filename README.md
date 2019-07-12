@@ -37,7 +37,8 @@ TABIX, Python 3.5 and the following python libraries are required for running TI
 - TWAS
 ```
 ./TIGAR_TWAS.sh --asso 1 \
---Gene_EXP ${Gene_Exp_path} --PED ${PED} --Asso_Info ${asso_Info} \
+--Gene_EXP ${Gene_Exp_path} \
+--PED ${PED} --Asso_Info ${asso_Info} \
 --out ${out_prefix}
 ```
 
