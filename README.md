@@ -18,14 +18,20 @@ TABIX, Python 3.5 and the following python libraries are required for running TI
 ```
 ./TIGAR_Model_Train.sh --model DPR \
 --Gene_Exp ${Gene_Exp_path} --train_sample ${train_sample_path} \
---chr 1 --train_dir ${train_dir} \
---geno_train vcf --FT DS \
+--chr 1 --genofile_dir ${genofile_dir} \
+--genofile_type vcf --FT GT \
 --out ${out_prefix}
 ```
 
 - Predict GReX
 ```
-
+./TIGAR_Model_Pred.sh --model elastic_net \
+--chr 1 \
+--train_result_path ${train_result_path} \
+--train_info_ptah ${train_info_path} \
+--genofile_dir ${genofile_dir} \
+--genofile_type vcf --Format GT \
+--out ${out_prefix}
 ```
 
 - TWAS
