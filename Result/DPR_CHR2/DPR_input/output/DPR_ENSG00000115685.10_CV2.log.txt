@@ -1,0 +1,22 @@
+##
+## GEMMA Version = 0.95alpha
+##
+## Command Line Input = /mnt/icebreaker/data2/home/snagpal/DPR/DPR-master/DPR -g /home/xmeng/TIGAR/Result_01/DPR_CHR2/DPR_input/CV/bimbam/ENSG00000115685.10_CV2_bimbam.txt -p /home/xmeng/TIGAR/Result_01/DPR_CHR2/DPR_input/CV/pheno/ENSG00000115685.10_CV2_pheno.txt -a /home/xmeng/TIGAR/Result_01/DPR_CHR2/DPR_input/CV/SNP_annot/ENSG00000115685.10_CV2_snp_annot.txt -dpr 1 -o DPR_ENSG00000115685.10_CV2 
+##
+## Date = Thu Jul 11 20:53:50 2019
+##
+## Summary Statistics:
+## number of total individuals = 102
+## number of analyzed individuals = 102
+## number of covariates = 1
+## number of phenotypes = 1
+## number of total SNPs = 7640
+## number of analyzed SNPs = 6035
+## number of the truncated normal distributions = 4
+## ELBO = -117600
+## estimated mean = 0.0636124
+##
+## Computation Time:
+## total computation time = 0.142838 min 
+## computation time break down: 
+##
