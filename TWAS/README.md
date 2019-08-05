@@ -7,6 +7,6 @@
 - `summary_stat.py`, `Asso_Study_02.sh`
 
 #### 3. Generate reference genotype covariance file
-- `covar_calculation.py`, `covar_calculation.sh`
+- `covar_calculation.py`
 
 

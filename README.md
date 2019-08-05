@@ -3,10 +3,10 @@
 
 ### Software
 
-- Please add the executable file `./Model_Train/DPR` to your linux `${PATH}` directory. Assuming `~/bin/` is a directory added to your `${PATH}` environmental variable, you can accomodate the following example command
+- Please add the executable file `./Model_Train_Pred/DPR` to your linux `${PATH}` directory. Assuming `~/bin/` is a directory added to your `${PATH}` environmental variable, you can accomodate the following example command
 
 ```
-cp ./Model_Train/DPR ~/bin/
+cp ./Model_Train_Pred/DPR ~/bin/
 ```
 
 - BGZIP, TABIX, Python 3.5 and the following python libraries are required for running TIGAR
@@ -22,14 +22,14 @@ cp ./Model_Train/DPR ~/bin/
 Example data provided here are generated artificially. All input files are tab delimited text files.
 
 
-#### 1. Gene Expression File (Gene_Exp_combination.txt)
+#### 1. Gene Expression File (`./example_data/Gene_Exp_combination.txt`)
 | CHROM | GeneStart | GeneEnd | TargetID/GeneID | GeneName | sample1 | sample...|
 |:-----:|:---------:|:-------:|:---------------:|:--------:|:-------:|:--------:|
 |   1   |    100    |   200   |     ENSG0000    |     X    |   0.2   |     ...  |
 
 
 #### 2. Genotype File
-1) vcf file
+1) vcf file (`./example_data/example.vcf.gz`)
 - http://www.internationalgenome.org/wiki/Analysis/Variant%20Call%20Format/vcf-variant-call-format-version-40/
 
 | CHROM | POS |  ID | REF | ALT | QUAL | FILTER | INFO | FORMAT |  sample1 | sample...|
@@ -42,15 +42,15 @@ Example data provided here are generated artificially. All input files are tab d
 |:-----:|:---:|:---:|:---:|:---:|:-------:|:--------:|
 |   1   | 100 | rs1 |  C  |  T  |   0.01  |    ...   |
 
-#### 3. PED File
+#### 3. PED File (`./example_data/example_PED.ped`)
 - http://zzz.bwh.harvard.edu/plink/data.shtml#ped
 
 | FAM_ID | IND_ID | FAT_ID | MOT_ID | SEX | PHENO | COV1 | COV...|
 |:------:|:------:|:------:|:------:|:---:|:-----:|:---:|:---:|
 |   11A  |   11A  |    X   |    X   |  1  |  0.2  | 0.3 |...|
 
-#### 4. Asso_Info file
-Two columns with the first column specifying the Phenotype (P) and Covariate variables (C) from the PED file, and the second column specifying the corresponding variable names in the PED file. The variables specified in the `Asso_Info.txt` file will be used in TWAS.
+#### 4. Asso_Info file (`./example_data/Asso_Info_*.txt`)
+Two columns with the first column specifying the Phenotype (P) and Covariate variables (C) from the PED file, and the second column specifying the corresponding variable names in the PED file. The variables specified in the Asso_Info file will be used in TWAS.
 
 |P|PHENO|
 |:-----:|:---:|
@@ -58,13 +58,13 @@ Two columns with the first column specifying the Phenotype (P) and Covariate var
 |C|COV2|
 |C|SEX|
 
-#### 5.Zscore File
+#### 5.Zscore File (`./example_data/CHR1_GWAS_Zscore.txt.gz`)
 
 | CHROM | POS | REF | ALT | Zscore |
 |:-----:|:---:|:---:|:---:|:------:|
 |   1   | 100 |  C  |  T  |  0.01  |
 
-#### 6. Genome block annotation file
+#### 6. Genome block annotation file (`./example_data/block_annotation_EUR.txt`)
 - The block annotation file is a tab delimited text file with head row of `CHROM Start End File`, denoting the chromosome number, starting position, ending position, and corresponding reference VCF file name under specified `--geno_path`. Reference VCF files shall be of one per chromosome, or one for the whole genome-wide variants. Example block annotation file for European samples is provided `./TIGAR/example_data/block_annotation_EUR.txt`. 
 
 | CHROM | Start | End | File |
@@ -80,7 +80,7 @@ Two columns with the first column specifying the Phenotype (P) and Covariate var
 
 Train DPR imputation model
 ```
-./Model_Train/TIGAR_Model_Train.sh --model DPR \
+./TIGAR_Model_Train.sh --model DPR \
 --Gene_Exp ${Gene_Exp_train_file} --train_sample ${train_sample_path} \
 --chr 1 --train_dir ${train_dir} \
 --geno_train vcf --FT DS \
@@ -89,13 +89,12 @@ Train DPR imputation model
 
 Train Elastic-Net imputation model
 ```
-./Model_Train/TIGAR_Model_Train.sh --model elastic_net \
+./TIGAR_Model_Train.sh --model elastic_net \
 --Gene_Exp ${Gene_Exp_train_file} --train_sample ${train_sample_path} \
 --chr 1 --train_dir ${train_dir} \
 --geno_train vcf --FT DS \
 --out ${out_prefix}
 ```
-<<<<<<< HEAD
 
 - Predict GReX
 ```
@@ -111,7 +110,7 @@ Train Elastic-Net imputation model
 
 Using individual-level GWAS data. Take the output `*_GReX_prediction.txt` from gene expression prediction as the input for `--Gene_EXP` here. 
 ```
-./TWAS/TIGAR_TWAS.sh --asso 1 \
+./TIGAR_TWAS.sh --asso 1 \
 --Gene_EXP ${Gene_Exp_prediction_file} --PED ${PED} --Asso_Info ${asso_Info} \
 --out ${out_prefix}
 ```
@@ -119,7 +118,7 @@ Using individual-level GWAS data. Take the output `*_GReX_prediction.txt` from g
 Using summary-level GWAS data. Take the output `*_training_param.txt` from imputation model training as the input Weight file here. 
 
 ```
-./TWAS/TIGAR_TWAS.sh --asso 2 \
+./TIGAR_TWAS.sh --asso 2 \
 --Gene_EXP ${Gene_Exp_file} --Zscore ${Zscore} --Weight ${Weight} \
 --Covar ${Ref_Covariance_file} --chr 22 \
 --out ${out_prefix}
@@ -127,8 +126,7 @@ Using summary-level GWAS data. Take the output `*_training_param.txt` from imput
 
 Generate reference covariance files
 ```
-<<<<<<< HEAD
-./TWAS/covar_calculation.sh --block ${block_annotation} \
+.TIGAR_Covar.sh --block ${block_annotation} \
 --geno_path ${geno_path} --geno vcf \
 --chr 22 --Format GT \
 --out ${out_prefix}
