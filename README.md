@@ -98,7 +98,13 @@ Train Elastic-Net imputation model
 
 - Predict GReX
 ```
-
+./TIGAR_Model_Pred.sh --model elastic_net \
+--chr 1 \
+--train_result_path ${train_result_path} \
+--train_info_ptah ${train_info_path} \
+--genofile_dir ${genofile_dir} \
+--genofile_type vcf --Format GT \
+--out ${out_prefix}
 ```
 
 - TWAS
