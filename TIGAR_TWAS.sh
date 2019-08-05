@@ -80,16 +80,22 @@ chr_num=${chr_num:-""}
 #############################################################################################################
 if [[ "$asso"x == "1"x ]];then
     echo "asso is 1"
+
+    mkdir -p ${out_prefix}/TIGAR_TWAS_M1
+
     ./TWAS/Asso_Study_01.py \
     --Gene_Exp_path ${Gene_Exp} \
     --PED ${PED} \
     --Asso_Info ${Asso_Info} \
     --method ${method} \
     --thread ${thread} \
-    --out_prefix ${out_prefix}
+    --out_prefix ${out_prefix}/TIGAR_TWAS_M1
 
 elif [[ "$asso"x == "2"x ]];then
     echo "asso is 2"
+
+    mkdir -p ${out_prefix}/TIGAR_TWAS_M2
+
     ./TWAS/Asso_Study_02.sh \
     --Gene_Exp_path ${Gene_Exp} \
     --Zscore ${Zscore} \
@@ -98,7 +104,7 @@ elif [[ "$asso"x == "2"x ]];then
     --chr ${chr_num} \
     --window ${window} \
     --thread ${thread} \
-    --out ${out_prefix}
+    --out ${out_prefix}/TIGAR_TWAS_M2
 fi
 
 

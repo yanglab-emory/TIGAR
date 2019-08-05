@@ -1,0 +1,29 @@
+/home/xmeng/TIGAR/Result/elastic_net_CHR2/CHR2_elastic_net_training_param.txt
+/home/xmeng/TIGAR/Result/elastic_net_CHR2/CHR2_elastic_net_training_info.txt
+Training Model:elastic_net
+chromosome number:2
+Testing data:/home/xmeng/TIGAR/example_data/Genotype.vcf.gz
+/home/xmeng/TIGAR/Result/CHR2_test_names.txt
+Test sampleID:/home/xmeng/TIGAR/example_data/sampleID.txt
+Number of thread:1
+Using GT Format for Prediction.
+Window:1000000
+MAF threshold for dropping testing snps:0.2
+Output dir:/home/xmeng/TIGAR/Result/elastic_net_CHR2
+54966492
+Running prediction for Gene:ENSG00000013441.11
+overlapID:218
+Overall ID used:218
+48801060
+Running prediction for Gene:ENSG00000063660.4
+overlapID:276
+Overall ID used:276
+71722828
+Running prediction for Gene:ENSG00000115307.12
+overlapID:290
+Overall ID used:290
+78461954
+Running prediction for Gene:ENSG00000115685.10
+overlapID:131
+Overall ID used:131
+0.01 minutes

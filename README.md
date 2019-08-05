@@ -95,6 +95,7 @@ Train Elastic-Net imputation model
 --geno_train vcf --FT DS \
 --out ${out_prefix}
 ```
+<<<<<<< HEAD
 
 - Predict GReX
 ```
@@ -126,6 +127,7 @@ Using summary-level GWAS data. Take the output `*_training_param.txt` from imput
 
 Generate reference covariance files
 ```
+<<<<<<< HEAD
 ./TWAS/covar_calculation.sh --block ${block_annotation} \
 --geno_path ${geno_path} --geno vcf \
 --chr 22 --Format GT \
