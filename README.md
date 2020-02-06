@@ -82,7 +82,6 @@ Two columns with the first column specifying the Phenotype (P) and Covariate var
 
 
 ### Example Usage 
-- More details are available in the TIGAR_Manual.pdf
 - Train gene expression imputation model
 
 Train DPR imputation model
@@ -131,7 +130,7 @@ Using summary-level GWAS data. Take the output `*_training_param.txt` from imput
 --out ${out_prefix}
 ```
 
-Generate reference covariance files
+- Generate reference covariance files
 ```
 .TIGAR_Covar.sh --block ${block_annotation} \
 --geno_path ${geno_path} --geno vcf \
