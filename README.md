@@ -23,7 +23,10 @@ Example data provided here are generated artificially. All input files are tab d
 
 
 #### 1. Gene Expression File (`./example_data/Gene_Exp.txt`)
-| CHROM | GeneStart | GeneEnd | TargetID/GeneID | GeneName | sample1 | sample...|
+- First 5 columns specify chromosome number, gene start position, gene end position, target gene ID, gene name (optional, could be the same as gene ID).
+- Sample gene expression data start from the 6th column. 
+
+| CHROM | GeneStart | GeneEnd |   TargetID      | GeneName | sample1 | sample...|
 |:-----:|:---------:|:-------:|:---------------:|:--------:|:-------:|:--------:|
 |   1   |    100    |   200   |     ENSG0000    |     X    |   0.2   |     ...  |
 
@@ -31,8 +34,9 @@ Example data provided here are generated artificially. All input files are tab d
 #### 2. Genotype File
 1) vcf file (`./example_data/example.vcf.gz`)
 
-- Sorted by chromosome and base pair position, zipped by `bgzip`, and tabixed
-- Example tabix commond, `tabix -f -p vcf *.vcf.gz`
+- Sorted by chromosome and base pair position, zipped by `bgzip`, and tabixed.
+- Example tabix commond, `tabix -f -p vcf *.vcf.gz`.
+- Genotype data start from the 10th column.
 - More information about VCF file format: http://www.internationalgenome.org/wiki/Analysis/Variant%20Call%20Format/vcf-variant-call-format-version-40/
 
 | CHROM | POS |  ID | REF | ALT | QUAL | FILTER | INFO | FORMAT |  sample1 | sample...|
@@ -40,20 +44,22 @@ Example data provided here are generated artificially. All input files are tab d
 |   1   | 100 | rs1 |  C  |  T  |   .  |  PASS  |   .  |  GT:DS | 0/0:0.01 |    ...   |
 
 2) dosages file
+- The first 5 columns are of the same format as VCF file.
+- Dosage genotype data start from the 6th column.
 
 | CHROM | POS |  ID | REF | ALT | sample1 | sample...|
 |:-----:|:---:|:---:|:---:|:---:|:-------:|:--------:|
 |   1   | 100 | rs1 |  C  |  T  |   0.01  |    ...   |
 
 #### 3. PED File (`./example_data/example_PED.ped`)
-- http://zzz.bwh.harvard.edu/plink/data.shtml#ped
+- More informationa bout PED file format: http://zzz.bwh.harvard.edu/plink/data.shtml#ped
 
 | FAM_ID | IND_ID | FAT_ID | MOT_ID | SEX | PHENO | COV1 | COV...|
 |:------:|:------:|:------:|:------:|:---:|:-----:|:---:|:---:|
 |   11A  |   11A  |    X   |    X   |  1  |  0.2  | 0.3 |...|
 
 #### 4. Asso_Info file (`./example_data/Asso_Info_*.txt`)
-Two columns with the first column specifying the Phenotype (P) and Covariate variables (C) from the PED file, and the second column specifying the corresponding variable names in the PED file. The variables specified in the Asso_Info file will be used in TWAS.
+- Two columns with the first column specifying the Phenotype (P) and Covariate variables (C) from the PED file, and the second column specifying the corresponding variable names in the PED file. The variables specified in the Asso_Info file will be used in TWAS.
 
 |P|PHENO|
 |:-----:|:---:|
@@ -72,7 +78,7 @@ Two columns with the first column specifying the Phenotype (P) and Covariate var
 #### 6. Genome block annotation file (`./example_data/block_annotation_EUR.txt`)
 - The block annotation file is a tab delimited text file with head row of `CHROM Start End File`, denoting the chromosome number, starting position, ending position, and corresponding reference VCF file name under specified `--geno_path`. Reference VCF files shall be of one per chromosome, or one for the whole genome-wide variants. Example block annotation file for European samples is provided `./TIGAR/example_data/block_annotation_EUR.txt`. 
 
-| CHROM | Start | End | File |
+| CHROM |   Start   |    End  |        File     |
 |:-----:|:---------:|:-------:|:---------------:|
 |   1   |    100    | 20000   |  CHR1.vcf.gz    |
 
@@ -81,7 +87,7 @@ Two columns with the first column specifying the Phenotype (P) and Covariate var
 #### 7. Gene Annotation File (`./example_data/Gene_annotation.txt`)
 - The same format as the first five columns of the Gene Expression File.
 
-| CHROM | GeneStart | GeneEnd | TargetID/GeneID | GeneName | 
+| CHROM | GeneStart | GeneEnd |     TargetID    | GeneName | 
 |:-----:|:---------:|:-------:|:---------------:|:--------:|
 |   1   |    100    |   200   |     ENSG0000    |     X    |
 
@@ -91,7 +97,7 @@ Two columns with the first column specifying the Phenotype (P) and Covariate var
 - The column `ES` (Effect Size) denotes the weights for this given SNP/TargetGene
 
 
-| CHROM | POS | REF | ALT |   TargetGeneID  |  ES  |
+| CHROM | POS | REF | ALT |     TargetID    |  ES  |
 |:-----:|:---:|:---:|:---:|:---------------:|:----:|
 |   1   | 100 |  C  |  T  |     ENSG0000    |  0.2 |
 
