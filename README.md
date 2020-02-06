@@ -30,7 +30,10 @@ Example data provided here are generated artificially. All input files are tab d
 
 #### 2. Genotype File
 1) vcf file (`./example_data/example.vcf.gz`)
-- http://www.internationalgenome.org/wiki/Analysis/Variant%20Call%20Format/vcf-variant-call-format-version-40/
+
+- Sorted by chromosome and base pair position, zipped by `bgzip`, and tabixed
+- Example tabix commond, `tabix -f -p vcf *_Zscore.txt.gz`
+- More information about VCF file format: http://www.internationalgenome.org/wiki/Analysis/Variant%20Call%20Format/vcf-variant-call-format-version-40/
 
 | CHROM | POS |  ID | REF | ALT | QUAL | FILTER | INFO | FORMAT |  sample1 | sample...|
 |:-----:|:---:|:---:|:---:|:---:|:----:|:------:|:----:|:------:|:--------:|:--------:|
@@ -59,6 +62,8 @@ Two columns with the first column specifying the Phenotype (P) and Covariate var
 |C|SEX|
 
 #### 5.Zscore File (`./example_data/CHR1_GWAS_Zscore.txt.gz`)
+- Sorted by chromosome and base pair position, zipped by `bgzip`, and tabixed
+- Example tabix commond, `tabix -f -p vcf *_Zscore.txt.gz`. The first 4 columns are of the same format as VCF file.
 
 | CHROM | POS | REF | ALT | Zscore |
 |:-----:|:---:|:---:|:---:|:------:|
