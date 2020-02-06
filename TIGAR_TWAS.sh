@@ -10,7 +10,8 @@
 # asso: Method for association study:
 #       1) asso==1, providing PED file (phenotype data)
 #       2) asso==2, providing previous GWAS Zscore result
-# Gene_Exp: Gene annotation and Expression level file path
+# Gene_Exp: Gene Expression file directory
+# Gene_anno: Gene annotation file directory (first 5 columns of the Gene_Exp file)
 
 # For asso==1
 # PED : Standard genotype file
@@ -31,7 +32,7 @@
 
 #############################################################################################################
 VARS=`getopt -o "" -a -l \
-asso:,Gene_Exp:,PED:,Asso_Info:,method:,block:,geno_path:,Format:,maf:,Zscore:,Weight:,Covar:,chr:,window:,thread:,out: \
+asso:,Gene_Exp:,Gene_anno:,PED:,Asso_Info:,method:,block:,geno_path:,Format:,maf:,Zscore:,Weight:,Covar:,chr:,window:,thread:,out: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -47,6 +48,7 @@ do
     case "$1" in
         --asso|-asso) asso=$2; shift 2;;
         --Gene_Exp|-Gene_Exp) Gene_Exp=$2; shift 2;;
+		--Gene_anno|-Gene_anno) Gene_anno=$2; shift 2;;
         --PED|-PED) PED=$2; shift 2;;
         --Asso_Info|-Asso_Info) Asso_Info=$2; shift 2;;
         --method|-method) method=$2; shift 2;;
@@ -84,7 +86,7 @@ if [[ "$asso"x == "1"x ]];then
     mkdir -p ${out_prefix}/TIGAR_TWAS_M1
 
     ./TWAS/Asso_Study_01.py \
-    --Gene_Exp_path ${Gene_Exp} \
+    --Gene_Exp ${Gene_Exp} \
     --PED ${PED} \
     --Asso_Info ${Asso_Info} \
     --method ${method} \
@@ -97,7 +99,7 @@ elif [[ "$asso"x == "2"x ]];then
     mkdir -p ${out_prefix}/TIGAR_TWAS_M2
 
     ./TWAS/Asso_Study_02.sh \
-    --Gene_Exp_path ${Gene_Exp} \
+    --Gene_anno ${Gene_anno} \
     --Zscore ${Zscore} \
     --Weight ${Weight} \
     --Covar ${Covar} \

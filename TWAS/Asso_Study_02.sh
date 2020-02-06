@@ -6,18 +6,18 @@
 # tabix
 ###
 
-# Gene_Exp_path : Gene annotation and Expression level file path
+# Gene_anno : Gene annotation file directory
 # Zscore : Zscore file from previous GWAS study (tabixed)
-# Weight : File contains snps effect size (Same format as prediction output file ?)
+# Weight : File contains snps effect size (Same format as prediction output file)
 # Covar : Reference covariance matrix (Scripts is provided, see in covar_calculation.py, tabixed)
 # chr : Chromosome number
 # window : Window for selecting genotype data, default 10^6
 # thread : Number of thread, default 1
-# out : output dir
+# out : output directory
 
 #####################################################################################################
 VARS=`getopt -o "" -a -l \
-Gene_Exp_path:,Zscore:,Weight:,Covar:,chr:,window:,thread:,out: \
+Gene_anno:,Zscore:,Weight:,Covar:,chr:,window:,thread:,out: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -31,7 +31,7 @@ eval set -- "$VARS"
 while true
 do
     case "$1" in
-        --Gene_Exp_path|-Gene_Exp_path) Gene_Exp_path=$2; shift 2;;
+        --Gene_anno|-Gene_anno) Gene_anno=$2; shift 2;;
         --Zscore|-Zscore) Zscore=$2; shift 2;;
         --Weight|-Weight) Weight=$2; shift 2;;
         --Covar|-Covar) Covar=$2; shift 2;;
@@ -50,7 +50,7 @@ sort -n -k2 ${Weight} | bgzip -c > ${out_prefix}/CHR${chr_num}_weight.txt.gz
 tabix -p vcf ${out_prefix}/CHR${chr_num}_weight.txt.gz
 
 ### extract gene annotation file
-cut -f1-5 ${Gene_Exp_path} > ${out_prefix}/CHR${chr_num}_Gene_Annotation.txt
+cut -f1-5 ${Gene_anno} > ${out_prefix}/CHR${chr_num}_Gene_Annotation.txt
 
 #zcat ${out_prefix}/${Weight}.gz | grep 'CHROM' > ${out_prefix}/CHR${chr_num}_weight_names.txt
 

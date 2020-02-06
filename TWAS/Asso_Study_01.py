@@ -64,7 +64,7 @@ def regression_multi(X,Y,TargetID):
 parser = argparse.ArgumentParser(description='manual to this script')
 
 ### for Gene annotation and Expression level file
-parser.add_argument('--Gene_Exp_path',type=str,default = None)
+parser.add_argument('--Gene_Exp',type=str,default = None)
 
 ### for PED file
 parser.add_argument('--PED',type=str,default = None)
@@ -85,7 +85,7 @@ args = parser.parse_args()
 
 #####################################################################################################
 # Print out variables or path using
-print("Gene-expression file:"+args.Gene_Exp_path)
+print("Gene-expression file:"+args.Gene_Exp)
 print("PED file using:"+args.PED)
 print("Assosiation Information file:"+args.Asso_Info)
 print("Regression method using:"+args.method)
@@ -96,7 +96,7 @@ print("Output dir:"+args.out_prefix)
 PED = pd.read_csv(args.PED,sep='\t').rename(columns={'#FAM_ID':'FAM_ID'})
 
 # Gene annotation and Expression level file
-Genecode = pd.read_csv(args.Gene_Exp_path,sep='\t')
+Genecode = pd.read_csv(args.Gene_Exp,sep='\t')
 
 # Read in Association information
 # P:phenotype
