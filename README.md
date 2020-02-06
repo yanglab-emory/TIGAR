@@ -75,6 +75,7 @@ Two columns with the first column specifying the Phenotype (P) and Covariate var
 
 #### 6. Gene Annotation File (`./example_data/Gene_annotation.txt`)
 - The same format as the first five columns of the Gene Expression File.
+
 | CHROM | GeneStart | GeneEnd | TargetID/GeneID | GeneName | 
 |:-----:|:---------:|:-------:|:---------------:|:--------:|
 |   1   |    100    |   200   |     ENSG0000    |     X    |
