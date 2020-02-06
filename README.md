@@ -122,11 +122,11 @@ Using individual-level GWAS data. Take the output `*_GReX_prediction.txt` from g
 --out ${out_prefix}
 ```
 
-Using summary-level GWAS data. Take the output `*_training_param.txt` from imputation model training as the input Weight file here. 
+Using summary-level GWAS data. Take the output `*_training_param.txt` from imputation model training as the input Weight file here. The first five columns of the gene expression file will be taken as gene annotation file here for `--Gene_anno`. The same gene expression file can be used as input for `--Gene_anno`. 
 
 ```
 ./TIGAR_TWAS.sh --asso 2 \
---Gene_EXP ${Gene_Exp_file} --Zscore ${Zscore} --Weight ${Weight} \
+--Gene_anno ${Gene_anno_file} --Zscore ${Zscore} --Weight ${Weight} \
 --Covar ${Ref_Covariance_file} --chr 22 \
 --out ${out_prefix}
 ```
