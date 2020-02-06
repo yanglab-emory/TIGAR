@@ -86,8 +86,10 @@ Two columns with the first column specifying the Phenotype (P) and Covariate var
 |   1   |    100    |   200   |     ENSG0000    |     X    |
 
 #### 8. Weight File used for TWAS with GWAS summary statistics (`./example_data/weight.txt`)
-- The column `ES` denotes the weights for this given SNP/TargetGene
 - First 5 columns have to be of the following format, specifying chromosome number, base pair position, reference allele, alternative allele, and target gene ID. 
+
+- The column `ES` (Effect Size) denotes the weights for this given SNP/TargetGene
+
 
 | CHROM | POS | REF | ALT |   TargetGeneID  |  ES  |
 |:-----:|:---:|:---:|:---:|:---------------:|:----:|
