@@ -197,7 +197,7 @@ def thread_process(num):
             print("Format needed is not provided in input file.")
         else:
             Chrom,sampleID = CHR_Reform_vcf(CHR,args.Format,args.maf)
-    elif args.geno=='doasges':
+    elif args.geno=='dosages':
         Chrom,sampleID = CHR_Reform_DS(CHR,args.maf)
     
     Chrom = Chrom.sort_values(by='POS')
