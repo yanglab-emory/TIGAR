@@ -79,7 +79,7 @@ python ./Model_Train_Pred/Prediction.py \
 --thread ${thread} \
 --maf_diff ${maf_diff} \
 --out_prefix ${out_prefix}/${model}_CHR${chr_num} \
-> ${out_prefix}/${model}_CHR${chr_num}/log_file/Elastic_Net_Prediction_log.txt
+> ${out_prefix}/${model}_CHR${chr_num}/log_file/${model}_CHR${chr_num}_prediction_log.txt
     
 rm ${out_prefix}/CHR${chr_num}_test_names.txt
 

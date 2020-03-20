@@ -119,7 +119,7 @@ parser.add_argument('--block',type=str,default = None)
 ### genotype file dir
 parser.add_argument('--geno_path',type=str,default = None)
 
-### specified input file type(vcf or doasges)
+### specified input file type(vcf or dosages)
 parser.add_argument('--geno',type=str,default = None)
 
 ### chromosome number
