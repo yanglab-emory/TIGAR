@@ -345,16 +345,16 @@ args = parser.parse_args()
 # variable checking
 
 ### Print all variables for model training
-print("Gene annotation and Expressiop level file:"+args.Gene_Exp_path)
-print("Training sampleID path:"+args.train_sample)
-print("Chrmosome number:"+str(args.chr_num))
-print("Number of thread:"+str(args.thread))
-print("Training file:"+args.train_dir)
-print(args.train_names)
+print("Gene annotation and Expression data file:"+args.Gene_Exp)
+print("Training sampleID file:"+args.train_sampleID)
+print("Chrmosome number:"+str(args.chr))
+print("Number of computation thread:"+str(args.thread))
+print("Training geno file:"+args.genofile)
+print("Column names of genotype file:"+args.geno_colnames)
 
 if args.geno=='vcf':
     print("Using "+args.Format+" Format for Training")
-elif args.geno=='dosages':
+elif args.geno=='dosage':
     print("Using DS Format for Training.")
 else:
     raise SystemExit("Geno file can not identify.")

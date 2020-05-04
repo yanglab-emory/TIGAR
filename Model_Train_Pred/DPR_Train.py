@@ -244,20 +244,20 @@ def Info_Gene(Chr,Exp):
 parser = argparse.ArgumentParser(description='manual to this script')
 
 ### for Gene annotation and Expression level file
-parser.add_argument('--Gene_Exp_path',type=str,default = None)
+parser.add_argument('--Gene_Exp',type=str,default = None)
 
 ### for training sampleID
-parser.add_argument('--train_sample',type=str,default = None)
+parser.add_argument('--train_sampleID',type=str,default = None)
 
 ### specified chromosome number
-parser.add_argument('--chr_num',type=int,default = None)
+parser.add_argument('--chr',type=int,default = None)
 
 ### Number of Thread
 parser.add_argument('--thread',type=int,default = None)
 
 ### training vcf file
-parser.add_argument('--train_dir',type=str,default = None)
-parser.add_argument('--train_names',type=str,default = None)
+parser.add_argument('--train_geno_file',type=str,default = None)
+parser.add_argument('--geno_colnames',type=str,default = None)
 
 ### specified input file type(vcf or dosages)
 parser.add_argument('--geno',type=str,default = None)
@@ -280,27 +280,27 @@ parser.add_argument('--dpr',type=int,default=None)
 parser.add_argument('--ES', type=str,default=None)
 
 ### output dir
-parser.add_argument('--out_prefix',type=str,default=None)
+parser.add_argument('--out_dir',type=str,default=None)
 
 args = parser.parse_args()
 
 ### check input command
-print("Gene annotation and Expressiop level file:"+args.Gene_Exp_path)
-print("Training sampleID path:"+args.train_sample)
-print("Chromosome number:"+str(args.chr_num))
+print("Gene annotation and Expressiop level file:"+args.Gene_Exp)
+print("Training sampleID file:"+args.train_sampleID)
+print("Chromosome number:"+str(args.chr))
 print("Number of thread:"+str(args.thread))
-print("Training file:"+args.train_dir)
-print(args.train_names)
+print("Training file:"+args.train_geno_file)
+print(args.geno_colnames)
 if args.geno=='vcf':
     print("Using "+args.Format+" Format for Training")
-elif args.geno=='dosages':
+elif args.geno=='dosage':
     print("Using DS Format for Training.")
 print("window="+str(args.window))
 print("Threshold for MAF:"+str(args.maf))
 print("Threshold for p-value of HW test:"+str(args.hwe))
 print("Runing DPR Model with dpr="+str(args.dpr))
 print("Using effect-size:"+args.ES)
-print("Output dir:"+args.out_prefix)
+print("Output dir:"+args.out_dir)
 
 #####################################################################################################################
 # Prepare DPR input
@@ -312,12 +312,12 @@ print("Output dir:"+args.out_prefix)
 ### 3.GeneEnd Position
 ### 4.TargetID (i.e.GeneID, treated as unique annotation for each gene)
 ### 5.Gene Name
-Gene_Exp = pd.read_csv(args.Gene_Exp_path,sep='\t',low_memory=False)
+Gene_Exp = pd.read_csv(args.Gene_Exp,sep='\t',low_memory=False)
 Gene_header = np.array(Gene_Exp.columns)
 Gene_header[0:5] = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName']
 Gene_Exp.columns = Gene_header
 
-train_sampleID = pd.read_csv(args.train_sample,sep='\t',header=None)
+train_sampleID = pd.read_csv(args.train_sampleID,sep='\t',header=None)
 train_sampleID = np.array(train_sampleID).ravel()
 
 ### seperate sampleIDs for cross validation
@@ -336,25 +336,25 @@ CV_trainID = CV_trainID.apply(lambda x:x.str.split(","))
 CV_testID = CV_testID.apply(lambda x:x.str.split(","))
 
 ### Extract expression level by chromosome
-EXP = Gene_Exp >> mask(Gene_Exp['CHROM'].astype('str')==str(args.chr_num))
+EXP = Gene_Exp >> mask(Gene_Exp['CHROM'].astype('str')==str(args.chr))
 EXP = EXP >> select(EXP[Gene_Exp.columns[0:5]],EXP[train_sampleID])
 EXP = EXP.reset_index(drop=True)
 if len(EXP.CHROM)==0:
     raise SystemExit("No training data.")
 
-train_names=pd.read_csv(args.train_names,sep='\t').rename(columns={'#CHROM':'CHROM'})
+geno_colnames=pd.read_csv(args.geno_colnames,sep='\t').rename(columns={'#CHROM':'CHROM'})
 
 ### Initialize output dataframe
 param_out=pd.DataFrame(columns=['CHROM','POS','REF','ALT','TargetID','n_miss',
                                 'b','beta','ES','gamma','p_HWE','MAF'])
 
-param_out.to_csv(args.out_prefix+'/CHR'+str(args.chr_num)+'_DPR_training_param.txt',
+param_out.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_DPR_training_param.txt',
                  sep='\t',header=True,index=None,mode='a')
 
 Info_out=pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName',
                                'snp_size','effect_snp_size','sample_size','5-fold-CV-R2','TrainPVALUE','Train-R2'])
 
-Info_out.to_csv(args.out_prefix+'/CHR'+str(args.chr_num)+'_DPR_training_info.txt',
+Info_out.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_DPR_training_info.txt',
                 sep='\t',header=True,index=None,mode='a')
 
 def thread_process(num):
@@ -366,7 +366,7 @@ def thread_process(num):
 
     # Requirement for input vcf file:Must be bgzip and tabix
     ### select corresponding vcf file by tabix
-    train_process=subprocess.Popen(["tabix"+" "+args.train_dir+" "+str(args.chr_num)+":"+str(start)+"-"+str(end)],
+    train_process=subprocess.Popen(["tabix"+" "+args.train_geno_file+" "+str(args.chr)+":"+str(start)+"-"+str(end)],
                                    shell=True,
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
@@ -379,7 +379,7 @@ def thread_process(num):
         print("Preparing DPR input for Gene:"+TargetID)
 
         Chr_temp=pd.read_csv(StringIO(out.decode('utf-8')),sep='\t',header=None,low_memory=False)
-        Chr_temp.columns=np.array(tuple(train_names))
+        Chr_temp.columns=np.array(tuple(geno_colnames))
         Chr_temp=Chr_temp.reset_index(drop=True)
 
         if args.geno=='vcf':
@@ -398,8 +398,8 @@ def thread_process(num):
         ### Evaluate vhether DPR model vaild
         ### create bimbam file for 5-folds cross validation
 
-        CV_file_dir=args.out_prefix+"/DPR_input/CV"
-        CV_output=args.out_prefix+"/DPR_input"
+        CV_file_dir=args.out_dir+"/DPR_input/CV"
+        CV_output=args.out_dir+"/DPR_input"
 
         k_fold_R2=[]
         k_fold_R2.append(0)
@@ -470,7 +470,7 @@ def thread_process(num):
         else:
             print("Running DPR training for Gene:"+TargetID)
             print(str(sum(k_fold_R2)/5))
-            file_dir=args.out_prefix+'/DPR_input'
+            file_dir=args.out_dir+'/DPR_input'
             print("Running model training for Gene:"+TargetID)
             bimbam = (Info >> select(Info.snpID,Info.REF,Info.ALT,Info[sampleID])).dropna(axis=0,how='any')
             
@@ -486,7 +486,7 @@ def thread_process(num):
             
             stop_DPR=0
             try:
-                subprocess.check_call(shlex.split('./Model_Train_Pred/call_DPR.sh'+' '+file_dir+' '+str(args.dpr)+' '+TargetID+' '+args.out_prefix))
+                subprocess.check_call(shlex.split('./Model_Train_Pred/call_DPR.sh'+' '+file_dir+' '+str(args.dpr)+' '+TargetID+' '+args.out_dir))
             except subprocess.CalledProcessError as err:
                 stop_DPR=1
                 print("DPR failed for TargetID:"+TargetID)
@@ -495,7 +495,7 @@ def thread_process(num):
                 Info_Train=pd.DataFrame()
                 Info_Train['TargetID']=np.array(TargetID).ravel()
                 
-                result=pd.read_csv(args.out_prefix+'/output/DPR_'+TargetID+'.param.txt',sep='\t')
+                result=pd.read_csv(args.out_dir+'/output/DPR_'+TargetID+'.param.txt',sep='\t')
                 result['TargetID']=TargetID
 
                 if args.ES=='fixed':
@@ -529,7 +529,7 @@ def thread_process(num):
                 param['CHROM'] = param['CHROM'].astype('int')
                 param['POS'] = param['POS'].astype('int')
 
-                param.to_csv(args.out_prefix+'/CHR'+str(args.chr_num)+'_DPR_training_param.txt',
+                param.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_DPR_training_param.txt',
                              sep='\t',header=None,index=None,mode='a')
 
                 result = result >> select(result.snpID,result.ES)
@@ -565,7 +565,7 @@ def thread_process(num):
                                                                             left_on='TargetID',
                                                                             right_on='TargetID',
                                                                             how='outer')
-                Info.to_csv(args.out_prefix+'/CHR'+str(args.chr_num)+'_DPR_training_info.txt',
+                Info.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_DPR_training_info.txt',
                             sep='\t',header=None,index=None,mode='a')
 
 ################################################################################################################

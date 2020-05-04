@@ -4,21 +4,21 @@
 ### vairable needed for training
 # model: DPR
 # Gene_Exp: Gene annotation and Expression level file
-# train_sample: a column of sampleIDs use for training
+# train_sampleID: a column of sampleIDs use for training
 # chr: chromosome number for corresponding training data
 # thread: number of thread for multiprocessing
 # genofile_type: vcf or dosages, both should be tabix
-# genofile_dir: training data path
-# Format: Format using for training data(GT or DS), default DS
+# genofile: directory of the training genotype file (bgzipped and tabixed)
+# Format: Format using for training data(GT or DS), default GT
 # maf: Threshold for Minor Allele Frequency (range from 0-1),default 0.01
-# hwe: Threshold of p-value for Hardy Weinberg Equilibrium exact test,default 0.001
+# hwe: Threshold of p-value for Hardy Weinberg Equilibrium exact test,default 0.00001
 # window: window for selecting data
 # dpr: model when we choose DPR, default 1
 # ES: effect size(fixed/additive)
 # out: output dir
 
 VARS=`getopt -o "" -a -l \
-model:,Gene_Exp:,train_sample:,chr:,genofile_type:,genofile_dir:,Format:,maf:,hwe:,window:,dpr:,ES:,thread:,out: \
+model:,Gene_Exp:,train_sampleID:,chr:,genofile_type:,genofile:,Format:,maf:,hwe:,window:,dpr:,ES:,thread:,out_dir: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -34,10 +34,10 @@ do
     case "$1" in
         --model|-model) model=$2; shift 2;;
         --Gene_Exp|-Gene_Exp) Gene_Exp=$2; shift 2;;
-        --train_sample|-train_sample) train_sample=$2; shift 2;;
-        --chr|-chr) chr_num=$2; shift 2;;
+        --train_sampleID|-train_sampleID) train_sampleID=$2; shift 2;;
+        --chr|-chr) chr=$2; shift 2;;
         --genofile_type|-genofile_type) genofile_type=$2; shift 2;;
-        --genofile_dir|-genofile_dir) genofile_dir=$2; shift 2;;
+        --genofile|-genofile) genofile=$2; shift 2;;
         --Format|-Format) Format=$2; shift 2;;
         --maf|-maf) maf=$2; shift 2;;
         --hwe|-hwe) hwe=$2; shift 2;;
@@ -45,52 +45,53 @@ do
         --dpr|-dpr) dpr_num=$2; shift 2;;
         --ES|-ES) ES=$2; shift 2;;
         --thread|-thread) thread=$2; shift 2;;
-        --out|-out) out_prefix=$2; shift 2;;
+        --out_dir|-out_dir) out_dir=$2; shift 2;;
         --) shift;break;;
         *) echo "Internal error!";exit 1;;
         esac
 done
 
-##########################################################################################
+#################################################
 ### 1.
 ### Extract vcf names(training dataset) from vcf file
-zcat ${genofile_dir} | grep 'CHROM' > ${out_prefix}/CHR${chr_num}_train_names.txt
+mkdir -p ${out_dir}
+zcat ${genofile} | grep 'CHROM' > ${out_dir}/CHR${chr}_geno_colnames.txt
 
 ### 2.
 ### Store overall result from DPR
-mkdir -p ${out_prefix}/DPR_CHR${chr_num}
+mkdir -p ${out_dir}/DPR_CHR${chr}
 
 ### Store python log file
-mkdir -p ${out_prefix}/DPR_CHR${chr_num}/log_file
+mkdir -p ${out_dir}/DPR_CHR${chr}/log_file
 
 ### 3.
 ### DPR input
 ### Store result for DPR_input
-mkdir -p ${out_prefix}/DPR_CHR${chr_num}/DPR_input
+mkdir -p ${out_dir}/DPR_CHR${chr}/DPR_input
 
 ### Store cross validation result
-mkdir -p ${out_prefix}/DPR_CHR${chr_num}/DPR_input/CV
-mkdir -p ${out_prefix}/DPR_CHR${chr_num}/DPR_input/CV/bimbam
-mkdir -p ${out_prefix}/DPR_CHR${chr_num}/DPR_input/CV/pheno
-mkdir -p ${out_prefix}/DPR_CHR${chr_num}/DPR_input/CV/SNP_annot
+mkdir -p ${out_dir}/DPR_CHR${chr}/DPR_input/CV
+mkdir -p ${out_dir}/DPR_CHR${chr}/DPR_input/CV/bimbam
+mkdir -p ${out_dir}/DPR_CHR${chr}/DPR_input/CV/pheno
+mkdir -p ${out_dir}/DPR_CHR${chr}/DPR_input/CV/SNP_annot
 
 ### Store bimbam file
-mkdir -p ${out_prefix}/DPR_CHR${chr_num}/DPR_input/bimbam
+mkdir -p ${out_dir}/DPR_CHR${chr}/DPR_input/bimbam
 
 ### Store phenotype file
-mkdir -p ${out_prefix}/DPR_CHR${chr_num}/DPR_input/pheno
+mkdir -p ${out_dir}/DPR_CHR${chr}/DPR_input/pheno
 
 ### Store SNP annotation file
-mkdir -p ${out_prefix}/DPR_CHR${chr_num}/DPR_input/SNP_annot
+mkdir -p ${out_dir}/DPR_CHR${chr}/DPR_input/SNP_annot
 
 ### Prepare for DPR input
 python ./Model_Train_Pred/DPR_Train.py \
---Gene_Exp_path ${Gene_Exp} \
---train_sample ${train_sample} \
---chr_num ${chr_num} \
+--Gene_Exp ${Gene_Exp} \
+--train_sampleID ${train_sampleID} \
+--chr ${chr} \
 --thread ${thread} \
---train_dir ${genofile_dir} \
---train_names ${out_prefix}/CHR${chr_num}_train_names.txt \
+--train_geno_file ${genofile} \
+--geno_colnames ${out_dir}/CHR${chr}_geno_colnames.txt \
 --geno ${genofile_type} \
 --Format ${Format} \
 --hwe ${hwe} \
@@ -98,12 +99,12 @@ python ./Model_Train_Pred/DPR_Train.py \
 --window ${window} \
 --dpr ${dpr_num} \
 --ES ${ES} \
---out_prefix ${out_prefix}/DPR_CHR${chr_num} \
-> ${out_prefix}/DPR_CHR${chr_num}/log_file/DPR_Train_log.txt
+--out_dir ${out_dir}/DPR_CHR${chr} \
+> ${out_dir}/DPR_CHR${chr}/log_file/DPR_Train_log.txt
 
 ### 4. remove file after finishing input preparation
-rm ${out_prefix}/CHR${chr_num}_train_names.txt
-rm -r ${out_prefix}/DPR_CHR${chr_num}/DPR_input/CV
+rm -f ${out_dir}/CHR${chr}_geno_colnames.txt
+rm -fr ${out_dir}/DPR_CHR${chr}/DPR_input/CV
 
 
 

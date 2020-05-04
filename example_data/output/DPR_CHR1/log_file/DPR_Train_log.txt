@@ -1,0 +1,13 @@
+Gene annotation and Expressiop level file:./example_data/Gene_Exp.txt
+Training sampleID file:./example_data/sampleID.txt
+Chromosome number:1
+Number of thread:1
+Training file:./example_data/example.vcf.gz
+./example_data/output/CHR1_geno_colnames.txt
+Using GT Format for Training
+window=1000000
+Threshold for MAF:0.01
+Threshold for p-value of HW test:1e-05
+Runing DPR Model with dpr=1
+Using effect-size:fixed
+Output dir:./example_data/output/DPR_CHR1
