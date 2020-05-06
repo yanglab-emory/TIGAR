@@ -103,7 +103,7 @@ Example data provided here are generated artificially. All input files are tab d
 
 
 ### Example Usage 
-- Train gene expression imputation model per chromosome
+1. Train gene expression imputation model per chromosome
 
 	* Variables to specify
 		* `--model`: Gene expression prediction model: `elastic_net` or `DPR`
@@ -120,39 +120,39 @@ Example data provided here are generated artificially. All input files are tab d
 		* `--out`: Output directory (will be created if not exist)
 
 
-	- Train nonparametric Bayesian DPR prediction model for gene expression
+	* Train nonparametric Bayesian DPR prediction model for gene expression
 
-	* Variables to specify for training nonparametric Bayesian DPR prediction model
-		* `--dpr`: Bayesian inference algorithm used by DPR: `1` (Variational Bayesian) or `2` (MCMC)
-		* `--ES`: Output effect size type: `fixed` (default) for fixed effects or `additive` for addition of fixed and random effects
+		* Variables to specify for training nonparametric Bayesian DPR prediction model
+			* `--dpr`: Bayesian inference algorithm used by DPR: `1` (Variational Bayesian) or `2` (MCMC)
+			* `--ES`: Output effect size type: `fixed` (default) for fixed effects or `additive` for addition of fixed and random effects
 
-	* Example bash command
-		```
-		./TIGAR_Model_Train.sh --model DPR \
-		--Gene_Exp ${Gene_Exp_train_file} --train_sample ${train_sample_path} \
-		--chr 1 --train_dir ${train_dir} \
-		--geno_train vcf --FT DS \
-		--out ${out_prefix}
-		```
+		* Example bash command
+			```
+			./TIGAR_Model_Train.sh --model DPR \
+			--Gene_Exp ${Gene_Exp_train_file} --train_sample ${train_sample_path} \
+			--chr 1 --train_dir ${train_dir} \
+			--geno_train vcf --FT DS \
+			--out ${out_prefix}
+			```
 
-	- Train Elastic-Net prediction model for gene expression
-	* Variables to specify for training Elastic-Net prediction model
-		* `--cv`: Number of cross validation folds for tuning elastic-net penalty parameter (default `5`)
-		* `--alpha`: Fixed L1 & L2 penalty ratio for elastic-net model (default `0.5`)
-			* If alpha=0, equivalent to lasso regression
-			* If alpha=1, equivalent to ridge regression
+	* Train Elastic-Net prediction model for gene expression
+		* Variables to specify for training Elastic-Net prediction model
+			* `--cv`: Number of cross validation folds for tuning elastic-net penalty parameter (default `5`)
+			* `--alpha`: Fixed L1 & L2 penalty ratio for elastic-net model (default `0.5`)
+				* If alpha=0, equivalent to lasso regression
+				* If alpha=1, equivalent to ridge regression
 
-	* Example bash command
-		```
-		./TIGAR_Model_Train.sh --model elastic_net \
-		--Gene_Exp ${Gene_Exp_train_file} --train_sample ${train_sample_path} \
-		--chr 1 --train_dir ${train_dir} \
-		--geno_train vcf --FT DS \
-		--out ${out_prefix}
-		```
+		* Example bash command
+			```
+			./TIGAR_Model_Train.sh --model elastic_net \
+			--Gene_Exp ${Gene_Exp_train_file} --train_sample ${train_sample_path} \
+			--chr 1 --train_dir ${train_dir} \
+			--geno_train vcf --FT DS \
+			--out ${out_prefix}
+			```
 
 
-- Predict GReX
+2. Predict GReX
 ```
 ./TIGAR_Model_Pred.sh --chr 1 \
 --train_result_path ${train_result_path} \
@@ -162,7 +162,7 @@ Example data provided here are generated artificially. All input files are tab d
 --out ${out_prefix}
 ```
 
-- TWAS
+3. TWAS
 
 Using individual-level GWAS data. Take the output `*_GReX_prediction.txt` from gene expression prediction as the input for `--Gene_EXP` here. 
 ```
@@ -180,7 +180,7 @@ Using summary-level GWAS data. Take the output `*_training_param.txt` from imput
 --out ${out_prefix}
 ```
 
-- Generate reference covariance files
+4. Generate reference covariance files
 ```
 .TIGAR_Covar.sh --block ${block_annotation} \
 --geno_path ${geno_path} --geno vcf \
