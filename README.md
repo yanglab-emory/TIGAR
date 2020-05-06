@@ -1,18 +1,27 @@
 ## TIGAR
-"TIGAR" standing for Transcriptome-Intergrated Genetic Association Resource, which is developed using Python and BASH scripts. TIGAR can fit both Elastic-Net and nonparametric Beyesian model (Dirichlet Process Regression, i.e. DPR) for gene expression imputation, impute genetically regulated gene expression (GReX) from individual-level genotype data, and conduct transcriptome-wide association studies (TWAS) using both individual-level and summary-level GWAS data for univariate and multivariate phenotypes.
+**TIGAR** standing for **Transcriptome-Intergrated Genetic Association Resource**, which is developed using *Python* and *BASH* scripts. 
 
-### Software
+1. **TIGAR** can fit both **Elastic-Net** and **nonparametric Beyesian (Dirichlet Process Regression (DPR)** models for predicting gene expression with reference panel
+2. Impute **Genetically Regulated gene eXpression (GReX)** from individual-level genotype data
+3. Conduct **transcriptome-wide association studies (TWAS)** using both individual-level and summary-level GWAS data for *Univariate* and *Multivariate* phenotypes.
 
-- Please add the executable file `./Model_Train_Pred/DPR` to your linux `${PATH}` directory. Assuming `~/bin/` is a directory added to your `${PATH}` environmental variable, you can accomodate the following example command
+### Software Setup
 
-```
-cp ./Model_Train_Pred/DPR ~/bin/
-```
+#### Setup executable files
+- Change all `*.sh` and `*.py` files into executable files
+	```
+	chmod 755 *.sh ./Model_Train_Pred/*.sh ./Model_Train_Pred/*.py ./Model_Train_Pred/DPR ./TWAS/*.sh ./TWAS/*.py
+	```
+- Add the executable file `./Model_Train_Pred/DPR` to your linux `${PATH}` directory. 
+	Assuming `~/bin/` is a directory added to your `${PATH}` environmental variable, you can accomodate the following example command
+	```
+	cp ./Model_Train_Pred/DPR ~/bin/
+	```
 
-- BGZIP, TABIX, Python 3.5 and the following python libraries are required for running TIGAR
-1. BGZIP: http://www.htslib.org/doc/bgzip.html 
-2. TABIX: http://www.htslib.org/doc/tabix.html 
-3. python 3.5 
+#### Install BGZIP, TABIX, Python 3.5 and the following python libraries
+- BGZIP: http://www.htslib.org/doc/bgzip.html 
+- TABIX: http://www.htslib.org/doc/tabix.html 
+- python 3.5 
    - dfply
    - io
    - subprocess
@@ -103,7 +112,7 @@ Example data provided here are generated artificially. All input files are tab d
 
 
 ### Example Usage 
-1. Train gene expression imputation model per chromosome
+#### 1. Train gene expression imputation model per chromosome
 
 	* Variables to specify
 		* `--model`: Gene expression prediction model: `elastic_net` or `DPR`
@@ -152,7 +161,7 @@ Example data provided here are generated artificially. All input files are tab d
 			```
 
 
-2. Predict GReX
+#### 2. Predict GReX
 ```
 ./TIGAR_Model_Pred.sh --chr 1 \
 --train_result_path ${train_result_path} \
@@ -162,7 +171,7 @@ Example data provided here are generated artificially. All input files are tab d
 --out ${out_prefix}
 ```
 
-3. TWAS
+#### 3. TWAS
 
 Using individual-level GWAS data. Take the output `*_GReX_prediction.txt` from gene expression prediction as the input for `--Gene_EXP` here. 
 ```
@@ -180,7 +189,7 @@ Using summary-level GWAS data. Take the output `*_training_param.txt` from imput
 --out ${out_prefix}
 ```
 
-4. Generate reference covariance files
+#### 4. Generate reference covariance files
 ```
 .TIGAR_Covar.sh --block ${block_annotation} \
 --geno_path ${geno_path} --geno vcf \
