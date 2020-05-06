@@ -1,35 +1,35 @@
 #!/usr/bin/bash
 
-#####################################################################################################
-# software requirement
+#########################################################
+####### Required software
 # python 3
 # tabix
-###
+#########################################################
 
-# vairable needed for training
+# Variable needed for training
 ###
-# model: elastic_net or DPR
-# Gene_Exp: Gene annotation and Expression level file path
-# train_sampleID: a file with sampleIDs that will be used for training
-# chr: chromosome number need to be specified with respect to the genotype input data
-# genofile_tye: vcf or dosage
-# genofile: directory of the training genotype file (gzipped), should be tabixed 
-# Format: Format using for training data(GT or DS), default GT
-# maf: Threshold for Minor Allele Frequency (range from 0-1),default 0.01
-# hwe: Threshold of p-value for Hardy Weinberg Equilibrium exact test,default 0.001
-# window: window for selecting data
-# thread: number of thread for multiprocessing
-# out: output dir
+# --model: Gene expression prediction model: "elastic_net" or "DPR"
+# --Gene_Exp: Path for Gene annotation and Expression file
+# --train_sampleID: Path for a file with sampleIDs that will be used for training
+# --genofile: Path for the training genotype file (bgzipped and tabixed) 
+# --chr: Chromosome number need to be specified with respect to the genotype input data
+# --genofile_tye: Genotype file type: "vcf" or "dosage"
+# --Format: Genotype format in VCF file that should be used: "GT" (default) for genotype data or "DS" for dosage data, only required if the input genotype file is of VCF file
+# --maf: Minor Allele Frequency threshold (ranges from 0 to 1; default 0.01) to exclude rare variants
+# --hwe: Hardy Weinberg Equilibrium p-value threshold (default 0.00001) to exclude variants that violated HWE
+# --window: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression prediction model (default 1000000 for +- 1MB region around TSS)
+# --thread: Number of threads for parallel computation (default 1)
+# --out: Output directory (will be created if not exist)
 
-### Elastic Net only
-# cv: cv-fold cross-validation in model selection, default 5-fold
-# alpha: L1 & L2 ratio for elastic net regression, default 0.5
-#        If alpha=0, lasso regression
-#        If alpha=1, ridge regression
+### Variables for fitting elastic_net gene expression prediction models only
+# --cv: Number of cross validation folds for tuning elastic-net penalty parameter (default 5)
+# --alpha: Fixed L1 & L2 penalty ratio for elastic-net model (default 0.5)
+#        If alpha=0, equivalent to lasso regression
+#        If alpha=1, equivalent to ridge regression
 
 ### DPR only
-# dpr: model using for DPR
-# ES: effect size (fixed/additive). Default is fixed.
+# --dpr: Bayesian inference algorithm used by DPR: "1" (Variational Bayesian) or "2" (MCMC)
+# --ES: Output effect size type: "fixed" (default) for fixed effects or "additive" for an addition of fixed and random effects)
 
 #############################################################################################################
 VARS=`getopt -o "" -a -l \
@@ -79,10 +79,13 @@ dpr_num=${dpr_num:-1} # 1 is for VB ; 2 is for MCMC
 ES=${ES:-"fixed"}
 thread=${thread:-1}
 
+#### Create output directory if not existed
+make -p ${out_dir}
+
 ##########################################################################################################
 # 1. Model Training & Prediction
 if [[ "$model"x == "elastic_net"x ]];then
-    echo "Using Elastic Net model for training."
+    echo "Train gene expression prediction models by Elastic-Net method..."
 
     ./Model_Train_Pred/Elastic_Net.sh \
     --model ${model} \
@@ -100,7 +103,7 @@ if [[ "$model"x == "elastic_net"x ]];then
     --thread ${thread} \
     --out_dir ${out_dir}
 elif [[ "$model"x == "DPR"x ]]; then
-    echo "Using DPR model for training."
+    echo "Train gene expression prediction models by Nonparametric Bayesian DPR method..."
 
     ./Model_Train_Pred/DPR.sh \
     --model ${model} \
@@ -118,5 +121,6 @@ elif [[ "$model"x == "DPR"x ]]; then
     --thread ${thread} \
     --out_dir ${out_dir}
 else
-    echo "Model not found."
+    echo "Warning: Please specify --model to be either elastic_net or DPR "
 fi
+

@@ -103,25 +103,54 @@ Example data provided here are generated artificially. All input files are tab d
 
 
 ### Example Usage 
-- Train gene expression imputation model
+- Train gene expression imputation model per chromosome
 
-Train DPR imputation model
-```
-./TIGAR_Model_Train.sh --model DPR \
---Gene_Exp ${Gene_Exp_train_file} --train_sample ${train_sample_path} \
---chr 1 --train_dir ${train_dir} \
---geno_train vcf --FT DS \
---out ${out_prefix}
-```
+	* Variables to specify
+		* `--model`: Gene expression prediction model: `elastic_net` or `DPR`
+		* `--Gene_Exp`: Path for Gene annotation and Expression file
+		* `--train_sampleID`: Path for a file with sampleIDs that will be used for training
+		* `--genofile`: Path for the training genotype file (bgzipped and tabixed) 
+		* `--chr`: Chromosome number need to be specified with respect to the genotype input data (default: `1`)
+		* `--genofile_tye`: Genotype file type: `vcf` or `dosage`
+		* `--Format`: Genotype format in VCF file that should be used: `GT` (default) for genotype data or `DS` for dosage data, only required if the input genotype file is of VCF file
+		* `--maf`: Minor Allele Frequency threshold (ranges from 0 to 1; default `0.01`) to exclude rare variants
+		* `--hwe`: Hardy Weinberg Equilibrium p-value threshold (default `0.00001`) to exclude variants that violated HWE
+		* `--window`: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression prediction model (default `1000000` for +- 1MB region around TSS)
+		* `--thread`: Number of threads for parallel computation (default `1`)
+		* `--out`: Output directory (will be created if not exist)
 
-Train Elastic-Net imputation model
-```
-./TIGAR_Model_Train.sh --model elastic_net \
---Gene_Exp ${Gene_Exp_train_file} --train_sample ${train_sample_path} \
---chr 1 --train_dir ${train_dir} \
---geno_train vcf --FT DS \
---out ${out_prefix}
-```
+
+	- Train nonparametric Bayesian DPR prediction model for gene expression
+
+	* Variables to specify for training nonparametric Bayesian DPR prediction model
+		* `--dpr`: Bayesian inference algorithm used by DPR: `1` (Variational Bayesian) or `2` (MCMC)
+		* `--ES`: Output effect size type: `fixed` (default) for fixed effects or `additive` for addition of fixed and random effects
+
+	* Example bash command
+		```
+		./TIGAR_Model_Train.sh --model DPR \
+		--Gene_Exp ${Gene_Exp_train_file} --train_sample ${train_sample_path} \
+		--chr 1 --train_dir ${train_dir} \
+		--geno_train vcf --FT DS \
+		--out ${out_prefix}
+		```
+
+	- Train Elastic-Net prediction model for gene expression
+	* Variables to specify for training Elastic-Net prediction model
+		* `--cv`: Number of cross validation folds for tuning elastic-net penalty parameter (default `5`)
+		* `--alpha`: Fixed L1 & L2 penalty ratio for elastic-net model (default `0.5`)
+			* If alpha=0, equivalent to lasso regression
+			* If alpha=1, equivalent to ridge regression
+
+	* Example bash command
+		```
+		./TIGAR_Model_Train.sh --model elastic_net \
+		--Gene_Exp ${Gene_Exp_train_file} --train_sample ${train_sample_path} \
+		--chr 1 --train_dir ${train_dir} \
+		--geno_train vcf --FT DS \
+		--out ${out_prefix}
+		```
+
 
 - Predict GReX
 ```

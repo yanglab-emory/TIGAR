@@ -1,25 +1,26 @@
 #########
-cd /home/jyang/GIT/TIGAR
+
+## Go to TIGAR tool directory
+# cd /home/jyang/GIT/TIGAR
 
 Gene_Exp_train_file="./example_data/Gene_Exp.txt"
 train_sample_ID_file="./example_data/sampleID.txt"
 genofile="./example_data/example.vcf.gz"
 out_dir="./example_data/output"
-mkdir -p ${out_dir}
 
 mafval=0.01
 hweval=0.00001
 
-module load Anaconda3/4.2.0
-conda activate myenv
-export PYTHONPATH=/home/rparrish/.conda/envs/myenv/lib/python3.5/site-packages/:$PYTHONPATH
+### Load Anaconda3 module, set up PATHONPATH to include required libraries
+# module load Anaconda3/4.2.0
+# conda activate myenv
+# export PYTHONPATH=/home/rparrish/.conda/envs/myenv/lib/python3.5/site-packages/:$PYTHONPATH
 
 ./TIGAR_Model_Train.sh --model DPR \
 --Gene_Exp ${Gene_Exp_train_file} \
 --train_sampleID ${train_sample_ID_file} \
---chr 1 --genofile_type vcf \
---genofile ${genofile} \
---Format GT \
+--genofile ${genofile} --chr 1 \
+--genofile_type vcf --Format GT \
 --maf ${mafval} \
 --hwe ${hweval} \
 --out_dir ${out_dir}
