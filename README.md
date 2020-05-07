@@ -1,7 +1,7 @@
 ## TIGAR
 **TIGAR** stands for **Transcriptome-Integrated Genetic Association Resource**, which is developed using *Python* and *BASH* scripts for conducting **Transcriptome-Wide Association Studies (TWAS)** by training gene expression imputation models by **nonparametric Bayesian Dirichlet Process Regression (DPR)** method with reference dataset. 
 
-1. **TIGAR** can train gene expression imputation models by both **Elastic-Net (PrediXcan)** and **nonparametric DPR** methods with reference dataset that contain transcriptomic and genetic data of the same samples.
+1. **TIGAR** can train gene expression imputation models by both **Elastic-Net (PrediXcan)** and **nonparametric Bayesian DPR** methods with reference dataset that contain transcriptomic and genetic data of the same samples.
 2. Impute **Genetically Regulated gene eXpression (GReX)** from *Individual-level* genetic data
 3. Conduct **TWAS** using both *Individual-level* and *Summary-level* GWAS data for *Univariate* and *Multivariate* phenotypes.
 
@@ -10,7 +10,7 @@
 #### 1. Setup Executable Files
 - Change all `*.sh` and `*.py` files into executable files
 	```
-	cd ${TIGAR_directory}
+	cd [TIGAR_directory]
 	chmod 755 *.sh ./Model_Train_Pred/*.sh ./Model_Train_Pred/*.py ./Model_Train_Pred/DPR ./TWAS/*.sh ./TWAS/*.py
 	```
 - Add the executable file `./Model_Train_Pred/DPR` to your `${PATH}` directory. 
@@ -29,11 +29,11 @@
    - multiprocess
 
 ### Input Files
-Example input files provided under `./example_data/` are generated artificially. All input files are **Tab Delimited Text Files**.
+Example input files provided under `./example_data/` are generated artificially. All input files are *Tab Delimited Text Files*.
 
 
 #### 1. Gene Expression File (`./example_data/Gene_Exp.txt`)
-- First 5 columns are Chromosome number, Gene start position, Gene end position, Target gene ID, Gene name (optional, could be the same as Target gene ID).
+- First 5 columns are *Chromosome number, Gene start position, Gene end position, Target gene ID, Gene name* (optional, could be the same as Target gene ID).
 - Gene expression data start from the 6th column. Each column denotes the corresponding gene expression value per sample. 
 
 | CHROM | GeneStart | GeneEnd |   TargetID      | GeneName | Sample1 | Sample...|
@@ -42,26 +42,26 @@ Example input files provided under `./example_data/` are generated artificially.
 
 
 #### 2. Genotype File
-	i. [VCF](http://www.internationalgenome.org/wiki/Analysis/Variant%20Call%20Format/vcf-variant-call-format-version-40/) file (`./example_data/example.vcf.gz`)
-		- Sorted by chromosome and base pair position, bgzipped by `bgzip`, and tabixed by `tabix`.
-		- Example tabix command for VCF file: `tabix -f -p vcf *.vcf.gz`.
-		- First 9 columns are Chromosome number, Base pair position, Variant ID, Reference allele, Alternative allele, Quality score, Filter status, Variant information, Genotype data format
-		- Genotype data start from the 10th column. Each column denotes the genotype data per sample.
+- [VCF](http://www.internationalgenome.org/wiki/Analysis/Variant%20Call%20Format/vcf-variant-call-format-version-40/) file (`./example_data/example.vcf.gz`)
+	- Sorted by chromosome and base pair position, bgzipped by `bgzip`, and tabixed by `tabix`.
+	- Example tabix command for VCF file: `tabix -f -p vcf *.vcf.gz`.
+	- First 9 columns are Chromosome number, Base pair position, Variant ID, Reference allele, Alternative allele, Quality score, Filter status, Variant information, Genotype data format
+	- Genotype data start from the 10th column. Each column denotes the genotype data per sample.
 
-		| CHROM | POS |  ID | REF | ALT | QUAL | FILTER | INFO | FORMAT |  Sample1 | Sample...|
-		|:-----:|:---:|:---:|:---:|:---:|:----:|:------:|:----:|:------:|:--------:|:--------:|
-		|   1   | 100 | rs1 |  C  |  T  |   .  |  PASS  |   .  |  GT:DS | 0/0:0.01 |    ...   |
+	| CHROM | POS |  ID | REF | ALT | QUAL | FILTER | INFO | FORMAT |  Sample1 | Sample...|
+	|:-----:|:---:|:---:|:---:|:---:|:----:|:------:|:----:|:------:|:--------:|:--------:|
+	|   1   | 100 | rs1 |  C  |  T  |   .  |  PASS  |   .  |  GT:DS | 0/0:0.01 |    ...   |
 
-	ii. Dosage file
-		- The first 5 columns are of the same format as VCF file.
-		- Dosage genotype data start from the 6th column that are values ranging from 0 to 2, denoting the number of minor alleles. Each column denotes the genotype data per sample.
+- Dosage file
+	- The first 5 columns are of the same format as VCF file.
+	- Dosage genotype data start from the 6th column that are values ranging from 0 to 2, denoting the number of minor alleles. Each column denotes the genotype data per sample.
 
-		| CHROM | POS |  ID | REF | ALT | Sample1 | Sample...|
-		|:-----:|:---:|:---:|:---:|:---:|:-------:|:--------:|
-		|   1   | 100 | rs** |  C  |  T  |   0.01  |    ...   |
+	| CHROM | POS |  ID | REF | ALT | Sample1 | Sample...|
+	|:-----:|:---:|:---:|:---:|:---:|:-------:|:--------:|
+	|   1   | 100 | rs** |  C  |  T  |   0.01  |    ...   |
 
 #### 3. Phenotype File: [PED](http://zzz.bwh.harvard.edu/plink/data.shtml#ped) (`./example_data/example_PED.ped`)
-- First five columns are *Family ID, Individual ID, Paternal ID, Maternal ID, Sex (1=male; 2=female; other=unknown)*. The combination of family and individual ID should uniquely identify a person.
+- First five columns are *Family ID, Individual ID, Paternal ID, Maternal ID, Sex* (1=male; 2=female; other=unknown). The combination of family and individual ID should uniquely identify a person.
 - Phenotype is the *Sixth* column. A PED file must have 1 and only 1 phenotype in the *Sixth* column.  
 - Other covariates start from the *Seventh* column
 
@@ -119,7 +119,7 @@ Example input files provided under `./example_data/` are generated artificially.
 
 
 ### Example Usage 
-#### 1. Train gene expression imputation models per chromosome using reference data that have both profiled gene expression and genotype data of the same samples
+#### 1. Train gene expression imputation models per chromosome
 
 - Variables to specify
 	- `--model`: Gene expression imputation model: `elastic_net` or `DPR`
@@ -136,8 +136,7 @@ Example input files provided under `./example_data/` are generated artificially.
 	- `--out`: Output directory (will be created if not exist)
 
 
-- Train nonparametric Bayesian DPR imputation model
-
+- Train *nonparametric Bayesian DPR* imputation model
 	- Variables to specify for training nonparametric Bayesian DPR imputation model
 		- `--dpr`: Bayesian inference algorithm used by DPR: `1` (Variational Bayesian) or `2` (MCMC)
 		- `--ES`: Output effect size type: `fixed` (default) for fixed effects or `additive` for addition of fixed and random effects
@@ -150,7 +149,7 @@ Example input files provided under `./example_data/` are generated artificially.
 			--out ${out_prefix}
 			```
 
-- Train Elastic-Net imputation model
+- Train *Elastic-Net* imputation model
 	- Variables to specify for training Elastic-Net imputation model
 		- `--cv`: Number of cross validation folds for tuning elastic-net penalty parameter (default `5`)
 		- `--alpha`: Fixed L1 & L2 penalty ratio for elastic-net model (default `0.5`)
