@@ -151,7 +151,7 @@ Example input files provided under `./example_data/` are generated artificially.
 		- `--ES`: Output effect size type: `fixed` (default) for fixed effects or `additive` for additive fixed and random effects
 	- Example bash command
 ```
-# setup input file paths
+# Setup input file paths
 Gene_Exp_train_file="./example_data/Gene_Exp.txt"
 train_sample_ID_file="./example_data/sampleID.txt"
 genofile="./example_data/example.vcf.gz"

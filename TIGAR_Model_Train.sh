@@ -31,17 +31,6 @@
 # --dpr: Bayesian inference algorithm used by DPR: "1" (Variational Bayesian) or "2" (MCMC)
 # --ES: Output effect size type: "fixed" (default) for fixed effects or "additive" for an addition of fixed and random effects)
 
-######### Setting Default Values ########################
-thread=${thread:-1}
-maf=${maf:-0.01}
-hwe=${hwe:-0.00001}
-window=${window:-$((10**6))}
-cv=${cv:-5}
-alpha=${alpha:-0.5}
-dpr_num=${dpr_num:-1} # 1 is for VB ; 2 is for MCMC
-ES=${ES:-"fixed"}
-thread=${thread:-1}
-
 #################################
 
 VARS=`getopt -o "" -a -l \
@@ -80,7 +69,16 @@ do
         esac
 done
 
-
+######### Setting Default Values ########################
+thread=${thread:-1}
+maf=${maf:-0.01}
+hwe=${hwe:-0.00001}
+window=${window:-$((10**6))}
+cv=${cv:-5}
+alpha=${alpha:-0.5}
+dpr_num=${dpr_num:-1} # 1 is for VB ; 2 is for MCMC
+ES=${ES:-"fixed"}
+thread=${thread:-1}
 
 #### Create output directory if not existed
 make -p ${out_dir}

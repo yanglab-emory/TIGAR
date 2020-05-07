@@ -1,6 +1,6 @@
 #/usr/bin/env python
 
-###############################################################################################
+################################################################
 # Import packages needed
 import argparse
 import time
@@ -20,11 +20,11 @@ import scipy.stats as stats
 
 import multiprocessing
 
-#################################################################################################
+############################################################
 ### time calculation
 start_time=time.clock()
 
-#################################################################################################
+############################################################
 
 # Construct Dataframe for Analysis
 
@@ -47,9 +47,9 @@ def geno_reform(data,Format):
         data[(data==".")]=nan
     return data
 
-### Calculating p-value for Hardy Weinberg Equilibrium exact test
+###### Calculating p-value for Hardy Weinberg Equilibrium exact test
 
-### gij denote value for gene variance for jth samples in ith SNPs
+### gij denote number of minor alleles for ith SNP and jth sample
 ### 0 <= gij< 0.5 denote as 0
 ### 0.5 <= gij < 1.5 denote as 1
 ### 1.5 <= gij <2 denote as 2
@@ -149,17 +149,17 @@ def p_HWE(data):
     return p_hwe
 
 
-### For vcf input
-### Split input dataframe by Format. ex, '0|0:0.128'
+### For VCF genotype file
+### Parse genotype input by specified data Format. ex, '0|0:0.128'
 ### Input:
-### 1. data:The first nine columns fixed
+### 1. data:First nine columns are fixed
 ### 2. Format: GT or DS
 
 ### Output:
 ### 1. The First six columns of output dataframe should be:
 ###    1) CHROM
 ###    2) POS
-###    3) ID (i.e. rsID)
+###    3) ID (SNPID provided by genotype input file, e.g., rsID)
 ###    4) REF
 ###    5) ALT
 ###    6) snpID (CHROM:POS:REF:ALT)
