@@ -1,75 +1,76 @@
 ## TIGAR
-**TIGAR** standing for **Transcriptome-Intergrated Genetic Association Resource**, which is developed using *Python* and *BASH* scripts. 
+**TIGAR** stands for **Transcriptome-Integrated Genetic Association Resource**, which is developed using *Python* and *BASH* scripts for conducting **Transcriptome-Wide Association Studies (TWAS)** by training gene expression imputation models by **nonparametric Bayesian Dirichlet Process Regression (DPR)** method with reference dataset. 
 
-1. **TIGAR** can fit both **Elastic-Net** and **nonparametric Beyesian Dirichlet Process Regression (DPR)** models for predicting gene expression with reference panel.
-2. Impute **Genetically Regulated gene eXpression (GReX)** from *Individual-level* genotype data
-3. Conduct **Transcriptome-Wide Association Studies (TWAS)** using both *Individual-level* and *Summary-level* GWAS data for *Univariate* and *Multivariate* phenotypes.
+1. **TIGAR** can train gene expression imputation models by both **Elastic-Net (PrediXcan)** and **nonparametric DPR** methods with reference dataset that contain transcriptomic and genetic data of the same samples.
+2. Impute **Genetically Regulated gene eXpression (GReX)** from *Individual-level* genetic data
+3. Conduct **TWAS** using both *Individual-level* and *Summary-level* GWAS data for *Univariate* and *Multivariate* phenotypes.
 
 ### Software Setup
 
 #### 1. Setup Executable Files
 - Change all `*.sh` and `*.py` files into executable files
 	```
+	cd ${TIGAR_directory}
 	chmod 755 *.sh ./Model_Train_Pred/*.sh ./Model_Train_Pred/*.py ./Model_Train_Pred/DPR ./TWAS/*.sh ./TWAS/*.py
 	```
-- Add the executable file `./Model_Train_Pred/DPR` to your linux `${PATH}` directory. 
-	Assuming `~/bin/` is a directory added to your `${PATH}` environmental variable, you can accomodate the following example command
+- Add the executable file `./Model_Train_Pred/DPR` to your `${PATH}` directory. 
+	Assuming `~/bin/` is a directory added to your `${PATH}`, you can accommodate the following example command
 	```
 	cp ./Model_Train_Pred/DPR ~/bin/
 	```
 
 #### 2. Install BGZIP, TABIX, Python 3.5 and the following python libraries
-- BGZIP: http://www.htslib.org/doc/bgzip.html 
-- TABIX: http://www.htslib.org/doc/tabix.html 
+- [BGZIP](http://www.htslib.org/doc/bgzip.html) 
+- [TABIX](http://www.htslib.org/doc/tabix.html) 
 - python 3.5 
    - dfply
    - io
    - subprocess
    - multiprocess
 
-### Input File Format
-Example data provided here are generated artificially. All input files are **Tab Delimited Text Files**.
+### Input Files
+Example input files provided under `./example_data/` are generated artificially. All input files are **Tab Delimited Text Files**.
 
 
 #### 1. Gene Expression File (`./example_data/Gene_Exp.txt`)
-- First 5 columns specify chromosome number, gene start position, gene end position, target gene ID, gene name (optional, could be the same as gene ID).
-- Sample gene expression data start from the 6th column. 
+- First 5 columns are Chromosome number, Gene start position, Gene end position, Target gene ID, Gene name (optional, could be the same as Target gene ID).
+- Gene expression data start from the 6th column. Each column denotes the corresponding gene expression value per sample. 
 
-| CHROM | GeneStart | GeneEnd |   TargetID      | GeneName | sample1 | sample...|
+| CHROM | GeneStart | GeneEnd |   TargetID      | GeneName | Sample1 | Sample...|
 |:-----:|:---------:|:-------:|:---------------:|:--------:|:-------:|:--------:|
 |   1   |    100    |   200   |     ENSG0000    |     X    |   0.2   |     ...  |
 
 
 #### 2. Genotype File
-	i. VCF file (`./example_data/example.vcf.gz`)
+	i. [VCF](http://www.internationalgenome.org/wiki/Analysis/Variant%20Call%20Format/vcf-variant-call-format-version-40/) file (`./example_data/example.vcf.gz`)
+		- Sorted by chromosome and base pair position, bgzipped by `bgzip`, and tabixed by `tabix`.
+		- Example tabix command for VCF file: `tabix -f -p vcf *.vcf.gz`.
+		- First 9 columns are Chromosome number, Base pair position, Variant ID, Reference allele, Alternative allele, Quality score, Filter status, Variant information, Genotype data format
+		- Genotype data start from the 10th column. Each column denotes the genotype data per sample.
 
-		- Sorted by chromosome and base pair position, zipped by `bgzip`, and tabixed.
-		- Example tabix commond, `tabix -f -p vcf *.vcf.gz`.
-		- Genotype data start from the 10th column.
-		- More information about VCF file format: http://www.internationalgenome.org/wiki/Analysis/Variant%20Call%20Format/vcf-variant-call-format-version-40/
-
-		| CHROM | POS |  ID | REF | ALT | QUAL | FILTER | INFO | FORMAT |  sample1 | sample...|
+		| CHROM | POS |  ID | REF | ALT | QUAL | FILTER | INFO | FORMAT |  Sample1 | Sample...|
 		|:-----:|:---:|:---:|:---:|:---:|:----:|:------:|:----:|:------:|:--------:|:--------:|
 		|   1   | 100 | rs1 |  C  |  T  |   .  |  PASS  |   .  |  GT:DS | 0/0:0.01 |    ...   |
 
 	ii. Dosage file
-
 		- The first 5 columns are of the same format as VCF file.
-		- Dosage genotype data start from the 6th column.
+		- Dosage genotype data start from the 6th column that are values ranging from 0 to 2, denoting the number of minor alleles. Each column denotes the genotype data per sample.
 
-		| CHROM | POS |  ID | REF | ALT | sample1 | sample...|
+		| CHROM | POS |  ID | REF | ALT | Sample1 | Sample...|
 		|:-----:|:---:|:---:|:---:|:---:|:-------:|:--------:|
-		|   1   | 100 | rs1 |  C  |  T  |   0.01  |    ...   |
+		|   1   | 100 | rs** |  C  |  T  |   0.01  |    ...   |
 
-#### 3. PED File (`./example_data/example_PED.ped`)
-- More informationa bout PED file format: http://zzz.bwh.harvard.edu/plink/data.shtml#ped
+#### 3. Phenotype File: [PED](http://zzz.bwh.harvard.edu/plink/data.shtml#ped) (`./example_data/example_PED.ped`)
+- First five columns are *Family ID, Individual ID, Paternal ID, Maternal ID, Sex (1=male; 2=female; other=unknown)*. The combination of family and individual ID should uniquely identify a person.
+- Phenotype is the *Sixth* column. A PED file must have 1 and only 1 phenotype in the *Sixth* column.  
+- Other covariates start from the *Seventh* column
 
 | FAM_ID | IND_ID | FAT_ID | MOT_ID | SEX | PHENO | COV1 | COV...|
 |:------:|:------:|:------:|:------:|:---:|:-----:|:---:|:---:|
 |   11A  |   11A  |    X   |    X   |  1  |  0.2  | 0.3 |...|
 
-#### 4. Asso_Info file (`./example_data/Asso_Info_*.txt`)
-- Two columns with the first column specifying the Phenotype (P) and Covariate variables (C) from the PED file, and the second column specifying the corresponding variable names in the PED file. The variables specified in the Asso_Info file will be used in TWAS.
+#### 4. Association study Information File to specify column headers of phenotype and covariates for TWAS (`./example_data/Asso_Info_*.txt`)
+- Two columns with the first column specifying the Phenotype (P) and Covariate variables (C) from the PED file, and the second column specifying the corresponding column headers in the PED file. 
 
 |P|PHENO|
 |:-----:|:---:|
@@ -77,16 +78,20 @@ Example data provided here are generated artificially. All input files are **Tab
 |C|COV2|
 |C|SEX|
 
-#### 5.Zscore File (`./example_data/CHR1_GWAS_Zscore.txt.gz`)
-- Sorted by chromosome and base pair position, zipped by `bgzip`, and tabixed
-- Example tabix commond, `tabix -f -p vcf *_Zscore.txt.gz`. The first 4 columns are of the same format as VCF file.
+#### 5. Zscore File (`./example_data/CHR1_GWAS_Zscore.txt.gz`)
+- First 4 columns are of the same format as VCF file.
+- Zscore statistic value must be provided under the column header of `Zscore`.
+- Sorted by Chromosome and Base pair position, bgzipped by `bgzip`, and tabixed by `tabix`. Example tabix command, `tabix -f -p vcf *_Zscore.txt.gz`.
+
 
 | CHROM | POS | REF | ALT | Zscore |
 |:-----:|:---:|:---:|:---:|:------:|
 |   1   | 100 |  C  |  T  |  0.01  |
 
-#### 6. Genome block annotation file (`./example_data/block_annotation_EUR.txt`)
-- The block annotation file is a tab delimited text file with head row of `CHROM Start End File`, denoting the chromosome number, starting position, ending position, and corresponding reference VCF file name under specified `--geno_path`. Reference VCF files shall be of one per chromosome, or one for the whole genome-wide variants. Example block annotation file for European samples is provided `./TIGAR/example_data/block_annotation_EUR.txt`. 
+#### 6. Genome Block Annotation File (`./example_data/block_annotation_EUR.txt`)
+- Genome block annotation file need to be specified for generating LD coefficients of your reference data that can be used to conduct TWAS with summary-level GWAS statistics
+- A tab delimited text file with 4 columns `CHROM Start End File`, denoting the chromosome number, starting position, ending position, and corresponding reference VCF file name under specified `--geno_path`. 
+- Reference VCF files shall be of one file per Chromosome, or one file for all genome-wide variants. Example genome block annotation file for European samples is provided `./TIGAR/example_data/block_annotation_EUR.txt`. 
 
 | CHROM |   Start   |    End  |        File     |
 |:-----:|:---------:|:-------:|:---------------:|
@@ -94,18 +99,19 @@ Example data provided here are generated artificially. All input files are **Tab
 
 - Block annotation files of other ethnicities can be adopted from the genome segmentation generated by `LDetect`, https://bitbucket.org/nygcresearch/ldetect-data/src/master/.
 
-#### 7. Gene Annotation File (`./example_data/Gene_annotation.txt`)
+#### 7. Gene Annotation File to provide a list of genes for TWAS (`./example_data/Gene_annotation.txt`)
 - The same format as the first five columns of the Gene Expression File.
 
 | CHROM | GeneStart | GeneEnd |     TargetID    | GeneName | 
 |:-----:|:---------:|:-------:|:---------------:|:--------:|
 |   1   |    100    |   200   |     ENSG0000    |     X    |
 
-#### 8. Weight File used for TWAS with GWAS summary statistics (`./example_data/weight.txt`)
-- First 5 columns have to be of the following format, specifying chromosome number, base pair position, reference allele, alternative allele, and target gene ID. 
-
-- The column `ES` (Effect Size) denotes the weights for this given SNP/TargetGene
-
+#### 8. Variant Weight File used for TWAS with GWAS summary statistics (`./example_data/weight.txt`)
+- First 5 columns have to be of the following format, specifying *Chromosome number, Base pair position, Reference allele, Alternative allele, and Target gene ID*. 
+- Six column `ES` denotes variant weights (estimated eQTL effect sizes from reference dataset) with respect to the Target gene ID.
+- Each row denotes the variant weight per variant for testing the association of the Target gene ID.
+- Variants will be matched with those from Zscore file by their unique `CHROM:POS:REF:ALT`.
+- Headers must be the same as shown below:
 
 | CHROM | POS | REF | ALT |     TargetID    |  ES  |
 |:-----:|:---:|:---:|:---:|:---------------:|:----:|
@@ -113,10 +119,10 @@ Example data provided here are generated artificially. All input files are **Tab
 
 
 ### Example Usage 
-#### 1. Train gene expression prediction models per chromosome using reference data that have both profiled gene expression and genotype data of the same samples
+#### 1. Train gene expression imputation models per chromosome using reference data that have both profiled gene expression and genotype data of the same samples
 
 - Variables to specify
-	- `--model`: Gene expression prediction model: `elastic_net` or `DPR`
+	- `--model`: Gene expression imputation model: `elastic_net` or `DPR`
 	- `--Gene_Exp`: Path for Gene annotation and Expression file
 	- `--train_sampleID`: Path for a file with sampleIDs that will be used for training
 	- `--genofile`: Path for the training genotype file (bgzipped and tabixed) 
@@ -125,14 +131,14 @@ Example data provided here are generated artificially. All input files are **Tab
 	- `--Format`: Genotype format in VCF file that should be used: `GT` (default) for genotype data or `DS` for dosage data, only required if the input genotype file is of VCF file
 	- `--maf`: Minor Allele Frequency threshold (ranges from 0 to 1; default `0.01`) to exclude rare variants
 	- `--hwe`: Hardy Weinberg Equilibrium p-value threshold (default `0.00001`) to exclude variants that violated HWE
-	- `--window`: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression prediction model (default `1000000` for +- 1MB region around TSS)
+	- `--window`: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression imputation model (default `1000000` for +- 1MB region around TSS)
 	- `--thread`: Number of threads for parallel computation (default `1`)
 	- `--out`: Output directory (will be created if not exist)
 
 
-- Train nonparametric Bayesian DPR prediction model
+- Train nonparametric Bayesian DPR imputation model
 
-	- Variables to specify for training nonparametric Bayesian DPR prediction model
+	- Variables to specify for training nonparametric Bayesian DPR imputation model
 		- `--dpr`: Bayesian inference algorithm used by DPR: `1` (Variational Bayesian) or `2` (MCMC)
 		- `--ES`: Output effect size type: `fixed` (default) for fixed effects or `additive` for addition of fixed and random effects
 	- Example bash command
@@ -144,8 +150,8 @@ Example data provided here are generated artificially. All input files are **Tab
 			--out ${out_prefix}
 			```
 
-- Train Elastic-Net prediction model
-	- Variables to specify for training Elastic-Net prediction model
+- Train Elastic-Net imputation model
+	- Variables to specify for training Elastic-Net imputation model
 		- `--cv`: Number of cross validation folds for tuning elastic-net penalty parameter (default `5`)
 		- `--alpha`: Fixed L1 & L2 penalty ratio for elastic-net model (default `0.5`)
 			- If alpha=0, equivalent to lasso regression
