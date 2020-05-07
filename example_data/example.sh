@@ -1,7 +1,7 @@
 #########
 
 ## Go to TIGAR tool directory
-# cd /home/jyang/GIT/TIGAR
+cd /home/jyang/GIT/TIGAR
 
 Gene_Exp_train_file="./example_data/Gene_Exp.txt"
 train_sample_ID_file="./example_data/sampleID.txt"
@@ -12,9 +12,9 @@ mafval=0.01
 hweval=0.00001
 
 ### Load Anaconda3 module, set up PATHONPATH to include required libraries
-# module load Anaconda3/4.2.0
-# conda activate myenv
-# export PYTHONPATH=/home/rparrish/.conda/envs/myenv/lib/python3.5/site-packages/:$PYTHONPATH
+module load Anaconda3/4.2.0
+conda activate myenv
+export PYTHONPATH=/home/rparrish/.conda/envs/myenv/lib/python3.5/site-packages/:$PYTHONPATH
 
 ./TIGAR_Model_Train.sh --model DPR \
 --Gene_Exp ${Gene_Exp_train_file} \
