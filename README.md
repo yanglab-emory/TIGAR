@@ -142,21 +142,31 @@ Example input files provided under `./example_data/` are generated artificially.
 	- `--hwe`: Hardy Weinberg Equilibrium p-value threshold (default `0.00001`) to exclude variants that violated HWE
 	- `--window`: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression imputation model (default `1000000` for +- 1MB region around TSS)
 	- `--thread`: Number of threads for parallel computation (default `1`)
-	- `--out`: Output directory (will be created if not exist)
+	- `--out_dir`: Output directory (will be created if not exist)
 
 
 - Train *nonparametric Bayesian DPR* imputation model
 	- Variables to specify for training nonparametric Bayesian DPR imputation model
-		- `--dpr`: Bayesian inference algorithm used by DPR: `1` (Variational Bayesian) or `2` (MCMC)
-		- `--ES`: Output effect size type: `fixed` (default) for fixed effects or `additive` for addition of fixed and random effects
+		- `--dpr`: Bayesian inference algorithm used by DPR: `1` (Variational Bayesian, faster but may less accurate) or `2` (MCMC, slower but accurate)
+		- `--ES`: Output effect size type: `fixed` (default) for fixed effects or `additive` for additive fixed and random effects
 	- Example bash command
-			```
-			./TIGAR_Model_Train.sh --model DPR \
-			--Gene_Exp ${Gene_Exp_train_file} --train_sample ${train_sample_path} \
-			--chr 1 --train_dir ${train_dir} \
-			--geno_train vcf --FT DS \
-			--out ${out_prefix}
-			```
+```
+# setup input file paths
+Gene_Exp_train_file="./example_data/Gene_Exp.txt"
+train_sample_ID_file="./example_data/sampleID.txt"
+genofile="./example_data/example.vcf.gz"
+out_dir="./example_data/output"
+
+# Call TIGAR model training shell script
+./TIGAR_Model_Train.sh --model DPR \
+--Gene_Exp ${Gene_Exp_train_file} \
+--train_sampleID ${train_sample_ID_file} \
+--genofile ${genofile} --chr 1 \
+--genofile_type vcf --Format GT \
+--maf 0.01 \
+--hwe 0.0001 \
+--out_dir ${out_dir}
+```
 
 - Train *Elastic-Net* imputation model
 	- Variables to specify for training Elastic-Net imputation model
@@ -166,13 +176,13 @@ Example input files provided under `./example_data/` are generated artificially.
 			- If alpha=1, equivalent to ridge regression
 
 	- Example bash command
-			```
-			./TIGAR_Model_Train.sh --model elastic_net \
-			--Gene_Exp ${Gene_Exp_train_file} --train_sample ${train_sample_path} \
-			--chr 1 --train_dir ${train_dir} \
-			--geno_train vcf --FT DS \
-			--out ${out_prefix}
-			```
+```
+./TIGAR_Model_Train.sh --model elastic_net \
+--Gene_Exp ${Gene_Exp_train_file} --train_sample ${train_sample_path} \
+--chr 1 --train_dir ${train_dir} \
+--geno_train vcf --FT DS \
+--out ${out_prefix}
+```
 
 
 #### 2. Predict GReX
