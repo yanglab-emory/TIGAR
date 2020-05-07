@@ -1,13 +1,13 @@
 ## TIGAR
 **TIGAR** standing for **Transcriptome-Intergrated Genetic Association Resource**, which is developed using *Python* and *BASH* scripts. 
 
-1. **TIGAR** can fit both **Elastic-Net** and **nonparametric Beyesian Dirichlet Process Regression (DPR)** models for predicting gene expression with reference panel
-2. Impute **Genetically Regulated gene eXpression (GReX)** from individual-level genotype data
+1. **TIGAR** can fit both **Elastic-Net** and **nonparametric Beyesian Dirichlet Process Regression (DPR)** models for predicting gene expression with reference panel.
+2. Impute **Genetically Regulated gene eXpression (GReX)** from *Individual-level* genotype data
 3. Conduct **Transcriptome-Wide Association Studies (TWAS)** using both *Individual-level* and *Summary-level* GWAS data for *Univariate* and *Multivariate* phenotypes.
 
 ### Software Setup
 
-#### Setup Executable Files
+#### 1. Setup Executable Files
 - Change all `*.sh` and `*.py` files into executable files
 	```
 	chmod 755 *.sh ./Model_Train_Pred/*.sh ./Model_Train_Pred/*.py ./Model_Train_Pred/DPR ./TWAS/*.sh ./TWAS/*.py
@@ -18,7 +18,7 @@
 	cp ./Model_Train_Pred/DPR ~/bin/
 	```
 
-#### Install BGZIP, TABIX, Python 3.5 and the following python libraries
+#### 2. Install BGZIP, TABIX, Python 3.5 and the following python libraries
 - BGZIP: http://www.htslib.org/doc/bgzip.html 
 - TABIX: http://www.htslib.org/doc/tabix.html 
 - python 3.5 
@@ -41,25 +41,25 @@ Example data provided here are generated artificially. All input files are **Tab
 
 
 #### 2. Genotype File
-i. VCF file (`./example_data/example.vcf.gz`)
+	i. VCF file (`./example_data/example.vcf.gz`)
 
-	- Sorted by chromosome and base pair position, zipped by `bgzip`, and tabixed.
-	- Example tabix commond, `tabix -f -p vcf *.vcf.gz`.
-	- Genotype data start from the 10th column.
-	- More information about VCF file format: http://www.internationalgenome.org/wiki/Analysis/Variant%20Call%20Format/vcf-variant-call-format-version-40/
+		- Sorted by chromosome and base pair position, zipped by `bgzip`, and tabixed.
+		- Example tabix commond, `tabix -f -p vcf *.vcf.gz`.
+		- Genotype data start from the 10th column.
+		- More information about VCF file format: http://www.internationalgenome.org/wiki/Analysis/Variant%20Call%20Format/vcf-variant-call-format-version-40/
 
-	| CHROM | POS |  ID | REF | ALT | QUAL | FILTER | INFO | FORMAT |  sample1 | sample...|
-	|:-----:|:---:|:---:|:---:|:---:|:----:|:------:|:----:|:------:|:--------:|:--------:|
-	|   1   | 100 | rs1 |  C  |  T  |   .  |  PASS  |   .  |  GT:DS | 0/0:0.01 |    ...   |
+		| CHROM | POS |  ID | REF | ALT | QUAL | FILTER | INFO | FORMAT |  sample1 | sample...|
+		|:-----:|:---:|:---:|:---:|:---:|:----:|:------:|:----:|:------:|:--------:|:--------:|
+		|   1   | 100 | rs1 |  C  |  T  |   .  |  PASS  |   .  |  GT:DS | 0/0:0.01 |    ...   |
 
-ii. Dosage file
+	ii. Dosage file
 
-	- The first 5 columns are of the same format as VCF file.
-	- Dosage genotype data start from the 6th column.
+		- The first 5 columns are of the same format as VCF file.
+		- Dosage genotype data start from the 6th column.
 
-	| CHROM | POS |  ID | REF | ALT | sample1 | sample...|
-	|:-----:|:---:|:---:|:---:|:---:|:-------:|:--------:|
-	|   1   | 100 | rs1 |  C  |  T  |   0.01  |    ...   |
+		| CHROM | POS |  ID | REF | ALT | sample1 | sample...|
+		|:-----:|:---:|:---:|:---:|:---:|:-------:|:--------:|
+		|   1   | 100 | rs1 |  C  |  T  |   0.01  |    ...   |
 
 #### 3. PED File (`./example_data/example_PED.ped`)
 - More informationa bout PED file format: http://zzz.bwh.harvard.edu/plink/data.shtml#ped
@@ -113,7 +113,7 @@ ii. Dosage file
 
 
 ### Example Usage 
-#### 1. Train gene expression imputation model per chromosome
+#### 1. Train gene expression prediction models per chromosome using reference data that have both profiled gene expression and genotype data of the same samples
 
 - Variables to specify
 	- `--model`: Gene expression prediction model: `elastic_net` or `DPR`
@@ -130,7 +130,7 @@ ii. Dosage file
 	- `--out`: Output directory (will be created if not exist)
 
 
-- Train nonparametric Bayesian DPR prediction model for gene expression
+- Train nonparametric Bayesian DPR prediction model
 
 	- Variables to specify for training nonparametric Bayesian DPR prediction model
 		- `--dpr`: Bayesian inference algorithm used by DPR: `1` (Variational Bayesian) or `2` (MCMC)
@@ -144,7 +144,7 @@ ii. Dosage file
 			--out ${out_prefix}
 			```
 
-- Train Elastic-Net prediction model for gene expression
+- Train Elastic-Net prediction model
 	- Variables to specify for training Elastic-Net prediction model
 		- `--cv`: Number of cross validation folds for tuning elastic-net penalty parameter (default `5`)
 		- `--alpha`: Fixed L1 & L2 penalty ratio for elastic-net model (default `0.5`)
