@@ -9,15 +9,15 @@
 
 #### 1. Setup Executable Files
 - Change all `*.sh` and `*.py` files into executable files
-	```
-	cd [TIGAR_directory]
-	chmod 755 *.sh ./Model_Train_Pred/*.sh ./Model_Train_Pred/*.py ./Model_Train_Pred/DPR ./TWAS/*.sh ./TWAS/*.py
-	```
+```
+cd [TIGAR_directory]
+chmod 755 *.sh ./Model_Train_Pred/*.sh ./Model_Train_Pred/*.py ./Model_Train_Pred/DPR ./TWAS/*.sh ./TWAS/*.py
+```
 - Add the executable file `./Model_Train_Pred/DPR` to your `${PATH}` directory. 
 	Assuming `~/bin/` is a directory added to your `${PATH}`, you can accommodate the following example command
-	```
-	cp ./Model_Train_Pred/DPR ~/bin/
-	```
+```
+cp ./Model_Train_Pred/DPR ~/bin/
+```
 
 #### 2. Install BGZIP, TABIX, Python 3.5 and the following python libraries
 - [BGZIP](http://www.htslib.org/doc/bgzip.html) 
