@@ -1,1 +1,0 @@
-CHROM	GeneStart	GeneEnd	TargetID	GeneName	sample_size	n_snp	n_effect_snp	CVR2	TrainPVALUE	TrainR2	k-fold	alpha	Lambda	cvm
