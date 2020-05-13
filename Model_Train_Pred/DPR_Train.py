@@ -221,7 +221,7 @@ def CHR_Reform_DS(data,p_hwe,maf):
 
     return data >> mask((data.p_HWE > p_hwe)&(data.MAF > maf))
 
-#######################################################################################################################
+###################################################################
 
 ### Merge SNPs information with Gene Expression Level by sampleID
 
@@ -239,7 +239,7 @@ def Info_Gene(Chr,Exp):
 
     return info,sampleID
 
-#######################################################################################################################
+############################################################
 ### variables need
 parser = argparse.ArgumentParser(description='manual to this script')
 
@@ -273,6 +273,9 @@ parser.add_argument('--maf',type=float,default=None)
 ### window
 parser.add_argument('--window',type=int,default=None)
 
+### cvR2
+parser.add_argument('--cvR2',type=int,default=None)
+
 ### model to run DPR
 parser.add_argument('--dpr',type=int,default=None)
 
@@ -285,24 +288,30 @@ parser.add_argument('--out_dir',type=str,default=None)
 args = parser.parse_args()
 
 ### check input command
-print("Gene annotation and Expressiop level file:"+args.Gene_Exp)
-print("Training sampleID file:"+args.train_sampleID)
-print("Chromosome number:"+str(args.chr))
-print("Number of thread:"+str(args.thread))
-print("Training file:"+args.train_geno_file)
-print(args.geno_colnames)
-if args.geno=='vcf':
-    print("Using "+args.Format+" Format for Training")
-elif args.geno=='dosage':
-    print("Using DS Format for Training.")
-print("window="+str(args.window))
-print("Threshold for MAF:"+str(args.maf))
-print("Threshold for p-value of HW test:"+str(args.hwe))
-print("Runing DPR Model with dpr="+str(args.dpr))
-print("Using effect-size:"+args.ES)
-print("Output dir:"+args.out_dir)
+print("********************************\n   Imput Arguments\n********************************\n")
+print("Gene Annotation and Expression file: "+args.Gene_Exp + "\n")
+print("Training sampleID file: "+args.train_sampleID+ "\n")
+print("Chromosome number: "+str(args.chr)+ "\n")
+print("Number of threads: "+str(args.thread)+ "\n")
+print("Training genotype file: "+args.train_geno_file+ "\n")
+print("Column names of genotype file:"+args.geno_colnames+ "\n")
 
-#####################################################################################################################
+if args.geno=='vcf':
+    print("VCF genotype file is used for training with genotype format : " + args.Format + "\n")
+elif args.geno=='dosage':
+    print("Dosage genotype file is used for Training."+ "\n")
+else:
+    raise SystemExit("Please specify input genotype file as either 'vcf' or 'dosage'."+ "\n")
+
+print("Gene region size : window ="+str(args.window)+ "\n")
+print("Evaluate DPR model by 5-fold cross validation : cvR2 = "+str(args.cvR2) + "\n")
+print("Threshold for MAF: "+str(args.maf)+ "\n")
+print("Threshold for HWE p-value : "+str(args.hwe)+ "\n")
+print("Runing DPR Model : dpr="+str(args.dpr)+ "\n")
+print("Output Effect-size type : "+args.ES+ "\n")
+print("Output directory : "+args.out_dir+ "\n")
+print("********************************\n\n")
+#################################################################################
 # Prepare DPR input
 
 ### Read in Gene annotation and Expression level file (text file)
@@ -320,20 +329,25 @@ Gene_Exp.columns = Gene_header
 train_sampleID = pd.read_csv(args.train_sampleID,sep='\t',header=None)
 train_sampleID = np.array(train_sampleID).ravel()
 
-### seperate sampleIDs for cross validation
-CV_trainID = []
-CV_testID = []
+### Split sampleIDs for cross validation
+if (args.cvR2 == 1):
+    print("Evaluate DPR model by average R2 of 5-fold cross validation ... "+ "\n")
+    print("Split sample IDs randomly into 5 folds ..."+ "\n")
+    CV_trainID = []
+    CV_testID = []
 
-kf=KFold(n_splits=5)
-for train_index,test_index in kf.split(train_sampleID):
-    CV_trainID.append(np.array(','.join(train_sampleID[train_index])))
-    CV_testID.append(np.array(','.join(train_sampleID[test_index])))
+    kf=KFold(n_splits=5)
+    for train_index,test_index in kf.split(train_sampleID):
+        CV_trainID.append(np.array(','.join(train_sampleID[train_index])))
+        CV_testID.append(np.array(','.join(train_sampleID[test_index])))
 
-CV_trainID = pd.DataFrame(CV_trainID)
-CV_testID = pd.DataFrame(CV_testID)
+    CV_trainID = pd.DataFrame(CV_trainID)
+    CV_testID = pd.DataFrame(CV_testID)
 
-CV_trainID = CV_trainID.apply(lambda x:x.str.split(","))
-CV_testID = CV_testID.apply(lambda x:x.str.split(","))
+    CV_trainID = CV_trainID.apply(lambda x:x.str.split(","))
+    CV_testID = CV_testID.apply(lambda x:x.str.split(","))
+else:
+    print("Skip 5-fold cross validation ...")
 
 ### Extract expression level by chromosome
 EXP = Gene_Exp >> mask(Gene_Exp['CHROM'].astype('str')==str(args.chr))
@@ -345,17 +359,18 @@ if len(EXP.CHROM)==0:
 geno_colnames=pd.read_csv(args.geno_colnames,sep='\t').rename(columns={'#CHROM':'CHROM'})
 
 ### Initialize output dataframe
+
 param_out=pd.DataFrame(columns=['CHROM','POS','REF','ALT','TargetID','n_miss',
                                 'b','beta','ES','gamma','p_HWE','MAF'])
 
-param_out.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_DPR_training_param.txt',
-                 sep='\t',header=True,index=None,mode='a')
+param_out.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_DPR_train_eQTLweights.txt',
+                 sep='\t',header=True,index=None,mode='w')
 
 Info_out=pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName',
-                               'snp_size','effect_snp_size','sample_size','5-fold-CV-R2','TrainPVALUE','Train-R2'])
+                               'n_snp', 'n_effect_snp', 'sample_size','CVR2','TrainPVALUE','TrainR2'])
 
-Info_out.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_DPR_training_info.txt',
-                sep='\t',header=True,index=None,mode='a')
+Info_out.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_DPR_train_GeneInfo.txt',
+                sep='\t',header=True,index=None,mode='w')
 
 def thread_process(num):
     Exp_temp = pd.DataFrame(EXP.loc[num]).T
@@ -376,7 +391,7 @@ def thread_process(num):
         print("No corresponding vcf data for this Gene:"+TargetID)
 
     else:
-        print("Preparing DPR input for Gene:"+TargetID)
+        print("Preparing DPR input for Gene: " + TargetID +"\n")
 
         Chr_temp=pd.read_csv(StringIO(out.decode('utf-8')),sep='\t',header=None,low_memory=False)
         Chr_temp.columns=np.array(tuple(geno_colnames))
@@ -395,98 +410,97 @@ def thread_process(num):
 
         Info,sampleID = Info_Gene(Chrom,Exp_temp)
 
-        ### Evaluate vhether DPR model vaild
-        ### create bimbam file for 5-folds cross validation
-
-        CV_file_dir=args.out_dir+"/DPR_input/CV"
-        CV_output=args.out_dir+"/DPR_input"
-
-        k_fold_R2=[]
-        k_fold_R2.append(0)
-        for i in range(5):
-            trainID = np.intersect1d(np.array(CV_trainID.loc[i][0]),sampleID)
-            testID = np.intersect1d(np.array(CV_testID.loc[i][0]),sampleID)
-            
-            Info_trainCV = Info >> select(Info.snpID,Info.POS,Info.CHROM,Info.REF,Info.ALT,Info[trainID],Info.TargetID)
-            ### bimbam file
-            bimbam_train = (Info_trainCV 
-                            >> select(Info_trainCV.snpID,Info_trainCV.REF,Info_trainCV.ALT,Info_trainCV[trainID])).dropna(axis=0,how='any')
-            bimbam_train.to_csv(CV_file_dir+'/bimbam/'+TargetID+'_CV'+str(i+1)+'_bimbam.txt',
-                                header=False,index=None,sep='\t',mode='a')
-            ### phenotype file
-            pheno_train = (Info_trainCV 
-                           >> mask(Info_trainCV.TargetID==TargetID)>> drop(Info_trainCV.TargetID)).dropna(axis=1,how='any')
-            pheno_train.T.to_csv(CV_file_dir+'/pheno/'+TargetID+'_CV'+str(i+1)+'_pheno.txt',
-                                 header=False,index=None,sep='\t',mode='a')
-            ### SNP annotation file
-            SNP_annot_train = (Info_trainCV >> select(Info_trainCV.snpID,Info_trainCV.POS,Info_trainCV.CHROM)).dropna(axis=0,how='any')
-            SNP_annot_train.to_csv(CV_file_dir+'/SNP_annot/'+TargetID+'_CV'+str(i+1)+'_snp_annot.txt',
-                                   header=False,index=None,sep='\t',mode='a')
-            ### call DPR
-            TargetID_CV = TargetID+'_CV'+str(i+1)
-            stop_CV=0
-            try:
-                subprocess.check_call(shlex.split('./Model_Train_Pred/call_DPR.sh'+' '+CV_file_dir+' '+str(args.dpr)+' '+TargetID_CV+' '+CV_output))
-            except subprocess.CalledProcessError as err:
-                stop_CV=1
-                print("DPR failed in CV"+str(i+1)+" for TargetID:"+TargetID)
-                
-            if stop_CV==1:
-                continue
-            else:
-                ### Read in cross validation training result
-                result_CV = pd.read_csv(CV_output+'/output/DPR_'+TargetID_CV+'.param.txt',sep='\t').rename(columns={'rs':'snpID'})
-
-                ### overall effect size
-                if args.ES=='fixed':
-                    result_CV['ES'] = result_CV['beta']
-                elif args.ES=='additive':
-                    result_CV['ES'] = result_CV['b']+result_CV['beta']
-
-                result_CV = result_CV >> select(result_CV.snpID,result_CV.ES)
-            
-                ### calculate predicted value for test set
-                Info_testCV = Info >> select(Info.snpID,Info.POS,Info.CHROM,Info.REF,Info.ALT,Info[testID],Info.TargetID)
-                
-                bimbam_test = (Info_testCV 
-                               >> select(Info_testCV.snpID,Info_testCV[testID])).dropna(axis=0,how='any')
-                pheno_test = (Info_testCV 
-                              >> mask(Info_testCV.TargetID==TargetID)>> drop(Info_testCV.TargetID)).dropna(axis=1,how='any')
-                pheno_test = pheno_test.reset_index(drop=True)
-                pheno_test = pd.DataFrame(pheno_test,dtype=np.float) 
-
-                overall = bimbam_test.merge(result_CV,left_on='snpID',right_on='snpID',how='outer')
-                overall['ES'].fillna(0,inplace=True)
-
-                Ypred=np.array(mat(pd.DataFrame(overall[testID],dtype=np.float)).T*mat(overall.ES).reshape((len(overall.snpID),1))).ravel()
-
-                lm = sm.OLS(np.array(pheno_test.loc[0]),sm.add_constant(Ypred)).fit()
-                k_fold_R2.append(lm.rsquared)
         
-        if sum(k_fold_R2)/5 < 0.01:
-            print("DPR model is not valid for Gene:"+TargetID)
-            print(str(sum(k_fold_R2)/5))
-        
+        if (args.cvR2 == 1) :
+            ### create bimbam file for 5-folds cross validation
+            CV_file_dir=args.out_dir+"/CV_Files"
+
+            k_fold_R2=[]
+            k_fold_R2.append(0)
+            for i in range(5):
+                trainID = np.intersect1d(np.array(CV_trainID.loc[i][0]),sampleID)
+                testID = np.intersect1d(np.array(CV_testID.loc[i][0]),sampleID)
+                
+                Info_trainCV = Info >> select(Info.snpID,Info.POS,Info.CHROM,Info.REF,Info.ALT,Info[trainID],Info.TargetID)
+                ### bimbam file
+                bimbam_train = (Info_trainCV 
+                                >> select(Info_trainCV.snpID,Info_trainCV.REF,Info_trainCV.ALT,Info_trainCV[trainID])).dropna(axis=0,how='any')
+                bimbam_train.to_csv(CV_file_dir + "/" +TargetID+'_CV'+str(i+1)+'_bimbam.txt',
+                                    header=False,index=None,sep='\t',mode='w')
+                ### phenotype file
+                pheno_train = (Info_trainCV 
+                               >> mask(Info_trainCV.TargetID==TargetID)>> drop(Info_trainCV.TargetID)).dropna(axis=1,how='any')
+                pheno_train.T.to_csv(CV_file_dir+ "/"+TargetID+'_CV'+str(i+1)+'_pheno.txt',
+                                     header=False,index=None,sep='\t',mode='w')
+                ### SNP annotation file
+                SNP_annot_train = (Info_trainCV >> select(Info_trainCV.snpID,Info_trainCV.POS,Info_trainCV.CHROM)).dropna(axis=0,how='any')
+                SNP_annot_train.to_csv(CV_file_dir+ "/" +TargetID+'_CV'+str(i+1)+'_snp_annot.txt',
+                                       header=False,index=None,sep='\t',mode='w')
+                ### call DPR
+                TargetID_CV = TargetID+'_CV'+str(i+1)
+                stop_CV=0
+                try:
+                    subprocess.check_call(shlex.split('./Model_Train_Pred/call_DPR.sh'+' '+CV_file_dir+' '+str(args.dpr)+' '+TargetID_CV))
+                except subprocess.CalledProcessError as err:
+                    stop_CV=1
+                    print("DPR failed in CV"+str(i+1)+" for TargetID:"+TargetID)
+                    
+                if stop_CV==1:
+                    continue
+                else:
+                    ### Read in cross validation DPR training result
+                    result_CV = pd.read_csv(CV_file_dir + '/output/DPR_'+TargetID_CV+'.param.txt',sep='\t').rename(columns={'rs':'snpID'})
+
+                    ### overall effect size
+                    if args.ES=='fixed':
+                        result_CV['ES'] = result_CV['beta']
+                    elif args.ES=='additive':
+                        result_CV['ES'] = result_CV['b']+result_CV['beta']
+
+                    result_CV = result_CV >> select(result_CV.snpID,result_CV.ES)
+                
+                    ### calculate predicted value for test set
+                    Info_testCV = Info >> select(Info.snpID,Info.POS,Info.CHROM,Info.REF,Info.ALT,Info[testID],Info.TargetID)
+                    
+                    bimbam_test = (Info_testCV 
+                                   >> select(Info_testCV.snpID,Info_testCV[testID])).dropna(axis=0,how='any')
+                    pheno_test = (Info_testCV 
+                                  >> mask(Info_testCV.TargetID==TargetID)>> drop(Info_testCV.TargetID)).dropna(axis=1,how='any')
+                    pheno_test = pheno_test.reset_index(drop=True)
+                    pheno_test = pd.DataFrame(pheno_test,dtype=np.float) 
+
+                    overall = bimbam_test.merge(result_CV,left_on='snpID',right_on='snpID',how='outer')
+                    overall['ES'].fillna(0,inplace=True)
+
+                    Ypred=np.array(mat(pd.DataFrame(overall[testID],dtype=np.float)).T*mat(overall.ES).reshape((len(overall.snpID),1))).ravel()
+
+                    lm = sm.OLS(np.array(pheno_test.loc[0]),sm.add_constant(Ypred)).fit()
+                    k_fold_R2.append(lm.rsquared)
         else:
-            print("Running DPR training for Gene:"+TargetID)
-            print(str(sum(k_fold_R2)/5))
-            file_dir=args.out_dir+'/DPR_input'
-            print("Running model training for Gene:"+TargetID)
+            k_fold_R2=[0, 0, 0, 0, 0]
+            print("Skip evaluation by 5-fold CV R2 ..." + "\n")
+
+        if ((args.cvR2 == 1) & (sum(k_fold_R2)/5 < 0.005)):
+                print("Average R2 by 5-fold CV = " + str(sum(k_fold_R2)/5) + " , less than 0.005 for " + TargetID)
+                print("Skip running DPR for gene " + TargetID +"\n")
+        else:
+            print("Running DPR training for Gene:"+TargetID +"\n")
+            file_dir=args.out_dir+'/DPR_Files'
             bimbam = (Info >> select(Info.snpID,Info.REF,Info.ALT,Info[sampleID])).dropna(axis=0,how='any')
             
-            bimbam.to_csv(file_dir+'/bimbam/'+TargetID+'_bimbam.txt',
-                          header=False,index=None,sep='\t',mode='a')
+            bimbam.to_csv(file_dir+'/'+TargetID+'_bimbam.txt',
+                          header=False,index=None,sep='\t',mode='w')
             pheno = (Info >> mask(Info.TargetID==TargetID)>> drop(Info.TargetID)).dropna(axis=1,how='any')
-            pheno.T.to_csv(file_dir+'/pheno/'+TargetID+'_pheno.txt',
-                           header=False,index=None,sep='\t',mode='a')
+            pheno.T.to_csv(file_dir+'/'+TargetID+'_pheno.txt',
+                           header=False,index=None,sep='\t',mode='w')
             
             SNP_annot = (Info >> select(Info.snpID,Info.POS,Info.CHROM)).dropna(axis=0,how='any')
-            SNP_annot.to_csv(file_dir+'/SNP_annot/'+TargetID+'_snp_annot.txt',
-                             header=False,index=None,sep='\t',mode='a')
+            SNP_annot.to_csv(file_dir+'/'+TargetID+'_snp_annot.txt',
+                             header=False,index=None,sep='\t',mode='w')
             
             stop_DPR=0
             try:
-                subprocess.check_call(shlex.split('./Model_Train_Pred/call_DPR.sh'+' '+file_dir+' '+str(args.dpr)+' '+TargetID+' '+args.out_dir))
+                subprocess.check_call(shlex.split('./Model_Train_Pred/call_DPR.sh'+' '+file_dir+' '+str(args.dpr)+' '+TargetID ))
             except subprocess.CalledProcessError as err:
                 stop_DPR=1
                 print("DPR failed for TargetID:"+TargetID)
@@ -495,7 +509,7 @@ def thread_process(num):
                 Info_Train=pd.DataFrame()
                 Info_Train['TargetID']=np.array(TargetID).ravel()
                 
-                result=pd.read_csv(args.out_dir+'/output/DPR_'+TargetID+'.param.txt',sep='\t')
+                result=pd.read_csv(file_dir+'/output/DPR_'+TargetID+'.param.txt',sep='\t')
                 result['TargetID']=TargetID
 
                 if args.ES=='fixed':
@@ -503,10 +517,10 @@ def thread_process(num):
                 elif args.ES=='additive':
                     result['ES']=result['beta']+result['b']
 
-                Info_Train['snp_size']=np.array(len(result.ES)).ravel()
+                Info_Train['n_snp']=np.array(len(result.ES)).ravel()
                 ### only keep snps with ES!=0
                 result = result >> mask(result.ES!=0)
-                Info_Train['effect_snp_size']=np.array(len(result.ES)).ravel()
+                Info_Train['n_effect_snp']=np.array(len(result.ES)).ravel()
 
                 ### output DPR training result to a single file
                 result=result.rename(columns={'chr':'CHROM','rs':'snpID','ps':'POS'})
@@ -529,7 +543,7 @@ def thread_process(num):
                 param['CHROM'] = param['CHROM'].astype('int')
                 param['POS'] = param['POS'].astype('int')
 
-                param.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_DPR_training_param.txt',
+                param.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_DPR_train_eQTLweights.txt',
                              sep='\t',header=None,index=None,mode='a')
 
                 result = result >> select(result.snpID,result.ES)
@@ -555,9 +569,9 @@ def thread_process(num):
                 pheno_pred = np.array(mat(pred)*mat(pred_temp.ES).T).ravel()
 
                 lm_final = sm.OLS(np.array(pheno_pred),sm.add_constant(np.array(pheno.loc[0]))).fit()
-                Info_Train['5-fold-CV-R2'] = np.array(sum(k_fold_R2)/5).ravel()
+                Info_Train['CVR2'] = np.array(sum(k_fold_R2)/5).ravel()
                 Info_Train['TrainPVALUE'] = np.array(lm_final.f_pvalue).ravel()
-                Info_Train['Train-R2'] = np.array(lm_final.rsquared).ravel()
+                Info_Train['TrainR2'] = np.array(lm_final.rsquared).ravel()
 
                 Info = (Exp_temp
                         >> select(Exp_temp[['CHROM','GeneStart','GeneEnd',
@@ -565,10 +579,10 @@ def thread_process(num):
                                                                             left_on='TargetID',
                                                                             right_on='TargetID',
                                                                             how='outer')
-                Info.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_DPR_training_info.txt',
+                Info.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_DPR_train_GeneInfo.txt',
                             sep='\t',header=None,index=None,mode='a')
 
-################################################################################################################
+##############################################################
 ### Start thread
 if (args.thread < int(len(EXP)/100) | args.thread > len(EXP)):
     args.thread = (int(len(EXP)/100)+1)*100
@@ -580,10 +594,11 @@ pool.map(thread_process,[num for num in range(len(EXP))])
 pool.close()
 pool.join()
 
-#################################################################################################################
+############################################################
 ### time calculation
 time=round((time.clock()-start_time)/60,2)
 
-print(str(time)+' minutes')
+# print("Computation time: " + str(time)+' minutes')
+
 
 

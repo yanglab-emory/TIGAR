@@ -1,9 +1,10 @@
 #!/usr/bin/bash
 
 #########################################################
-####### Required software
-# python 3
-# tabix
+#### Required software
+#       -python 3
+#       -tabix
+#       -DPR
 #########################################################
 
 # Variable needed for training
@@ -18,6 +19,7 @@
 # --maf: Minor Allele Frequency threshold (ranges from 0 to 1; default 0.01) to exclude rare variants
 # --hwe: Hardy Weinberg Equilibrium p-value threshold (default 0.00001) to exclude variants that violated HWE
 # --window: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression prediction model (default 1000000 for +- 1MB region around TSS)
+# --cvR2: Take value 0 for calculating training R2 from fitted model and 1 for calculating training R2 from 5-fold cross validation
 # --thread: Number of threads for parallel computation (default 1)
 # --out_dir: Output directory (will be created if not exist)
 
@@ -32,9 +34,8 @@
 # --ES: Output effect size type: "fixed" (default) for fixed effects or "additive" for an addition of fixed and random effects)
 
 #################################
-
 VARS=`getopt -o "" -a -l \
-model:,Gene_Exp:,train_sampleID:,chr:,genofile_type:,genofile:,Format:,maf:,hwe:,window:,cv:,alpha:,dpr:,ES:,thread:,out_dir: \
+model:,Gene_Exp:,train_sampleID:,chr:,genofile_type:,genofile:,Format:,maf:,hwe:,window:,cvR2:,cv:,alpha:,dpr:,ES:,thread:,out_dir: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -58,6 +59,7 @@ do
         --maf|-maf) maf=$2; shift 2;;
         --hwe|-hwe) hwe=$2; shift 2;;
         --window|-window) window=$2; shift 2;;
+        --cvR2|-cvR2) cvR2=$2; shift 2;;
         --cv|-cv) cv=$2; shift 2;;
         --alpha|-alpha) alpha=$2; shift 2;;
         --dpr|-dpr) dpr_num=$2; shift 2;;
@@ -69,11 +71,15 @@ do
         esac
 done
 
-######### Setting Default Values ########################
+##########################################
+# Setting Default Input Argument Values 
+##########################################
+
 thread=${thread:-1}
 maf=${maf:-0.01}
 hwe=${hwe:-0.00001}
 window=${window:-$((10**6))}
+cvR2=${cvR2:-1} 
 cv=${cv:-5}
 alpha=${alpha:-0.5}
 dpr_num=${dpr_num:-1} # 1 is for VB ; 2 is for MCMC
@@ -81,10 +87,37 @@ ES=${ES:-"fixed"}
 thread=${thread:-1}
 
 #### Create output directory if not existed
-make -p ${out_dir}
+mkdir -p ${out_dir}
 
-##########################################################################################################
-# 1. Model Training & Prediction
+# check tabix command
+if [ ! -x "$(command -v tabix)" ]; then
+    echo 'Error: required tool TABIX is not available.' >&2
+    exit 1
+fi
+
+# Check gene expression file
+if [ ! -f "${Gene_Exp}" ] ; then
+    echo Error: Gene expression file ${Gene_Exp} dose not exist or empty. >&2
+    exit 1
+fi
+
+# Check training sample ID file
+if [ ! -f "${train_sampleID}" ] ; then
+    echo Error: Training sample ID file ${train_sampleID} dose not exist or empty. >&2
+    exit 1
+fi
+
+# Check genotype file 
+if [ ! -f "${genofile}" ] ; then
+    echo Error: Training genotype file ${genofile} dose not exist or empty. >&2
+    exit 1
+fi
+
+
+####################################
+# 1. Model Training 
+####################################
+
 if [[ "$model"x == "elastic_net"x ]];then
     echo "Train gene expression imputation models by Elastic-Net method..."
 
@@ -99,28 +132,34 @@ if [[ "$model"x == "elastic_net"x ]];then
     --maf ${maf} \
     --hwe ${hwe} \
     --window ${window} \
+    --cvR2 ${cvR2} \
     --cv ${cv} \
     --alpha ${alpha} \
     --thread ${thread} \
     --out_dir ${out_dir}
 elif [[ "$model"x == "DPR"x ]]; then
     echo "Train gene expression imputation models by Nonparametric Bayesian DPR method..."
-
-    ./Model_Train_Pred/DPR.sh \
-    --model ${model} \
-    --Gene_Exp ${Gene_Exp} \
-    --train_sampleID ${train_sampleID} \
-    --chr ${chr} \
-    --genofile_type ${genofile_type} \
-    --genofile ${genofile} \
-    --Format ${Format} \
-    --maf ${maf} \
-    --hwe ${hwe} \
-    --window ${window} \
-    --dpr ${dpr_num} \
-    --ES ${ES} \
-    --thread ${thread} \
-    --out_dir ${out_dir}
+    if [ ! -x "$(command -v DPR)" ]; then
+        echo 'Error: please add DPR executible file into your PATH.' >&2
+        exit 1
+    else
+        ./Model_Train_Pred/DPR.sh \
+        --model ${model} \
+        --Gene_Exp ${Gene_Exp} \
+        --train_sampleID ${train_sampleID} \
+        --chr ${chr} \
+        --genofile_type ${genofile_type} \
+        --genofile ${genofile} \
+        --Format ${Format} \
+        --maf ${maf} \
+        --hwe ${hwe} \
+        --window ${window} \
+        --cvR2 ${cvR2} \
+        --dpr ${dpr_num} \
+        --ES ${ES} \
+        --thread ${thread} \
+        --out_dir ${out_dir}
+    fi
 else
     echo "Error: Please specify --model to be either elastic_net or DPR "
 fi

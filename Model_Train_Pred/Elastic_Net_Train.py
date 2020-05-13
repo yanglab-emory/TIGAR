@@ -29,15 +29,17 @@ from sklearn.metrics import r2_score
 import statsmodels.api as sm
 from scipy import stats
 
-###############################################################################################
+warnings.filterwarnings("ignore")
+
+######################################################
 ### time calculation
+###################################################
 start_time=time.clock()
 
-###############################################################################################
-warnings.filterwarnings("ignore")
-###############################################################################################
+
+####################################################
 # Construct Dataframe for Analysis
-###############################################################################################
+###################################################
 
 # Reform vcf file
 ### input each sample genotype
@@ -59,7 +61,7 @@ def geno_reform(data,Format):
         data[(data==".")]=nan
     return data
 
-################################################################################################
+###########################################################
 ### Calculating p-value for Hardy Weinberg Equilibrium exact test
 
 ### Input value:
@@ -145,11 +147,11 @@ def p_HWE(data):
     
     return p_hwe
 
-#######################################################################################################
-### For vcf input
-### Split input dataframe by Format. ex, '0|0:0.128'
+##########################################################
+### For vcf genotype file 
+### Split input genotype column by Format. ex, '0|0:0.128' for 'GT:DS'
 ### Input:
-### 1. data:The first nine columns fixed
+### 1. First nine columns fixed
 ### 2. Format: GT or DS
 
 ### Output:
@@ -194,15 +196,15 @@ def CHR_Reform_vcf(data,Format,p_hwe,maf):
     
     return CHR >> mask((CHR.p_HWE>=p_hwe)&(CHR.MAF>=maf))
 
-### For dosages input
+### For dosages genotype file 
 ### Input:
-### 1. data:The first five columns fixed
+### 1. First five columns fixed
 ###    1) CHROM
 ###    2) POS
 ###    3) ID (i.e. rsID)
 ###    4) REF
 ###    5) ALT
-### 2. Format: DS
+### 2. Format: DS (dosage)
 ### 3. Output dataframe will be selected by p_HWE and MAF:
 ###    Default threshold is p_HWE > 10**(-3) and MAF > 0.01
 def CHR_Reform_DS(data,p_hwe,maf):
@@ -224,13 +226,13 @@ def CHR_Reform_DS(data,p_hwe,maf):
     
     return data >> mask((data.p_HWE>=p_hwe)&(data.MAF>=maf))
 
-##############################################################################################
+#################################################################
 
 ### Merge SNPs information with Gene Expression Level by sampleID
 
 ### Output dataframe:
 ### sample ID as index
-### SNps & TargetID as columns
+### SNPs & TargetID as columns
 def Info_Gene(Chr,Exp):
     sampleID_temp = np.intersect1d(np.array(Chr.columns),np.array(Exp.columns))
     
@@ -252,7 +254,7 @@ def Info_Gene(Chr,Exp):
     
     return info,snpID,len(sampleID)
 
-########################################################################################
+##############################################################
 # Model Selection
 
 ### 5-folds cross validation R2 calculation
@@ -295,32 +297,36 @@ def elastic_net(trainX,trainY,k,Alpha):
 
     return reg.coef_,r2_score(trainY,Ypred),lm.f_pvalue,clf.best_params_['alpha'],clf.best_score_
 
-#########################################################################################
+#######################################################
 # Model Training
+#######################################################
 
-### variables need
+#######################################################
+# Parse input variables
+#######################################################
+
 parser = argparse.ArgumentParser(description='manual to this script')
 
-### for Gene annotation and Expression level file
-parser.add_argument('--Gene_Exp_path',type=str,default = None)
+### Gene Annotation and Expression level file
+parser.add_argument('--Gene_Exp',type=str,default = None)
 
-### for training sampleID
-parser.add_argument('--train_sample',type=str,default = None)
+### Training sampleID
+parser.add_argument('--train_sampleID',type=str,default = None)
 
-### specified chromosome number
-parser.add_argument('--chr_num',type=int,default = None)
+### Specified chromosome number
+parser.add_argument('--chr',type=int,default = None)
 
-### number of thread
+### Number of thread
 parser.add_argument('--thread',type=int,default = None)
 
-### training input
-parser.add_argument('--train_dir',type=str,default = None)
-parser.add_argument('--train_names',type=str,default = None)
+### Training genotype files
+parser.add_argument('--genofile',type=str,default = None)
+parser.add_argument('--geno_colnames',type=str,default = None)
 
-### specified input file type(vcf or dosages)
+### Specified input file type(vcf or dosages)
 parser.add_argument('--geno',type=str,default = None)
 
-### 'DS' or 'GT'
+### 'DS' or 'GT' for VCF genotype file
 parser.add_argument('--Format',type=str,default=None)
 
 ### for data selection
@@ -331,44 +337,51 @@ parser.add_argument('--hwe',type=float,default=None)
 ### window
 parser.add_argument('--window',type=int,default=None)
 
-### for model trainin
+### cvR2
+parser.add_argument('--cvR2',type=int,default=None)
+
+######### Specific for EN model training
 ### k-fold cross validation
 parser.add_argument('--cv',type=int,default=None)
+
 ### Ratio of L1 and L2
 parser.add_argument('--alpha',type=float,default=None)
 
 ### output dir
-parser.add_argument('--out_prefix',type=str,default=None)
+parser.add_argument('--out_dir',type=str,default=None)
 
 args = parser.parse_args()
-##############################################################################################
+###############################################################
 # variable checking
 
 ### Print all variables for model training
-print("Gene annotation and Expression data file:"+args.Gene_Exp)
-print("Training sampleID file:"+args.train_sampleID)
-print("Chrmosome number:"+str(args.chr))
-print("Number of computation thread:"+str(args.thread))
-print("Training geno file:"+args.genofile)
-print("Column names of genotype file:"+args.geno_colnames)
+print("********************************\n   Imput Arguments\n********************************\n")
+print("Gene Annotation and Expression data file : "+args.Gene_Exp + "\n")
+print("Training sampleID file : "+args.train_sampleID+ "\n")
+print("Chrmosome : "+str(args.chr)+ "\n")
+print("Training genotype file : "+args.genofile+ "\n")
+# print("Column names of genotype file:"+args.geno_colnames+ "\n")
 
 if args.geno=='vcf':
-    print("Using "+args.Format+" Format for Training")
+    print("VCF genotype file is used for training with genotype format : " + args.Format + "\n")
 elif args.geno=='dosage':
-    print("Using DS Format for Training.")
+    print("Dosage genotype file is used for Training."+ "\n")
 else:
-    raise SystemExit("Geno file can not identify.")
+    raise SystemExit("Please specify input genotype file as either 'vcf' or 'dosage'."+ "\n")
 
+print("Gene region size : window = "+str(args.window)+ "\n")
+print("Evaluate Elastic-Net model by 5-fold cross validation : cvR2 = "+str(args.cvR2) + "\n")
+print("Threshold for MAF :"+str(args.maf)+ "\n")
+print("Threshold for HWE p-value :"+str(args.hwe)+ "\n")
 
-print("output dir:"+args.out_prefix)
-print("Threshold for MAF:"+str(args.maf))
-print("Threshold for p-value of HW test:"+str(args.hwe))
-print("window="+str(args.window))
+print("Using "+str(args.cv)+"-fold for cross-validation to tune penalty parameter : lambda"+ "\n")
+print("The ratio for L1 & L2 penalty used by Elastic-Net regression: alpha = "+str(args.alpha)+ "\n")
 
-print("Using "+str(args.cv)+"-fold for cross-validation")
-print("L1 & L2 ratio in elastic net regression:"+str(args.alpha))
+print("Number of threads : "+str(args.thread)+ "\n")
+print("Output dir : "+args.out_dir+ "\n")
 
-########################################################################################
+print("********************************\n\n")
+###############################################################
 
 ### Training Processing
 
@@ -379,12 +392,12 @@ print("L1 & L2 ratio in elastic net regression:"+str(args.alpha))
 ### 3.GeneEnd Position
 ### 4.TargetID (i.e.GeneID, treated as unique annotation for each gene)
 ### 5.Gene Name
-Gene_Exp = pd.read_csv(args.Gene_Exp_path,sep='\t',low_memory=False)
+Gene_Exp = pd.read_csv(args.Gene_Exp,sep='\t',low_memory=False)
 Gene_header = np.array(Gene_Exp.columns)
 Gene_header[0:5] = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName']
 Gene_Exp.columns = Gene_header
 
-train_sampleID = pd.read_csv(args.train_sample,sep='\t',header=None)
+train_sampleID = pd.read_csv(args.train_sampleID,sep='\t',header=None)
 train_sampleID = np.array(train_sampleID).ravel()
 
 ### seperate sampleIDs for cross validation
@@ -403,27 +416,27 @@ CV_trainID = CV_trainID.apply(lambda x:x.str.split(","))
 CV_testID = CV_testID.apply(lambda x:x.str.split(","))
 
 ### Extract expression level by chromosome
-EXP = Gene_Exp >> mask(Gene_Exp['CHROM'].astype('str')==str(args.chr_num))
+EXP = Gene_Exp >> mask(Gene_Exp['CHROM'].astype('str')==str(args.chr))
 EXP = EXP >> select(EXP[Gene_Exp.columns[0:5]],EXP[train_sampleID])
 EXP = EXP.reset_index(drop=True)
 if len(EXP.CHROM)==0:
-    raise SystemExit("No training data.")
+    raise SystemExit("There is no gene expression data for given training samples.")
 
 ### Initialized output
 output_param=pd.DataFrame(columns=['CHROM','POS','ID','REF','ALT','TargetID','MAF','p_HWE','ES'])
 
-output_param.to_csv(args.out_prefix+'/CHR'+str(args.chr_num)+'_elastic_net_training_param.txt',
-                    header=True,index=None,sep='\t',mode='a')
+output_param.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_EN_train_eQTLweights.txt',
+                    header=True,index=None,sep='\t',mode='w')
 
 output_Info=pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName',
-                                  'sample_size','snp_size','effect_snp_size','5-fold-CV-R2','TrainPVALUE','Train-R2',
+                                  'sample_size','n_snp','n_effect_snp','CVR2','TrainPVALUE','TrainR2',
                                   'k-fold','alpha','Lambda','cvm'])
 
-output_Info.to_csv(args.out_prefix+'/CHR'+str(args.chr_num)+'_elastic_net_training_info.txt',
-                   header=True,index=None,sep='\t',mode='a')
+output_Info.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_EN_train_GeneInfo.txt',
+                   header=True,index=None,sep='\t',mode='w')
 
 ### Read in header for vcf file
-train_names=pd.read_csv(args.train_names,sep='\t').rename(columns={'#CHROM':'CHROM'})
+train_names=pd.read_csv(args.geno_colnames,sep='\t').rename(columns={'#CHROM':'CHROM'})
 
 def thread_process(num):
     Exp_temp=pd.DataFrame(EXP.loc[num]).T
@@ -433,14 +446,15 @@ def thread_process(num):
     end=max(int(Exp_temp.GeneEnd)+args.window,0)
 
     ### select corresponding vcf file by tabix
-    train_process=subprocess.Popen(["tabix"+" "+args.train_dir+" "+str(args.chr_num)+":"+str(start)+"-"+str(end)],
+    print("Loading genotype data for Gene: " + TargetID +"\n")
+    train_process=subprocess.Popen(["tabix"+" "+args.genofile+" "+str(args.chr)+":"+str(start)+"-"+str(end)],
                                    shell=True,
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
     out=train_process.communicate()[0]
     
     if len(out)==0:
-        print("No Training Data for this Gene:"+TargetID)
+        print("There is no genotype data for this Gene:"+TargetID+"\n")
 
     else:
         ### Recode subprocess output in 'utf-8'
@@ -450,13 +464,13 @@ def thread_process(num):
        
         if args.geno=='vcf':
             if args.Format not in unique(Chr_temp.FORMAT)[0].split(":"):
-                print("Format needed for training is not provided in input vcf file.")
+                print("Specified genotype format is not provided in the FORMAT column of VCF file.")
             else:
                 Chrom = CHR_Reform_vcf(Chr_temp,args.Format,args.hwe,args.maf)
         elif args.geno=='dosages':
             Chrom = CHR_Reform_DS(Chr_temp,args.hwe,args.maf)
         
-        print("Running training for Gene:"+TargetID)
+        print("Running 5-fold CV to tune Elastic-Net penalty parameter for Gene:"+TargetID+"\n")
         Information,SNPs,sample_size = Info_Gene(Chrom,Exp_temp)
         
         ### Evaluate whether Elastic Net model valid
@@ -468,12 +482,11 @@ def thread_process(num):
             k_fold_R2.append(CV_R2(Info_CV_train[SNPs],Info_CV_train[TargetID],
                              Info_CV_test[SNPs],Info_CV_test[TargetID],args.cv,args.alpha))
 
-        if sum(k_fold_R2)/5 < 0.01:
-            print("Elastic Net model is not valid for Gene:"+TargetID)
-            print(str(sum(k_fold_R2)/5))
-
+        if ( (args.cvR2 == 1) & (sum(k_fold_R2)/5 < 0.005) ):
+            print("Average R2 by 5-fold CV = " + str(sum(k_fold_R2)/5) + ", less than 0.005 for "+TargetID)
+            print("Skip running Elastic-Net regression model for gene " + TargetID +"\n")
         else:
-            print(str(sum(k_fold_R2)/5))
+            print("Train Elastic-Net imputation model for Gene:" + TargetID + "\n")
             Beta_temp=pd.DataFrame()
             
             Beta_temp['SNPs']=SNPs
@@ -494,7 +507,7 @@ def thread_process(num):
                               Beta.ALT,Beta.TargetID,Beta.MAF,Beta.p_HWE,Beta.beta))
             Beta=Beta.rename(columns={'beta':'ES'})
         
-            Beta.to_csv(args.out_prefix+'/CHR'+str(args.chr_num)+'_elastic_net_training_param.txt',
+            Beta.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_EN_train_eQTLweights.txt',
                         header=False,index=None,sep='\t',mode='a')
         
             ### Store training information
@@ -503,19 +516,19 @@ def thread_process(num):
         
             Info_Train['TargetID']=np.array(TargetID).ravel()
             Info_Train['sample_size']=sample_size
-            Info_Train['snp_size']=len(SNPs)
-            Info_Train['effect_snp_size']=len(Beta.ES)
-            Info_Train['5-fold-CV-R2'] = np.array(sum(k_fold_R2)/5).ravel()
+            Info_Train['n_snp']=len(SNPs)
+            Info_Train['n_effect_snp']=len(Beta.ES)
+            Info_Train['CVR2'] = np.array(sum(k_fold_R2)/5).ravel()
             Info_Train['TrainPVALUE'] = np.array(Pvalue).ravel()
             
             if len(Beta.ES)==0:
-                Info_Train['Train-R2']=0
+                Info_Train['TrainR2']=0
             else:
-                Info_Train['Train-R2']=R2
+                Info_Train['TrainR2']=R2
             
             Info_Train['k_fold']=args.cv
             Info_Train['alpha']=args.alpha
-            Info_Train['Lambda']=Lambda
+            Info_Train['lambda']=Lambda
             Info_Train['cvm']=cvm
             
             Info = (Exp_temp >> select(Exp_temp[['CHROM','GeneStart','GeneEnd',
@@ -523,7 +536,7 @@ def thread_process(num):
                                                                                  left_on='TargetID',
                                                                                  right_on='TargetID',
                                                                                  how='outer')
-            Info.to_csv(args.out_prefix+'/CHR'+str(args.chr_num)+'_elastic_net_training_info.txt',
+            Info.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_EN_train_GeneInfo.txt',
                         header=None,index=None,sep='\t',mode='a')
 
 ###############################################################################################################
@@ -542,7 +555,7 @@ pool.join()
 ### time calculation
 time=round((time.clock()-start_time)/60,2)
 
-print(str(time)+' minutes')
+# print(str(time)+' minutes')
 
 
 

@@ -23,16 +23,16 @@ cp ./Model_Train_Pred/DPR ~/bin/
 - [BGZIP](http://www.htslib.org/doc/bgzip.html) 
 - [TABIX](http://www.htslib.org/doc/tabix.html) 
 - Python 3.5 libraries
-   - dfply
-   - io
-   - subprocess
-   - multiprocess
+   - panda, numpy, dfply, io, argparse
+   - time, shlex, warnings
+   - subprocess, multiprocess
+   - sklearn, statsmodels, scipy
 
 ### Input Files
-Example input files provided under `./example_data/` are generated artificially. All input files are *Tab Delimited Text Files*.
+Example input files provided under `./ExampleData/` are generated artificially. All input files are *Tab Delimited Text Files*.
 
 
-#### 1. Gene Expression File (`./example_data/Gene_Exp.txt`)
+#### 1. Gene Expression File (`./ExampleData/Gene_Exp.txt`)
 - First 5 columns are *Chromosome number, Gene start position, Gene end position, Target gene ID, Gene name* (optional, could be the same as Target gene ID).
 - Gene expression data start from the 6th column. Each column denotes the corresponding gene expression value per sample. 
 
@@ -42,7 +42,7 @@ Example input files provided under `./example_data/` are generated artificially.
 
 
 #### 2. Genotype File
-- [VCF](http://www.internationalgenome.org/wiki/Analysis/Variant%20Call%20Format/vcf-variant-call-format-version-40/) file (`./example_data/example.vcf.gz`)
+- [VCF](http://www.internationalgenome.org/wiki/Analysis/Variant%20Call%20Format/vcf-variant-call-format-version-40/) file (`./ExampleData/example.vcf.gz`)
 	- Sorted by chromosome and base pair position, bgzipped by `bgzip`, and tabixed by `tabix`.
 	- Example tabix command for VCF file: `tabix -f -p vcf *.vcf.gz`.
 	- First 9 columns are Chromosome number, Base pair position, Variant ID, Reference allele, Alternative allele, Quality score, Filter status, Variant information, Genotype data format
@@ -60,7 +60,7 @@ Example input files provided under `./example_data/` are generated artificially.
 	|:-----:|:---:|:---:|:---:|:---:|:-------:|:--------:|
 	|   1   | 100 | rs** |  C  |  T  |   0.01  |    ...   |
 
-#### 3. Phenotype [PED](http://zzz.bwh.harvard.edu/plink/data.shtml#ped) File (`./example_data/example_PED.ped`)
+#### 3. Phenotype [PED](http://zzz.bwh.harvard.edu/plink/data.shtml#ped) File (`./ExampleData/example_PED.ped`)
 - First five columns are *Family ID, Individual ID, Paternal ID, Maternal ID, Sex* (1=male; 2=female; other=unknown). The combination of family and individual ID should uniquely identify a person.
 - Phenotype is the *Sixth* column. A PED file must have 1 and only 1 phenotype in the *Sixth* column.  
 - Other covariates start from the *Seventh* column
@@ -69,7 +69,7 @@ Example input files provided under `./example_data/` are generated artificially.
 |:------:|:------:|:------:|:------:|:---:|:-----:|:---:|:---:|
 |   11A  |   11A  |    X   |    X   |  1  |  0.2  | 0.3 |...|
 
-#### 4. Association Study Information File (`./example_data/Asso_Info_*.txt`)
+#### 4. Association Study Information File (`./ExampleData/Asso_Info_*.txt`)
 - Specify column headers of phenotype and covariates for TWAS 
 - Two columns with the first column specifying the Phenotype (P) and Covariate variables (C) from the PED file, and the second column specifying the corresponding column headers in the PED file. 
 
@@ -79,7 +79,7 @@ Example input files provided under `./example_data/` are generated artificially.
 |C|COV2|
 |C|SEX|
 
-#### 5. Zscore File (`./example_data/CHR1_GWAS_Zscore.txt.gz`)
+#### 5. Zscore File (`./ExampleData/CHR1_GWAS_Zscore.txt.gz`)
 - Contain GWAS summary statistics (*Zscore*) for TWAS
 - First 4 columns are of the same format as VCF file.
 - Zscore statistic value must be provided under the column header of `Zscore`.
@@ -90,20 +90,19 @@ Example input files provided under `./example_data/` are generated artificially.
 |:-----:|:---:|:---:|:---:|:------:|
 |   1   | 100 |  C  |  T  |  0.01  |
 
-#### 6. Variant Weight File (`./example_data/weight.txt`)
-- Contain cis-eQTL effect sizes (i.e., SNP weights) estimated from reference data for TWAS
-- First 5 columns have to be of the following format, specifying *Chromosome number, Base pair position, Reference allele, Alternative allele, and Target gene ID*. 
-- Column `ES` denotes variant weights (estimated eQTL effect sizes from reference dataset) with respect to the Target gene ID.
-- Each row denotes the variant weight per variant for testing the association of the Target gene ID.
+#### 6. Variant Weight (eQTL effect size) File (`./ExampleData/eQTLweights.txt`)
+- Contain cis-eQTL effect sizes (i.e., SNP weights) estimated from reference data for TWAS. The output `*_eQTLweights.txt` file by `./TIGAR_Model_Train.sh` can be used here as the variant weight file.
+- First 5 columns must be of the following format, specifying *Chromosome number, Base pair position, Reference allele, Alternative allele, and Target gene ID*. 
+- Must contain a column named `ES` to denote variant weights (estimated eQTL effect sizes from reference dataset) with respect to the Target gene ID.
+- Each row denotes the variant weight (eQTL effect size) for testing the association of the Target gene ID.
 - Variants will be matched with those from Zscore file by their unique `CHROM:POS:REF:ALT`.
-- Headers of the first 5 columns and variant weights must be the same as shown below:
 
 | CHROM | POS | REF | ALT |     TargetID    |  ES  |
 |:-----:|:---:|:---:|:---:|:---------------:|:----:|
 |   1   | 100 |  C  |  T  |     ENSG0000    |  0.2 |
 
 
-#### 7. Gene Annotation File (`./example_data/Gene_annotation.txt`)
+#### 7. Gene Annotation File (`./ExampleData/Gene_annotation.txt`)
 - Provide a list of genes for TWAS 
 - Same format as the first five columns of the Gene Expression File.
 
@@ -111,20 +110,19 @@ Example input files provided under `./example_data/` are generated artificially.
 |:-----:|:---------:|:-------:|:---------------:|:--------:|
 |   1   |    100    |   200   |     ENSG0000    |     X    |
 
-#### 8. Genome Block Annotation File (`./example_data/block_annotation_EUR.txt`)
+#### 8. LD File
+- Provide LD coefficients generated from reference data for TWAS with GWAS summary statistics
+
+#### 9. Genome Block Annotation File (`./ExampleData/block_annotation_EUR.txt`)
 - Genome block annotation file need to be specified for generating LD coefficients of your reference data that can be used to conduct TWAS with summary-level GWAS statistics
 - A tab delimited text file with 4 columns `CHROM Start End File`, denoting the Chromosome number, Starting position, Ending position, and corresponding reference VCF file name under specified `--geno_path`. 
-- Reference VCF files shall be of one file per Chromosome, or one file for all genome-wide variants. Example genome block annotation file for European samples is provided `./TIGAR/example_data/block_annotation_EUR.txt`. 
+- Reference VCF files shall be of one file per Chromosome, or one file for all genome-wide variants. Example genome block annotation file for European samples is provided `./TIGAR/ExampleData/block_annotation_EUR.txt`. 
 
 | CHROM |   Start   |    End  |        File     |
 |:-----:|:---------:|:-------:|:---------------:|
 |   1   |    100    | 20000   |  CHR1.vcf.gz    |
 
 - Block annotation files of other ethnicities can be adopted from the genome segmentation generated by `LDetect`, https://bitbucket.org/nygcresearch/ldetect-data/src/master/.
-
-#### 9. LD File
-- Provide LD coefficients generated from reference data for TWAS with GWAS summary statistics
-
 
 
 ### Example Usage 
@@ -141,6 +139,7 @@ Example input files provided under `./example_data/` are generated artificially.
 	- `--maf`: Minor Allele Frequency threshold (ranges from 0 to 1; default `0.01`) to exclude rare variants
 	- `--hwe`: Hardy Weinberg Equilibrium p-value threshold (default `0.00001`) to exclude variants that violated HWE
 	- `--window`: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression imputation model (default `1000000` for +- 1MB region around TSS)
+	- `--cvR2`: Take value `1` for evaluating training model by R2 from 5-fold cross validation (only output trained model if R2_CV < 0.005, default) or value `0` to skip this 5-fold cross validation evaluation (output trained model anyway)
 	- `--thread`: Number of threads for parallel computation (default `1`)
 	- `--out_dir`: Output directory (will be created if not exist)
 
@@ -152,10 +151,10 @@ Example input files provided under `./example_data/` are generated artificially.
 	- Example bash command
 ```
 # Setup input file paths
-Gene_Exp_train_file="./example_data/Gene_Exp.txt"
-train_sample_ID_file="./example_data/sampleID.txt"
-genofile="./example_data/example.vcf.gz"
-out_dir="./example_data/output"
+Gene_Exp_train_file="./ExampleData/Gene_Exp.txt"
+train_sample_ID_file="./ExampleData/sampleID.txt"
+genofile="./ExampleData/example.vcf.gz"
+out_dir="./ExampleData/output"
 
 # Call TIGAR model training shell script
 ./TIGAR_Model_Train.sh --model DPR \
@@ -165,6 +164,8 @@ out_dir="./example_data/output"
 --genofile_type vcf --Format GT \
 --maf 0.01 \
 --hwe 0.0001 \
+--cvR2 1 \
+--dpr 1 --ES fixed \
 --out_dir ${out_dir}
 ```
 
@@ -178,22 +179,52 @@ out_dir="./example_data/output"
 	- Example bash command
 ```
 ./TIGAR_Model_Train.sh --model elastic_net \
---Gene_Exp ${Gene_Exp_train_file} --train_sample ${train_sample_path} \
---chr 1 --train_dir ${train_dir} \
---geno_train vcf --FT DS \
---out ${out_prefix}
+--Gene_Exp ${Gene_Exp_train_file} \
+--train_sampleID ${train_sample_ID_file} \
+--genofile ${genofile} --chr 1 \
+--genofile_type vcf --Format GT \
+--maf ${mafval} \
+--hwe ${hweval} \
+--cvR2 1 \
+--alpha 0.5 \
+--out_dir ${out_dir}
 ```
 
+- Model training output files
+	- `*_eQTLweights.txt` is the file storing all eQTL effect sizes (`ES`) estimated from the gene expression imputation model per gene (`TargetID`)
+	- `*_GeneInfo.txt` is the file storing information about the fitted gene expression imputation model per gene (per row), including gene annotation (`CHROM GeneStart GeneEnd TargetID GeneName`), sample size, number of SNP used in the model training (`n_snp`), number of SNPs with non-zero eQTL effect sizes (`n_effect_snp`), imputation R2 by 5-fold cross validation (`CVR2`), imputation R2 using all given training samples (`TrainR2`)
+	- `*_Log.txt` is the file storing all log messages for model training.
 
 #### 2. Predict GReX
+- Predict GReX value with given input files of variant weights and individual-level genotype data
+- Variables to specify
+	- `--chr`: Chromosome number need to be specified with respect to the genotype input data
+	- `--weight`: Path for SNP weight (eQTL effect size) file 
+	- `--test_sampleID`: Path for a file with sampleIDs that should be contained in the genotype file
+	- `--genofile`: Path for the training genotype file (bgzipped and tabixed) 
+	- `--genofile_tye`: Genotype file type: `vcf` or `dosage`
+	- `--Format`: Genotype format in VCF file that should be used: `GT` (default) for genotype data or `DS` for dosage data, only required if the input genotype file is of VCF file
+	- `--window`: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression prediction model (default `1000000` for +- 1MB region around TSS)
+	- `--maf_diff`: MAF difference threshold for matching SNPs from eQTL weight file and test genotype file. If SNP MAF difference is greater than `maf_diff` (default `0.2`), , the SNP will be excluded
+	- `--thread`: Number of threads for parallel computation (default `1`)
+	- `--out_dir`: Output directory (will be created if not exist)
+- Example bash command
 ```
+eQTL_ES_file="./ExampleData/eQTLweights.txt"
+gene_anno_file="./ExampleData/gene_anno.txt"
+test_sample_ID_file="./ExampleData/test_sampleID.txt"
+
 ./TIGAR_Model_Pred.sh --chr 1 \
---train_result_path ${train_result_path} \
---train_info_path ${train_info_path} \
---genofile_dir ${genofile_dir} \
+--weight ${eQTL_ES_file} \
+--gene_anno ${gene_anno_file} \
+--test_sampleID ${test_sample_ID_file} \
+--genofile ${genofile} \
 --genofile_type vcf --Format GT \
---out ${out_prefix}
+--out_dir ${out_dir}
 ```
+- GReX prediction output
+	- `*_Pred_GReX.txt` : File containing predicted GReX values in the same format as gene expression file.
+	- `*_Pred_Log.txt` : File containing log messages
 
 #### 3. TWAS
 

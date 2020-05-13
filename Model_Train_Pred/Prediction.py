@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-##########################################################################################
+############################################################
 # import packages needed
 import argparse
 import time
@@ -15,11 +15,11 @@ from numpy import *
 from dfply import *
 import multiprocessing
 
-#######################################################################################
+##########################################################
 ### time calculation
 start_time=time.clock()
 
-#################################################################################################
+###########################################################
 # Construct Dataframe for Analysis
 
 ### input each sample genotype
@@ -110,144 +110,152 @@ def CHR_Reform_DS(data,sampleID):
     
     return data.rename(columns={'MAF':'MAF_test'})
 
-#########################################################################################
+#######################################################################
+### Input Arguments for GReX Prediction
+#######################################################################
+
+# --chr: Chromosome number need to be specified with respect to the genotype input data
+# --weight: Path for SNP weight (eQTL effect size) file 
+# --test_sampleID: Path for a file with sampleIDs that should be contained in the genotype file
+# --genofile: Path for the training genotype file (bgzipped and tabixed) 
+# --genofile_tye: Genotype file type: "vcf" or "dosage"
+# --test_geno_colnames : File with column heads of genotype file
+# --Format: Genotype format in VCF file that should be used: "GT" (default) for genotype data or "DS" for dosage data, only required if the input genotype file is of VCF file
+# --window: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression prediction model (default 1000000 for +- 1MB region around TSS)
+# --maf_diff: MAF difference threshold for matching SNPs from eQTL weight file and test genotype file. If SNP MAF difference is greater than maf_diff (default 0.2), , the SNP will be excluded
+# --thread: Number of threads for parallel computation (default 1)
+# --out_dir: Output directory (will be created if not exist)
+
+#######################################
 ### variables need
 parser = argparse.ArgumentParser(description='manual to this script')
 
-### specified training method
-parser.add_argument('--model',type=str,default = None)
+### eQTL weight file
+parser.add_argument('--weight',type=str,default = None)
 
-### for Training result
-parser.add_argument('--train_result_path',type=str,default = None)
-### for DPR Training information
-parser.add_argument('--train_info_path',type=str,default = None)
+### Test sampleID
+parser.add_argument('--test_sampleID',type=str,default = None)
 
-### specified chromosome number
-parser.add_argument('--chr_num',type=int,default = None)
+### Specified chromosome number
+parser.add_argument('--chr',type=int,default = None)
 
-### training vcf fir
-parser.add_argument('--test_dir',type=str,default = None)
-parser.add_argument('--test_names',type=str,default = None)
+### Test genotype files
+parser.add_argument('--genofile',type=str,default = None)
+parser.add_argument('--test_geno_colnames', type=str, default = None)
 
-### SampleIDs
-parser.add_argument('--test_sample',type=str,default=None)
-
-### number of thread
-parser.add_argument('--thread',type=int,default = None)
-
-### specified input file type(vcf or dosages)
+### Specified input file type(vcf or dosages)
 parser.add_argument('--geno',type=str,default = None)
 
-### 'DS' or 'GT'
+### 'DS' or 'GT' for VCF genotype file
 parser.add_argument('--Format',type=str,default=None)
 
 ### window
 parser.add_argument('--window',type=int,default=None)
 
+### Gene annotation file
+parser.add_argument('--gene_anno',type=str,default = None)
+
+### number of thread
+parser.add_argument('--thread',type=int,default = None)
+
 ### Threshold of difference of maf between training data and testing data
 parser.add_argument('--maf_diff',type=float,default=None)
 
 ### output dir
-parser.add_argument('--out_prefix',type=str,default=None)
+parser.add_argument('--out_dir',type=str,default=None)
 
 args = parser.parse_args()
 
 ### check input command
-print(args.train_result_path)
-print(args.train_info_path)
-
-if args.model!="elastic_net" and args.model!="DPR":
-	raise SystemExit("Model "+args.model+" not found.")
-else:
-	print("Training Model:"+args.model)
-
-print("chromosome number:"+str(args.chr_num))
-print("Testing data:"+args.test_dir)
-print(args.test_names)
-print("Test sampleID:"+args.test_sample)
-print("Number of thread:"+str(args.thread))
+print("********************************\n   Imput Arguments\n********************************\n")
+print("Chrmosome : "+str(args.chr)+ "\n")
+print("eQTL weight file : "+args.weight+ "\n")
+print("Test gene annotation file : "+args.gene_anno+ "\n")
+print("Test sampleID file : "+args.test_sampleID+ "\n")
+print("Test genotype file : "+args.genofile+ "\n")
+# print("Column names of test genotype file:"+args.geno_colnames+ "\n")
 
 if args.geno=='vcf':
-    print("Using "+args.Format+" Format for Prediction.")
-elif args.geno=='dosages':
-    print("Using DS Format for Prediction.")
+    print("VCF genotype file is used for prediction with genotype format : " + args.Format + "\n")
+elif args.geno=='dosage':
+    print("Dosage genotype file is used for prediction."+ "\n")
 else:
-	raise SystemExit("Geno file can not identify.")
+    raise SystemExit("Please specify input test genotype file as either 'vcf' or 'dosage'."+ "\n")
 
-print("Window:"+str(args.window))
-print("MAF threshold for dropping testing snps:"+str(args.maf_diff))
-print("Output dir:"+args.out_prefix)
+print("Gene region size : window = "+str(args.window)+ "\n")
 
-############################################################################################
-### Training Parameter
-Result=pd.read_csv(args.train_result_path,sep='\t')
+print("MAF difference threshold for matching SNPs from eQTL weight file and test genotype file : "+str(args.maf_diff)+ "\n")
+
+print("Number of threads : "+str(args.thread)+ "\n")
+print("Output dir : "+args.out_dir+ "\n")
+
+############# Load eQTL weights (ES) #################################
+Result=pd.read_csv(args.weight,sep='\t')
 Result['CHROM']=Result['CHROM'].astype('int')
 Result['POS']=Result['POS'].astype('int')
-
 Result['snpID']=(Result['CHROM'].astype('str')+':'+Result['POS'].astype('str')
                  +':'+Result.REF+':'+Result.ALT)
-
 if len(Result.ES)==0:
-    raise SystemExit('No training parameters, please check input files.')
+    raise SystemExit('There is no valid eQTL weights.')
 
-### Training Information
-Train_Info=pd.read_csv(args.train_info_path,sep='\t')
+#############  Training Information
+Gene_Info=pd.read_csv(args.gene_anno,sep='\t')
 
-test_names=pd.read_csv(args.test_names,sep='\t').rename(columns={'#CHROM':'CHROM'})
+# Load genotype column names of test genotype file
+test_names=pd.read_csv(args.test_geno_colnames,sep='\t').rename(columns={'#CHROM':'CHROM'})
 test_names=np.array(tuple(test_names))
 
-sampleID=pd.read_csv(args.test_sample,sep='\t',header=None)
+# Load test sample IDs
+sampleID=pd.read_csv(args.test_sampleID,sep='\t',header=None)
 sampleID=np.array(sampleID).ravel()
 
 ### Define TargetID
 TargetID=unique(np.array(Result.TargetID))
 
-out_header=pd.DataFrame(columns=np.hstack((['CHROM','GeneStart','GeneEnd','GeneName','TargetID'],
+out_header=pd.DataFrame(columns=np.hstack((['CHROM','GeneStart','GeneEnd','TargetID','GeneName'],
                                            sampleID)))
 
-out_header.to_csv(args.out_prefix+'/CHR'+str(args.chr_num)+'_'+args.model+'_prediction.txt',
-                  sep='\t',index=None,header=True,mode='a')
-
+out_header.to_csv(args.out_dir+'/CHR'+str(args.chr) + '_Pred_GReX.txt',
+                  sep='\t', index=None, header=True, mode='w')
 
 ### thread function
 def thread_process(num):
-    Info_temp=Train_Info >> mask(Train_Info.TargetID==TargetID[num])
+    Info_temp=Gene_Info >> mask(Gene_Info.TargetID==TargetID[num])
     Info_temp=Info_temp.reset_index(drop=True)
     
     start = max(int(Info_temp.GeneStart)-args.window,0)
     end = max(int(Info_temp.GeneEnd)+args.window,0)
     
-    test_process=subprocess.Popen(["tabix"+" "+args.test_dir+" "+str(args.chr_num)+":"+str(start)+"-"+str(end)],
+    test_process=subprocess.Popen(["tabix"+" "+args.genofile+" "+ str(args.chr)+":"+str(start)+"-"+str(end)],
                                   shell=True,
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE)
     
     out=test_process.communicate()[0]
-    print(str(len(out)))
+   # print(str(len(out)))
     
     if len(out)==0:
-        print("No testing data for Gene:"+TargetID[num])
+        print("There is no test genotype data for Gene:" + TargetID[num] + "\n")
     else:
-        print("Running prediction for Gene:"+TargetID[num])
+        print("Predict GReX for Gene : "+TargetID[num])
         Test_temp=pd.read_csv(StringIO(out.decode('utf-8')),sep='\t',header=None,low_memory=False)
         Test_temp.columns = np.array(tuple(test_names))
         Test_temp=Test_temp.reset_index(drop=True)
     
         if args.geno=='vcf':
             if args.Format not in unique(Test_temp.FORMAT)[0].split(":"):
-                print("Format needed for training is not provided in input vcf file.")
-                raise SystemExit('Geno file can not identify.')
+                raise SystemExit('Given genotype Format (e.g., GT or ES) need to be specified in the FORMAT column of test VCF genotype file.')
             else:
                 Chrom = CHR_Reform_vcf(Test_temp,args.Format,sampleID)
         elif args.geno=='dosages':
             Chrom = CHR_Reform_DS(Test_temp,sampleID)
         
-        ### Deal with training result
+        ### Intersect SNPs from eQTL weight file and test genotype file
         beta_temp = Result >> mask(Result.TargetID==TargetID[num]) >> select(Result.snpID,Result.ES,Result.MAF)
         beta_temp = beta_temp.drop_duplicates(['snpID'],keep='first')
         
         overlapID = np.intersect1d(np.array(beta_temp.snpID),np.array(Test_temp.snpID))
-        print("overlapID:"+str(len(overlapID)))
+        print("Number of SNPs overlapped between eQTL weight file and test genotype file : "+str(len(overlapID)) + "\n")
         
         if len(overlapID)==0:
             Chrom=Chrom >> drop(Chrom.snpID)
@@ -279,10 +287,10 @@ def thread_process(num):
             
             Pred['diff'] = abs(Pred['MAF'].astype('float')-Pred['MAF_test'].astype('float'))
             Pred = Pred >> mask(Pred['diff']<=args.maf_diff) >> drop(Pred[['MAF','MAF_test','diff']])
-            print("Overall ID used:"+str(len(Pred.snpID)))
+            print("Number of SNPs used for prediction after filtered by maf_diff : "+str(len(Pred.snpID)))
             
             if len(Pred.snpID)==0:
-                print("Differences of maf between training and testing are greater than "+str(args.maf_diff))
+                print("SNP MAF between training and testing samples differs greater than "+str(args.maf_diff) + "\n")
             else:
                 testX_temp=Pred.T
                 testX_temp.columns=testX_temp.loc['snpID']
@@ -295,12 +303,12 @@ def thread_process(num):
                 pred['TargetID']=TargetID[num]
                 
                 out=(Info_temp[['CHROM','GeneStart','GeneEnd',
-                                'GeneName','TargetID']].merge(pred,left_on='TargetID',
+                                'TargetID','GeneName']].merge(pred,left_on='TargetID',
                                                               right_on='TargetID',how='outer'))
-                out.to_csv(args.out_prefix+'/CHR'+str(args.chr_num)+'_'+args.model+'_prediction.txt',
+                out.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_Pred_GReX.txt',
                            sep='\t',index=None,header=None,mode='a')
         else:
-            print("Prediction Stop")
+            print("There is no matched SNPs from eQTL weight file and test genotype file. \n")
 
 ########################################################################################################
 # thread begin
@@ -319,7 +327,7 @@ pool.join()
 ### time calculation
 time=round((time.clock()-start_time)/60,2)
 
-print(str(time)+' minutes')
+# print(str(time)+' minutes')
 
 
 
