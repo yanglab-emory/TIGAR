@@ -1,0 +1,22 @@
+##
+## GEMMA Version = 0.95alpha
+##
+## Command Line Input = DPR -g ENSG00000237613.2_bimbam.txt -p ENSG00000237613.2_pheno.txt -a ENSG00000237613.2_snp_annot.txt -dpr 1 -o DPR_ENSG00000237613.2 
+##
+## Date = Tue May 12 17:51:37 2020
+##
+## Summary Statistics:
+## number of total individuals = 129
+## number of analyzed individuals = 129
+## number of covariates = 1
+## number of phenotypes = 1
+## number of total SNPs = 1885
+## number of analyzed SNPs = 1754
+## number of the truncated normal distributions = 4
+## ELBO = -27085.5
+## estimated mean = 0.00101793
+##
+## Computation Time:
+## total computation time = 0.055278 min 
+## computation time break down: 
+##

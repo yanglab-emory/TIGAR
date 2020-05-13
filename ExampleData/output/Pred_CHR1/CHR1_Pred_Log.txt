@@ -1,0 +1,36 @@
+********************************
+   Imput Arguments
+********************************
+
+Chrmosome : 1
+
+eQTL weight file : ./ExampleData/eQTLweights.txt
+
+Test gene annotation file : ./ExampleData/gene_anno.txt
+
+Test sampleID file : ./ExampleData/test_sampleID.txt
+
+Test genotype file : ./ExampleData/example.vcf.gz
+
+VCF genotype file is used for prediction with genotype format : GT
+
+Gene region size : window = 1000000
+
+MAF difference threshold for matching SNPs from eQTL weight file and test genotype file : 0.2
+
+Number of threads : 1
+
+Output dir : ./ExampleData/output/Pred_CHR1
+
+20299028
+Predict GReX for Gene : ENSG00000223972.4
+overlapID:1673
+Number of SNPs used for prediction : 1673
+21397716
+Predict GReX for Gene : ENSG00000227232.4
+overlapID:1732
+Number of SNPs used for prediction : 1732
+21738866
+Predict GReX for Gene : ENSG00000237613.2
+overlapID:1754
+Number of SNPs used for prediction : 1754

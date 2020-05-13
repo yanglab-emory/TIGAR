@@ -1,0 +1,50 @@
+********************************
+   Imput Arguments
+********************************
+
+Gene Annotation and Expression data file : ./ExampleData/Gene_Exp.txt
+
+Training sampleID file : ./ExampleData/sampleID.txt
+
+Chrmosome : 1
+
+Training genotype file : ./ExampleData/example.vcf.gz
+
+Using genotype format GT from VCF file for Training.
+
+Gene region size : window = 1000000
+
+Evaluate Elastic-Net model by 5-fold cross validation : cvR2 = 1
+
+Threshold for MAF :0.01
+
+Threshold for HWE p-value :1e-05
+
+Using 5-fold for cross-validation to tune penalty parameter lambda
+
+The ratio for L1 & L2 penalty used by Elastic-Net regression: alpha = 0.5
+
+Number of threads: 1
+
+Output dir:./ExampleData/output/EN_CHR1
+
+********************************
+
+
+Running training for Gene:ENSG00000223972.4
+Average R2 by 5-fold CV = 2.2204460492503132e-17, less than 0.005 for ENSG00000223972.4
+Skip running Elastic-Net regression model for gene ENSG00000223972.4
+
+Running training for Gene:ENSG00000227232.4
+Average R2 by 5-fold CV = -1.3322676295501878e-16, less than 0.005 for ENSG00000227232.4
+Skip running Elastic-Net regression model for gene ENSG00000227232.4
+
+Running training for Gene:ENSG00000237613.2
+Average R2 by 5-fold CV = 0.0021864235468269434, less than 0.005 for ENSG00000237613.2
+Skip running Elastic-Net regression model for gene ENSG00000237613.2
+
+Running training for Gene:ENSG00000243485.2
+Average R2 by 5-fold CV = 0.0003312706341578764, less than 0.005 for ENSG00000243485.2
+Skip running Elastic-Net regression model for gene ENSG00000243485.2
+
+0.05 minutes
