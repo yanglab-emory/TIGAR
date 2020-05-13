@@ -196,7 +196,7 @@ out_dir="./ExampleData/output"
 	- `*_Log.txt` is the file storing all log messages for model training.
 
 #### 2. Predict GReX
-- Predict GReX value with given input files of variant weights and individual-level genotype data
+- Predict GReX value with given variant weights (eQTL effect sizes) from trained gene expression imputation models and individual-level genotype data of test samples
 - Variables to specify
 	- `--chr`: Chromosome number need to be specified with respect to the genotype input data
 	- `--weight`: Path for SNP weight (eQTL effect size) file 
@@ -204,7 +204,7 @@ out_dir="./ExampleData/output"
 	- `--genofile`: Path for the training genotype file (bgzipped and tabixed) 
 	- `--genofile_tye`: Genotype file type: `vcf` or `dosage`
 	- `--Format`: Genotype format in VCF file that should be used: `GT` (default) for genotype data or `DS` for dosage data, only required if the input genotype file is of VCF file
-	- `--window`: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression prediction model (default `1000000` for +- 1MB region around TSS)
+	- `--window`: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression prediction model (default `1000000` for `+- 1MB` region around TSS)
 	- `--maf_diff`: MAF difference threshold for matching SNPs from eQTL weight file and test genotype file. If SNP MAF difference is greater than `maf_diff` (default `0.2`), , the SNP will be excluded
 	- `--thread`: Number of threads for parallel computation (default `1`)
 	- `--out_dir`: Output directory (will be created if not exist)
