@@ -4,7 +4,7 @@
 1. **TIGAR** can train gene expression imputation models by both **nonparametric Bayesian DPR** and **Elastic-Net (PrediXcan)** methods with reference dataset that contain transcriptomic and genetic data of the same samples.
 2. Impute **Genetically Regulated gene eXpression (GReX)** from *Individual-level* genetic data
 3. Conduct **TWAS** using both *Individual-level* and *Summary-level* GWAS data for studying *Univariate* and *Multivariate* phenotypes.
-
+4. Note: please use our most recently updated scripts to conduct TWAS.
 
 
 ### Software Setup
