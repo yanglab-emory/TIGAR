@@ -10,16 +10,17 @@
 # Variable needed for training
 ###
 # --model: Gene expression prediction model: "elastic_net" or "DPR"
-# --Gene_Exp: Path for Gene annotation and Expression file
+# --gene_exp: Path for Gene annotation and Expression file
 # --train_sampleID: Path for a file with sampleIDs that will be used for training
 # --genofile: Path for the training genotype file (bgzipped and tabixed) 
 # --chr: Chromosome number need to be specified with respect to the genotype input data
 # --genofile_tye: Genotype file type: "vcf" or "dosage"
-# --Format: Genotype format in VCF file that should be used: "GT" (default) for genotype data or "DS" for dosage data, only required if the input genotype file is of VCF file
+# --format: Genotype format in VCF file that should be used: "GT" (default) for genotype data or "DS" for dosage data, only required if the input genotype file is of VCF file
 # --maf: Minor Allele Frequency threshold (ranges from 0 to 1; default 0.01) to exclude rare variants
 # --hwe: Hardy Weinberg Equilibrium p-value threshold (default 0.00001) to exclude variants that violated HWE
 # --window: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression prediction model (default 1000000 for +- 1MB region around TSS)
 # --cvR2: Take value 0 for calculating training R2 from fitted model and 1 for calculating training R2 from 5-fold cross validation
+# --TIGAR_dir : Specify the directory of TIGAR source code
 # --thread: Number of threads for parallel computation (default 1)
 # --out_dir: Output directory (will be created if not exist)
 
@@ -35,7 +36,7 @@
 
 #################################
 VARS=`getopt -o "" -a -l \
-model:,Gene_Exp:,train_sampleID:,chr:,genofile_type:,genofile:,Format:,maf:,hwe:,window:,cvR2:,cv:,alpha:,dpr:,ES:,thread:,out_dir: \
+model:,gene_exp:,train_sampleID:,chr:,genofile_type:,genofile:,Format:,maf:,hwe:,window:,cvR2:,cv:,alpha:,dpr:,ES:,TIGAR_dir:,thread:,out_dir: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -50,7 +51,7 @@ while true
 do
     case "$1" in
         --model|-model) model=$2; shift 2;;
-        --Gene_Exp|-Gene_Exp) Gene_Exp=$2; shift 2;;
+        --gene_exp|-gene_exp) gene_exp=$2; shift 2;;
         --train_sampleID|-train_sampleID) train_sampleID=$2; shift 2;;
         --chr|-chr) chr=$2; shift 2;;
         --genofile_type|-genofile_type) genofile_type=$2; shift 2;;
@@ -64,6 +65,7 @@ do
         --alpha|-alpha) alpha=$2; shift 2;;
         --dpr|-dpr) dpr_num=$2; shift 2;;
         --ES|-ES) ES=$2; shift 2;;
+        --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
         --thread|-thread) thread=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
         --) shift;break;;
@@ -96,8 +98,8 @@ if [ ! -x "$(command -v tabix)" ]; then
 fi
 
 # Check gene expression file
-if [ ! -f "${Gene_Exp}" ] ; then
-    echo Error: Gene expression file ${Gene_Exp} dose not exist or empty. >&2
+if [ ! -f "${gene_exp}" ] ; then
+    echo Error: Gene expression file ${gene_exp} dose not exist or empty. >&2
     exit 1
 fi
 
@@ -121,20 +123,26 @@ fi
 if [[ "$model"x == "elastic_net"x ]];then
     echo "Train gene expression imputation models by Elastic-Net method..."
 
-    ./Model_Train_Pred/Elastic_Net.sh \
+    # Make shell script executible
+    if [[ ! -x ${TIGAR_dir}/Model_Train_Pred/Elastic_Net.sh ]] ; then
+        chmod 755 ${TIGAR_dir}/Model_Train_Pred/Elastic_Net.sh
+    fi
+
+    ${TIGAR_dir}/Model_Train_Pred/Elastic_Net.sh \
     --model ${model} \
-    --Gene_Exp ${Gene_Exp} \
+    --gene_exp ${gene_exp} \
     --train_sampleID ${train_sampleID} \
     --chr ${chr} \
     --genofile_type ${genofile_type} \
     --genofile ${genofile} \
-    --Format ${Format} \
+    --format ${format} \
     --maf ${maf} \
     --hwe ${hwe} \
     --window ${window} \
     --cvR2 ${cvR2} \
     --cv ${cv} \
     --alpha ${alpha} \
+    --TIGAR_dir ${TIGAR_dir} \
     --thread ${thread} \
     --out_dir ${out_dir}
 elif [[ "$model"x == "DPR"x ]]; then
@@ -143,20 +151,26 @@ elif [[ "$model"x == "DPR"x ]]; then
         echo 'Error: please add DPR executible file into your PATH.' >&2
         exit 1
     else
-        ./Model_Train_Pred/DPR.sh \
+        # Make shell script executible
+        if [[ ! -x ${TIGAR_dir}/Model_Train_Pred/DPR.sh ]] ; then
+            chmod 755 ${TIGAR_dir}/Model_Train_Pred/DPR.sh
+        fi
+        
+        ${TIGAR_dir}/Model_Train_Pred/DPR.sh \
         --model ${model} \
-        --Gene_Exp ${Gene_Exp} \
+        --gene_exp ${gene_exp} \
         --train_sampleID ${train_sampleID} \
         --chr ${chr} \
         --genofile_type ${genofile_type} \
         --genofile ${genofile} \
-        --Format ${Format} \
+        --format ${format} \
         --maf ${maf} \
         --hwe ${hwe} \
         --window ${window} \
         --cvR2 ${cvR2} \
         --dpr ${dpr_num} \
         --ES ${ES} \
+        --TIGAR_dir ${TIGAR_dir} \
         --thread ${thread} \
         --out_dir ${out_dir}
     fi

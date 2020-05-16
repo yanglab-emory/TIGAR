@@ -59,18 +59,18 @@ def regression_multi(X,Y,TargetID):
     
     return result
 
-######################################################################################################
+##########################################################
 ### variables need
-parser = argparse.ArgumentParser(description='manual to this script')
+parser = argparse.ArgumentParser(description='Help: ')
 
 ### for Gene annotation and Expression level file
-parser.add_argument('--Gene_Exp',type=str,default = None)
+parser.add_argument('--gene_exp',type=str,default = None)
 
 ### for PED file
 parser.add_argument('--PED',type=str,default = None)
 
 ### Association Information file
-parser.add_argument('--Asso_Info',type=str,default = None)
+parser.add_argument('--PED_info',type=str,default = None)
 
 ### Method use for regression
 parser.add_argument('--method',type=str,default = None)
@@ -79,53 +79,54 @@ parser.add_argument('--method',type=str,default = None)
 parser.add_argument('--thread',type=int,default = None)
 
 ### output dir
-parser.add_argument('--out_prefix',type=str,default=None)
+parser.add_argument('--out_dir',type=str,default=None)
 
 args = parser.parse_args()
 
-#####################################################################################################
+###########################################################
 # Print out variables or path using
-print("Gene-expression file:"+args.Gene_Exp)
+print("Gene-expression file:"+args.gene_exp)
 print("PED file using:"+args.PED)
-print("Assosiation Information file:"+args.Asso_Info)
+print("Assosiation Information file:"+args.PED_info)
 print("Regression method using:"+args.method)
 print("Number of thread:"+str(args.thread))
-print("Output dir:"+args.out_prefix)
-####################################################################################################
+print("Output dir:"+args.out_dir)
+############################################################
 # Read in PED file
 PED = pd.read_csv(args.PED,sep='\t').rename(columns={'#FAM_ID':'FAM_ID'})
 
 # Gene annotation and Expression level file
-Genecode = pd.read_csv(args.Gene_Exp,sep='\t')
+Genecode = pd.read_csv(args.gene_exp,sep='\t')
 
 # Read in Association information
 # P:phenotype
 # C:covariate
-Asso_Info=pd.read_csv(args.Asso_Info,sep='\t',header=None)
+Asso_Info=pd.read_csv(args.PED_info,sep='\t',header=None)
 Asso_Info.columns=['Ind','Var']
 
 ### phenotype
 pheno = Asso_Info >> mask(Asso_Info.Ind=='P') >> select(Asso_Info.Var) 
 pheno = np.array(pheno).ravel()
 if len(pheno)==0:
-    raise SystemExit("No phenotype provided.")
+    raise SystemExit("No phenotype column name is provided by --PED_info.")
 else:
-    print("Phenotype Used:",pheno)
-### covariance
+    print("Phenotypes to be studied : ", pheno)
+
+### covariates
 cov = Asso_Info >> mask(Asso_Info.Ind=='C') >> select(Asso_Info.Var)
 cov = np.array(cov).ravel()
 if len(cov)==0:
     raise SystemExit("No covariates provided.")
 else:
-    print("Covariance used:",cov)
+    print("Covariates to be used:",cov)
 
 TargetID = np.array(Genecode.TargetID)
 if len(TargetID)==0:
-    raise SystemExit("No Gene in gene-expression file")
+    raise SystemExit("There is no GREx data in gene expression file provided by --gene_exp ")
 
 sampleID = np.intersect1d(np.array(PED.IND_ID),np.array(Genecode.columns[5:]))
 if len(sampleID)==0:
-    raise SystemExit("No overlaping IND_ID between gene-expression and PED file.")
+    raise SystemExit("There is no overlapped sample IDs between gene expression file and PED file.")
 
 # Organizing PED and Gene-expression file
 PED = PED >> mask(PED.IND_ID.isin(sampleID)) >> select(PED.IND_ID,PED[pheno],PED[cov])
@@ -139,7 +140,7 @@ Gene_temp = Gene_temp.drop(['TargetID'])
 Gene_temp['IND_ID'] = Gene_temp.index
 Gene_temp = Gene_temp.reset_index(drop=True)
 
-##################################################################################################
+##################################################
 # Thread Process
 
 # Single Phenotype
@@ -154,7 +155,7 @@ def thread_single(num):
     
     out = Gene_annot.merge(lm,left_on='TargetID',right_on='TargetID',how='outer')
     
-    out.to_csv(args.out_prefix+"/association_study_"+args.method+".txt",sep='\t',header=None,index=None,mode='a')
+    out.to_csv(args.out_dir+"/asso_"+args.method+".txt",sep='\t',header=None,index=None,mode='a')
 
 # Multiple Phenotype
 def thread_multi(num):
@@ -169,18 +170,18 @@ def thread_multi(num):
     Gene_annot = Genecode >> mask(Genecode.TargetID==TargetID[num]) >> select(Genecode.columns[0:5])
     out = Gene_annot.merge(lm,left_on='TargetID',right_on='TargetID',how='outer')
     
-    out.to_csv(args.out_prefix+"/association_study_"+args.method+".txt",sep='\t',header=None,index=None,mode='a')
+    out.to_csv(args.out_dir+"/asso_"+args.method+".txt",sep='\t',header=None,index=None,mode='a')
 
-###################################################################################################
+###################################################
 # Association Study
 if len(pheno)==1:
     Target = PED.merge(Gene_temp,left_on='IND_ID',right_on='IND_ID',how='outer')
     Target = pd.DataFrame((Target >> drop(Target.IND_ID)),dtype='float')
     
-    out_temp = pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','GeneName','TargetID',
+    out_temp = pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName',
                                      'R2','BETA','BETA_SE','T_STAT','PVALUE','N'])
     
-    out_temp.to_csv(args.out_prefix+"/association_study_"+args.method+".txt",sep='\t',header=True,index=None,mode='a')
+    out_temp.to_csv(args.out_dir+"/asso"+args.method+".txt",sep='\t',header=True,index=None,mode='w')
 
     pool = multiprocessing.Pool(args.thread)
     pool.map(thread_single,[num for num in range(len(TargetID))])
@@ -194,10 +195,10 @@ elif len(pheno)>1:
     for i in range(len(pheno)):
         res[pheno[i]] = np.array(sm.OLS(PED[pheno[i]],sm.add_constant(PED[cov])).fit().resid).ravel()
     
-    out_temp = pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','GeneName','TargetID',
+    out_temp = pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName',
                                      'R2','F_STAT','F_PVALUE','N'])
     
-    out_temp.to_csv(args.out_prefix+"/association_study_"+args.method+".txt",sep='\t',header=True,index=None,mode='a')
+    out_temp.to_csv(args.out_dir+"/asso"+args.method+".txt",sep='\t',header=True,index=None,mode='w')
     
     Target = res.merge(Gene_temp,left_on='IND_ID',right_on='IND_ID',how='outer')
     Target = pd.DataFrame((Target >> drop(Target.IND_ID)),dtype='float')

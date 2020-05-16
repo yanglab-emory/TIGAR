@@ -5,21 +5,11 @@
 2. Impute **Genetically Regulated gene eXpression (GReX)** from *Individual-level* genetic data
 3. Conduct **TWAS** using both *Individual-level* and *Summary-level* GWAS data for studying *Univariate* and *Multivariate* phenotypes.
 
+
+
 ### Software Setup
 
-#### 1. Setup Executable Files
-- Change all `*.sh` and `*.py` files into executable files
-```
-cd [TIGAR_directory]
-chmod 755 *.sh ./Model_Train_Pred/*.sh ./Model_Train_Pred/*.py ./Model_Train_Pred/DPR ./TWAS/*.sh ./TWAS/*.py
-```
-- Add the executable file `./Model_Train_Pred/DPR` to your `${PATH}` directory. 
-	Assuming `~/bin/` is a directory added to your `${PATH}`, you can accommodate the following example command
-```
-cp ./Model_Train_Pred/DPR ~/bin/
-```
-
-#### 2. Install BGZIP, TABIX, Python 3.5 and the following python libraries
+#### 1. Install BGZIP, TABIX, Python 3.5 and the following python libraries
 - [BGZIP](http://www.htslib.org/doc/bgzip.html) 
 - [TABIX](http://www.htslib.org/doc/tabix.html) 
 - Python 3.5 libraries
@@ -28,11 +18,19 @@ cp ./Model_Train_Pred/DPR ~/bin/
    - subprocess, multiprocess
    - sklearn, statsmodels, scipy
 
+#### 2. Setup Executable Files
+- Change `*.sh` files under **TIGAR** directory into executable files
+```
+cd [TIGAR_directory]
+chmod 755 *.sh 
+```
+
+
 ### Input Files
 Example input files provided under `./ExampleData/` are generated artificially. All input files are *Tab Delimited Text Files*.
 
 
-#### 1. Gene Expression File (`./ExampleData/Gene_Exp.txt`)
+#### 1. Gene Expression File (`./ExampleData/gene_exp.txt`)
 - First 5 columns are *Chromosome number, Gene start position, Gene end position, Target gene ID, Gene name* (optional, could be the same as Target gene ID).
 - Gene expression data start from the 6th column. Each column denotes the corresponding gene expression value per sample. 
 
@@ -69,7 +67,7 @@ Example input files provided under `./ExampleData/` are generated artificially. 
 |:------:|:------:|:------:|:------:|:---:|:-----:|:---:|:---:|
 |   11A  |   11A  |    X   |    X   |  1  |  0.2  | 0.3 |...|
 
-#### 4. Association Study Information File (`./ExampleData/Asso_Info_*.txt`)
+#### 4. Phenotype and Covariate Information File (`./ExampleData/PED_Info_*.txt`)
 - Specify column headers of phenotype and covariates for TWAS 
 - Two columns with the first column specifying the Phenotype (P) and Covariate variables (C) from the PED file, and the second column specifying the corresponding column headers in the PED file. 
 
@@ -102,7 +100,7 @@ Example input files provided under `./ExampleData/` are generated artificially. 
 |   1   | 100 |  C  |  T  |     ENSG0000    |  0.2 |
 
 
-#### 7. Gene Annotation File (`./ExampleData/Gene_annotation.txt`)
+#### 7. Gene Annotation File (`./ExampleData/gene_anno.txt`)
 - Provide a list of genes for TWAS 
 - Same format as the first five columns of the Gene Expression File.
 
@@ -110,7 +108,7 @@ Example input files provided under `./ExampleData/` are generated artificially. 
 |:-----:|:---------:|:-------:|:---------------:|:--------:|
 |   1   |    100    |   200   |     ENSG0000    |     X    |
 
-#### 8. LD File
+#### 8. LD File (`./ExampleData/`)
 - Provide LD coefficients generated from reference data for TWAS with GWAS summary statistics
 
 #### 9. Genome Block Annotation File (`./ExampleData/block_annotation_EUR.txt`)
@@ -140,6 +138,7 @@ Example input files provided under `./ExampleData/` are generated artificially. 
 	- `--hwe`: Hardy Weinberg Equilibrium p-value threshold (default `0.00001`) to exclude variants that violated HWE
 	- `--window`: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression imputation model (default `1000000` for +- 1MB region around TSS)
 	- `--cvR2`: Take value `1` for evaluating training model by R2 from 5-fold cross validation (only output trained model if R2_CV < 0.005, default) or value `0` to skip this 5-fold cross validation evaluation (output trained model anyway)
+	- `--TIGAR_dir` : Specify the directory of TIGAR source code
 	- `--thread`: Number of threads for parallel computation (default `1`)
 	- `--out_dir`: Output directory (will be created if not exist)
 
@@ -151,13 +150,14 @@ Example input files provided under `./ExampleData/` are generated artificially. 
 	- Example bash command
 ```
 # Setup input file paths
-Gene_Exp_train_file="./ExampleData/Gene_Exp.txt"
-train_sample_ID_file="./ExampleData/sampleID.txt"
-genofile="./ExampleData/example.vcf.gz"
-out_dir="./ExampleData/output"
+TIGAR_dir="/home/jyang/GIT/TIGAR"
+Gene_Exp_train_file="${TIGAR_dir}/ExampleData/gene_exp.txt"
+train_sample_ID_file="${TIGAR_dir}/ExampleData/sampleID.txt"
+genofile="${TIGAR_dir}/ExampleData/example.vcf.gz"
+out_dir="${TIGAR_dir}/ExampleData/output"
 
 # Call TIGAR model training shell script
-./TIGAR_Model_Train.sh --model DPR \
+${TIGAR_dir}/TIGAR_Model_Train.sh --model DPR \
 --Gene_Exp ${Gene_Exp_train_file} \
 --train_sampleID ${train_sample_ID_file} \
 --genofile ${genofile} --chr 1 \
@@ -166,6 +166,7 @@ out_dir="./ExampleData/output"
 --hwe 0.0001 \
 --cvR2 1 \
 --dpr 1 --ES fixed \
+--TIGAR_dir ${TIGAR_dir} \
 --out_dir ${out_dir}
 ```
 
@@ -178,15 +179,16 @@ out_dir="./ExampleData/output"
 
 	- Example bash command
 ```
-./TIGAR_Model_Train.sh --model elastic_net \
+${TIGAR_dir}/TIGAR_Model_Train.sh --model elastic_net \
 --Gene_Exp ${Gene_Exp_train_file} \
 --train_sampleID ${train_sample_ID_file} \
 --genofile ${genofile} --chr 1 \
 --genofile_type vcf --Format GT \
---maf ${mafval} \
---hwe ${hweval} \
+--maf 0.01 \
+--hwe 0.0001 \
 --cvR2 1 \
 --alpha 0.5 \
+--TIGAR_dir ${TIGAR_dir} \
 --out_dir ${out_dir}
 ```
 
@@ -205,21 +207,23 @@ out_dir="./ExampleData/output"
 	- `--genofile_tye`: Genotype file type: `vcf` or `dosage`
 	- `--Format`: Genotype format in VCF file that should be used: `GT` (default) for genotype data or `DS` for dosage data, only required if the input genotype file is of VCF file
 	- `--window`: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression prediction model (default `1000000` for `+- 1MB` region around TSS)
-	- `--maf_diff`: MAF difference threshold for matching SNPs from eQTL weight file and test genotype file. If SNP MAF difference is greater than `maf_diff` (default `0.2`), , the SNP will be excluded
+	- `--maf_diff`: MAF difference threshold for matching SNPs from eQTL weight file and test genotype file. If SNP MAF difference is greater than `maf_diff` (default `0.2`), the SNP will be excluded
+	- `--TIGAR_dir` : Specify the directory of TIGAR source code
 	- `--thread`: Number of threads for parallel computation (default `1`)
 	- `--out_dir`: Output directory (will be created if not exist)
 - Example bash command
 ```
-eQTL_ES_file="./ExampleData/eQTLweights.txt"
-gene_anno_file="./ExampleData/gene_anno.txt"
-test_sample_ID_file="./ExampleData/test_sampleID.txt"
+eQTL_ES_file="${TIGAR_dir}/ExampleData/eQTLweights.txt"
+gene_anno_file="${TIGAR_dir}/ExampleData/gene_anno.txt"
+test_sample_ID_file="${TIGAR_dir}/ExampleData/test_sampleID.txt"
 
-./TIGAR_Model_Pred.sh --chr 1 \
+${TIGAR_dir}/TIGAR_Model_Pred.sh --chr 1 \
 --weight ${eQTL_ES_file} \
 --gene_anno ${gene_anno_file} \
 --test_sampleID ${test_sample_ID_file} \
 --genofile ${genofile} \
 --genofile_type vcf --Format GT \
+--TIGAR_dir ${TIGAR_dir} \
 --out_dir ${out_dir}
 ```
 - GReX prediction output
@@ -227,28 +231,61 @@ test_sample_ID_file="./ExampleData/test_sampleID.txt"
 	- `*_Pred_Log.txt` : File containing log messages
 
 #### 3. TWAS
+- Variables to specify for TWAS
+	- `--asso` : Specify TWAS type either by using individual-level phenotype data and predicted GReX with value `1` (default) or using GWAS summary Z-score statistics with value `2`
+	- `--thread` : Number of threads for parallel computation (default `1`)
+	- `--out_dir`: Output directory (will be created if not exist)
 
-Using individual-level GWAS data. Take the output `*_GReX_prediction.txt` from gene expression prediction as the input for `--Gene_EXP` here. 
+- Variables to specify for using *individual-level* GWAS data. 
+	- `--gene_exp` : Path for predicted GReX file
+	- `--PED` : Path for PED file that contains phenotype and covariate data
+	- `--PED_info` : Specify culumn names for phenotypes and covariates that will be used in TWAS.
+		- Rows started with value `P` : followed with phenotype column names
+		- Rows started with value `C` : followed with covariate column names
+	- `--method` : `OLS` (default) for studying quantitative phenotype or multivariate phenotypes or `Logit` for studying dichotomous univariate phenotype
+
 ```
-./TIGAR_TWAS.sh --asso 1 \
---Gene_EXP ${Gene_Exp_prediction_file} --PED ${PED} --Asso_Info ${asso_Info} \
---out ${out_prefix}
+GReX_pred_file="${TIGAR_dir}/CHR1_Pred_GReX.txt"
+PED="${TIGAR_dir}/example_PED.ped"
+PED_info="${TIGAR_dir}/PED_Info_SinglePheno.txt"
+
+${TIGAR_dir}/TIGAR_TWAS.sh --asso 1 \
+--gene_exp ${GReX_pred_file} \
+--PED ${PED} --PED_info ${PED_info} \
+--method OLS \
+--out ${out_dir}
 ```
 
-Using summary-level GWAS data. Take the output `*_training_param.txt` from imputation model training as the input Weight file here. The first five columns of the gene expression file will be taken as gene annotation file here for `--Gene_anno`. The same gene expression file can be used as input for `--Gene_anno`. 
+- Variables to specify for using *summary-level* GWAS data.
+	- `--gene_anno` : Path for gene annotation file to specify a list of gene for TWAS. The first six columns of the gene expression file can be used here.
+	- `--chr`: Chromosome number need to be specified to conduct TWAS per chromosome 
+	- `--weight`: Path for SNP weight (eQTL effect size) file. Output file by model training can be used here. 
+	- `--Zscore` : Path for GWAS summary Zscore statistics.
+	- `--LD` : Path for reference LD (SNP genotype covariance matrix) that should be bgzipped and tabixed. Can be generated by using our `${TIGAR_dir}/TWAS/Get_LD.py` script with individual-level genotype data of reference samples.
+	- `--window`: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for TWAS (default `1000000` for `+- 1MB` region around TSS)
+	- `--TIGAR_dir` : Specify the directory of **TIGAR** source code
 
 ```
-./TIGAR_TWAS.sh --asso 2 \
---Gene_anno ${Gene_anno_file} --Zscore ${Zscore} --Weight ${Weight} \
---Covar ${Ref_Covariance_file} --chr 22 \
---out ${out_prefix}
+gene_anno_file="${TIGAR_dir}/ExampleData/gene_anno.txt"
+Zscore_file="${TIGAR_dir}/CHR1_GWAS_Zscore.txt.gz"
+eQTL_ES_file="${TIGAR_dir}/ExampleData/eQTLweights.txt"
+LD_file="${TIGAR_dir}/CHR1_LD.txt.gz"
+out_dir="${TIGAR_dir}/ExampleData/output"
+
+${TIGAR_dir}/TIGAR_TWAS.sh --asso 2 \
+--gene_anno ${gene_anno_file} \
+--Zscore ${Zscore_file} \
+--weight ${eQTL_ES_file} \
+--LD ${LD_file} \
+--chr 1 \
+--out ${out_dir}
 ```
 
 #### 4. Generate reference covariance files
 ```
-.TIGAR_Covar.sh --block ${block_annotation} \
+${TIGAR_dir}/TIGAR_Covar.sh --block ${block_annotation} \
 --geno_path ${geno_path} --geno vcf \
---chr 22 --Format GT \
+--chr 1 --Format GT \
 --out ${out_prefix}
 ```
 

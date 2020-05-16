@@ -244,7 +244,7 @@ def Info_Gene(Chr,Exp):
 parser = argparse.ArgumentParser(description='manual to this script')
 
 ### for Gene annotation and Expression level file
-parser.add_argument('--Gene_Exp',type=str,default = None)
+parser.add_argument('--gene_exp',type=str,default = None)
 
 ### for training sampleID
 parser.add_argument('--train_sampleID',type=str,default = None)
@@ -263,7 +263,7 @@ parser.add_argument('--geno_colnames',type=str,default = None)
 parser.add_argument('--geno',type=str,default = None)
 
 ### 'DS' or 'GT'
-parser.add_argument('--Format',type=str,default=None)
+parser.add_argument('--format',type=str,default=None)
 
 ### p-value for HW test
 parser.add_argument('--hwe',type=float,default=None)
@@ -282,6 +282,9 @@ parser.add_argument('--dpr',type=int,default=None)
 ### define effect-size
 parser.add_argument('--ES', type=str,default=None)
 
+### Specify tool directory
+parser.add_argument('--TIGAR_dir', type=str,default=None)
+
 ### output dir
 parser.add_argument('--out_dir',type=str,default=None)
 
@@ -289,7 +292,7 @@ args = parser.parse_args()
 
 ### check input command
 print("********************************\n   Imput Arguments\n********************************\n")
-print("Gene Annotation and Expression file: "+args.Gene_Exp + "\n")
+print("Gene Annotation and Expression file: "+args.gene_exp + "\n")
 print("Training sampleID file: "+args.train_sampleID+ "\n")
 print("Chromosome number: "+str(args.chr)+ "\n")
 print("Number of threads: "+str(args.thread)+ "\n")
@@ -297,7 +300,7 @@ print("Training genotype file: "+args.train_geno_file+ "\n")
 print("Column names of genotype file:"+args.geno_colnames+ "\n")
 
 if args.geno=='vcf':
-    print("VCF genotype file is used for training with genotype format : " + args.Format + "\n")
+    print("VCF genotype file is used for training with genotype format : " + args.format + "\n")
 elif args.geno=='dosage':
     print("Dosage genotype file is used for Training."+ "\n")
 else:
@@ -321,7 +324,7 @@ print("********************************\n\n")
 ### 3.GeneEnd Position
 ### 4.TargetID (i.e.GeneID, treated as unique annotation for each gene)
 ### 5.Gene Name
-Gene_Exp = pd.read_csv(args.Gene_Exp,sep='\t',low_memory=False)
+Gene_Exp = pd.read_csv(args.gene_exp,sep='\t',low_memory=False)
 Gene_header = np.array(Gene_Exp.columns)
 Gene_header[0:5] = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName']
 Gene_Exp.columns = Gene_header
@@ -398,10 +401,10 @@ def thread_process(num):
         Chr_temp=Chr_temp.reset_index(drop=True)
 
         if args.geno=='vcf':
-            if args.Format not in unique(Chr_temp.FORMAT)[0].split(":"):
+            if args.format not in unique(Chr_temp.FORMAT)[0].split(":"):
                 print("Format needed for training is not provided in input vcf file.")
             else:
-                Chrom = CHR_Reform_vcf(Chr_temp,args.Format,args.hwe,args.maf)
+                Chrom = CHR_Reform_vcf(Chr_temp,args.format,args.hwe,args.maf)
         elif args.geno=='dosages':
             Chrom = CHR_Reform_DS(Chr_temp,args.hwe,args.maf)
         else:
@@ -440,7 +443,7 @@ def thread_process(num):
                 TargetID_CV = TargetID+'_CV'+str(i+1)
                 stop_CV=0
                 try:
-                    subprocess.check_call(shlex.split('./Model_Train_Pred/call_DPR.sh'+' '+CV_file_dir+' '+str(args.dpr)+' '+TargetID_CV))
+                    subprocess.check_call(shlex.split('./Model_Train_Pred/call_DPR.sh'+' '+CV_file_dir+' '+str(args.dpr)+' '+TargetID_CV + ' ' + args.TIGAR_dir))
                 except subprocess.CalledProcessError as err:
                     stop_CV=1
                     print("DPR failed in CV"+str(i+1)+" for TargetID:"+TargetID)
@@ -500,7 +503,7 @@ def thread_process(num):
             
             stop_DPR=0
             try:
-                subprocess.check_call(shlex.split('./Model_Train_Pred/call_DPR.sh'+' '+file_dir+' '+str(args.dpr)+' '+TargetID ))
+                subprocess.check_call(shlex.split('./Model_Train_Pred/call_DPR.sh'+' '+file_dir+' '+str(args.dpr)+' '+TargetID + ' ' + args.TIGAR_dir))
             except subprocess.CalledProcessError as err:
                 stop_DPR=1
                 print("DPR failed for TargetID:"+TargetID)

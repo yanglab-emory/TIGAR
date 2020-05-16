@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-##############################################################################################
+###################################################################
 # Import packages needed
 import argparse
 import time
@@ -17,34 +17,34 @@ from scipy.stats import chi2
 
 import multiprocessing
 
-##############################################################################################
+#########################################################################
 ### timecalculation
 start_time=time.clock()
 
-##############################################################################################
+############################################################
 ### variable needed
-parser = argparse.ArgumentParser(description='manual to this script')
+parser = argparse.ArgumentParser(description='Help: ')
 
 ### Gene annotation file
-parser.add_argument("--Gene",type=str,default = None)
+parser.add_argument("--gene_anno",type=str,default = None)
 
 ### GWAS Z score file
 parser.add_argument('--Zscore',type=str,default = None)
 
 ### Header of GWAS Z score file
-parser.add_argument('--Zscore_names',type=str,default=None)
+parser.add_argument('--Zscore_colnames',type=str,default=None)
 
 ### Weight
-parser.add_argument('--Weight',type=str,default = None)
+parser.add_argument('--weight',type=str,default = None)
 
 ### Header of Weight file
-parser.add_argument('--Weight_names',type=str,default=None)
+parser.add_argument('--weight_colnames',type=str,default=None)
 
 ### Reference covariance file
-parser.add_argument('--Covar',type=str,default = None)
+parser.add_argument('--LD',type=str,default = None)
 
 ### chromosome number
-parser.add_argument('--chr_num',type=int,default = None)
+parser.add_argument('--chr',type=int,default = None)
 
 ### window
 parser.add_argument('--window',type=int,default = None)
@@ -53,34 +53,34 @@ parser.add_argument('--window',type=int,default = None)
 parser.add_argument('--thread',type=int,default = None)
 
 ### Output dir
-parser.add_argument('--out_prefix',type=str,default = None)
+parser.add_argument('--out_dir',type=str,default = None)
 
 args = parser.parse_args()
 
 ################################################################################################
 ### variable checking
-print("Gene annotation file:"+args.Gene)
-print("GWAS test result:"+args.Zscore)
-print("Snps weight:"+args.Weight)
-print("Reference covariance file:"+args.Covar)
-print("Chromosome number:"+str(args.chr_num))
-print("window="+str(args.window))
-print("Number of thread:"+str(args.thread))
-print("Output dir:"+args.out_prefix)
+print("Gene annotation file : "+args.gene_anno + "\n")
+print("GWAS summary-level Z-score file : " + args.Zscore+ "\n")
+print("cis-eQTL weight file : "+args.weight+ "\n")
+print("Reference LD genotype covariance file:"+args.LD + "\n")
+print("Chromosome number : "+str(args.chr))
+print("Test gene region including SNPs within +- window = "+str(args.window) + " base paire of GeneStart/GeneEnd positions \n")
+print("Number of threads : "+str(args.thread) + "\n")
+print("Output directory : "+args.out_dir+ "\n")
 
 ################################################################################################
 ### Read in gene annotation 
-Gene = pd.read_csv(args.Gene,sep='\t')
+Gene = pd.read_csv(args.gene_anno,sep='\t')
 
-Gene = (Gene >> mask(Gene['CHROM'].astype('str')==str(args.chr_num))).reset_index(drop=True)
+Gene = (Gene >> mask(Gene['CHROM'].astype('str')==str(args.chr))).reset_index(drop=True)
 
 TargetID = np.array(Gene.TargetID)
 
-pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','Zscore','Pvalue']).to_csv(args.out_prefix+'/CHR'+str(args.chr_num)+'_association_study.txt',
-                                                                                          sep='\t',index=None,header=True,mode='a')
+pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName','Zscore','Pvalue']).to_csv(args.out_dir+'/CHR'+str(args.chr)+'_asso_study.txt',
+                     sep='\t',index=None,header=True,mode='w')
 
-Weight_names = pd.read_csv(args.Weight_names,sep='\t')
-Zscore_names = pd.read_csv(args.Zscore_names,sep='\t')
+Weight_names = pd.read_csv(args.weight_colnames,sep='\t')
+Zscore_names = pd.read_csv(args.Zscore_colnames,sep='\t')
 
 def thread_process(num):
     Gene_temp = Gene >> mask(Gene.TargetID == TargetID[num])
@@ -88,22 +88,22 @@ def thread_process(num):
     start=max(int(Gene_temp.GeneStart)-args.window,0)
     end=max(int(Gene_temp.GeneEnd)+args.window,0)
     
-    Zscore_process = subprocess.Popen(["tabix"+" "+args.Zscore+" "+str(args.chr_num)+":"+str(start)+"-"+str(end)],
+    Zscore_process = subprocess.Popen(["tabix"+" "+args.Zscore+" "+str(args.chr)+":"+str(start)+"-"+str(end)],
                                       shell=True,
                                       stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE)
     Zscore_out = Zscore_process.communicate()[0]
 
-    Weight_process = subprocess.Popen(["tabix"+" "+args.Weight+" "+str(args.chr_num)+":"+str(start)+"-"+str(end)],
+    Weight_process = subprocess.Popen(["tabix"+" "+args.Weight+" "+str(args.chr)+":"+str(start)+"-"+str(end)],
                                       shell=True,
                                       stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE)
     Weight_out = Weight_process.communicate()[0]
     
     if len(Zscore_out)==0 | len(Weight_out) == 0:
-        print("No GWAS test result or weight for this gene:"+TargetID[num])
+        print("There is no test SNP with non-zero cis-eQTL weights for gene:"+TargetID[num])
     else:
-        print("Running association study for gene:"+TargetID[num])
+        print("TWAS for gene:"+TargetID[num])
         Zscore = pd.read_csv(StringIO(Zscore_out.decode('utf-8')),sep='\t',header=None,low_memory=False)
         Zscore.columns = np.array(tuple(Zscore_names))
 
@@ -129,7 +129,7 @@ def thread_process(num):
         ZW = ZW.reset_index(drop=True)
 
         ### Read in reference covariance matrix file
-        covar_process = subprocess.Popen(["tabix"+" "+args.Covar+" "+str(args.chr_num)+":"+str(min(ZW.POS))+"-"+str(max(ZW.POS))],
+        covar_process = subprocess.Popen(["tabix"+" "+args.LD+" "+str(args.chr)+":"+str(min(ZW.POS))+"-"+str(max(ZW.POS))],
                                          shell=True,
                                          stdout=subprocess.PIPE,
                                          stderr=subprocess.PIPE)
@@ -172,18 +172,19 @@ def thread_process(num):
             burden_Z = mat(ZW.Zscore)*mat(ZW.ES).T/sqrt(mat(ZW.ES)*V*mat(ZW.ES).T)
 
             result = pd.DataFrame()
-            result['CHROM'] = np.array(args.chr_num).ravel()
+            result['CHROM'] = np.array(args.chr).ravel()
             result['GeneStart'] = np.array(Gene_temp.GeneStart).ravel()
             result['GeneEnd'] = np.array(Gene_temp.GeneEnd).ravel()
             result['TargetID'] = np.array(TargetID[num]).ravel()
+            result['GeneName'] = np.array(Gene_temp.GeneName).ravel()
             result['Zscore'] = burden_Z
             ### p-value for chi-square test
             result['Pvalue'] = 1-chi2.cdf(burden_Z**2,1)
 
-            result.to_csv(args.out_prefix+'/CHR'+str(args.chr_num)+'_association_study.txt',
+            result.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_asso_study.txt',
                           sep='\t',index=None,header=None,mode='a')
 
-########################################################################################################
+###############################################################
 ### thread process
 pool = multiprocessing.Pool(args.thread)
 
@@ -192,11 +193,11 @@ pool.map(thread_process,[num for num in range(len(TargetID))])
 pool.close()
 pool.join()
 
-#########################################################################################################
+############################################################
 ### time calculation
 time=round((time.clock()-start_time)/60,2)
 
-print(str(time)+' minutes')
+# print(str(time)+' minutes')
 
 
 

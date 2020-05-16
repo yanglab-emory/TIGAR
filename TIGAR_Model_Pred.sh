@@ -1,30 +1,26 @@
 #!/usr/bin/bash
 
-##################################################################
-# software requirement
-# python 3
-# tabix
-###
-
 #######################################################################
 ### Input Arguments for GReX Prediction
 #######################################################################
 
 # --chr: Chromosome number need to be specified with respect to the genotype input data
 # --weight: Path for SNP weight (eQTL effect size) file 
+# --gene_anno : Path for gene annotation file to specify a list of gene for GReX prediction
 # --test_sampleID: Path for a file with sampleIDs that should be contained in the genotype file
 # --genofile: Path for the training genotype file (bgzipped and tabixed) 
 # --genofile_tye: Genotype file type: "vcf" or "dosage"
-# --Format: Genotype format in VCF file that should be used: "GT" (default) for genotype data or "DS" for dosage data, only required if the input genotype file is of VCF file
+# --format: Genotype format in VCF file that should be used: "GT" (default) for genotype data or "DS" for dosage data, only required if the input genotype file is of VCF file
 # --window: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression prediction model (default 1000000 for +- 1MB region around TSS)
 # maf_diff: MAF difference threshold for matching SNPs from eQTL weight file and test genotype file. If SNP MAF difference is greater than maf_diff (default 0.2), , the SNP will be excluded
+# --TIGAR_dir : Specify the directory of TIGAR source code
 # --thread: Number of threads for parallel computation (default 1)
 # --out_dir: Output directory (will be created if not exist)
 
 
 #######################################################################
 VARS=`getopt -o "" -a -l \
-chr:,weight:,gene_anno:,genofile_type:,genofile:,test_sampleID:,Format:,window:,maf_diff:,thread:,out_dir: \
+chr:,weight:,gene_anno:,genofile_type:,genofile:,test_sampleID:,format:,window:,maf_diff:,TIGAR_dir:,thread:,out_dir: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -44,9 +40,10 @@ do
         --genofile_type|-genofile_type) genofile_type=$2; shift 2;;
         --genofile|-genofile) genofile=$2; shift 2;;
         --test_sampleID|-test_sampleID) test_sampleID_file=$2; shift 2;;
-        --Format|-Format) Format=$2; shift 2;;
+        --format|-format) format=$2; shift 2;;
         --window|-window) window=$2; shift 2;;
         --maf_diff|-maf_diff) maf_diff=$2; shift 2;;
+        --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
         --thread|-thread) thread=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
         --) shift;break;;
@@ -96,13 +93,18 @@ if [ ! -f "${gene_anno}" ] ; then
     exit 1
 fi
 
-python ./Model_Train_Pred/Prediction.py \
+# Make python script executible
+if [[ ! -x  ${TIGAR_dir}/Model_Train_Pred/Prediction.py ]] ; then
+    chmod 755  ${TIGAR_dir}/Model_Train_Pred/Prediction.py
+fi
+
+python ${TIGAR_dir}/Model_Train_Pred/Prediction.py \
 --chr ${chr} \
 --weight ${weight_file} \
 --genofile ${genofile} \
 --test_geno_colnames ${out_dir}/Pred_CHR${chr}/test_geno_colnames.txt \
 --test_sampleID ${test_sampleID_file} \
---Format ${Format} \
+--format ${format} \
 --geno ${genofile_type} \
 --gene_anno ${gene_anno} \
 --window ${window} \

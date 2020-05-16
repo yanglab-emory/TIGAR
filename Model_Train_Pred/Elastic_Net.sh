@@ -14,6 +14,7 @@
 # --hwe: Hardy Weinberg Equilibrium p-value threshold (default 0.00001) to exclude variants that violated HWE
 # --window: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression prediction model (default 1000000 for +- 1MB region around TSS)
 # --cvR2: Take value 0 for calculating training R2 from fitted model and 1 for calculating training R2 from 5-fold cross validation
+# --TIGAR_dir : Specify the directory of TIGAR source code
 # --thread: Number of threads for parallel computation (default 1)
 # --out_dir: Output directory (will be created if not exist)
 
@@ -25,7 +26,7 @@
 
 
 VARS=`getopt -o "" -a -l \
-model:,Gene_Exp:,train_sampleID:,chr:,genofile_type:,genofile:,Format:,maf:,hwe:,window:,cvR2:,cv:,alpha:,thread:,out_dir: \
+model:,Gene_Exp:,train_sampleID:,chr:,genofile_type:,genofile:,Format:,maf:,hwe:,window:,cvR2:,cv:,alpha:,TIGAR_dir:,thread:,out_dir: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -52,6 +53,7 @@ do
         --cvR2|-cvR2) cvR2=$2; shift 2;;
         --cv|-cv) cv=$2; shift 2;;
         --alpha|-alpha) alpha=$2; shift 2;;
+        --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
         --thread|-thread) thread=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
         --) shift;break;;
@@ -70,8 +72,15 @@ zcat ${genofile} | grep 'CHROM' > ${out_dir}/EN_CHR${chr}/geno_colnames.txt
 echo ${out_dir}/EN_CHR${chr}/geno_colnames.txt
 
 ### 3.
+
+
 ### Training
-python ./Model_Train_Pred/Elastic_Net_Train.py \
+
+if [[ ! -x ${TIGAR_dir}/Model_Train_Pred/Elastic_Net_Train.py ]] ; then
+    chmod 755 ${TIGAR_dir}/Model_Train_Pred/Elastic_Net_Train.py
+fi
+
+python ${TIGAR_dir}/Model_Train_Pred/Elastic_Net_Train.py \
 --Gene_Exp ${Gene_Exp} \
 --train_sampleID ${train_sampleID} \
 --chr ${chr} \
