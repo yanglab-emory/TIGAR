@@ -217,7 +217,7 @@ eQTL_ES_file="${TIGAR_dir}/ExampleData/eQTLweights.txt"
 gene_anno_file="${TIGAR_dir}/ExampleData/gene_anno.txt"
 test_sample_ID_file="${TIGAR_dir}/ExampleData/test_sampleID.txt"
 
-${TIGAR_dir}/TIGAR_Model_Pred.sh --chr 1 \
+${TIGAR_dir}/TIGAR_GReX_Pred.sh --chr 1 \
 --weight ${eQTL_ES_file} \
 --gene_anno ${gene_anno_file} \
 --test_sampleID ${test_sample_ID_file} \
@@ -283,7 +283,7 @@ ${TIGAR_dir}/TIGAR_TWAS.sh --asso 2 \
 
 #### 4. Generate reference covariance files
 ```
-${TIGAR_dir}/TIGAR_Covar.sh --block ${block_annotation} \
+${TIGAR_dir}/TIGAR_LD.sh --block ${block_annotation} \
 --geno_path ${geno_path} --geno vcf \
 --chr 1 --Format GT \
 --out ${out_prefix}
