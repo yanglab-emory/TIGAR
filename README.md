@@ -4,7 +4,7 @@
 1. **TIGAR** can train gene expression imputation models by both **nonparametric Bayesian DPR** and **Elastic-Net (PrediXcan)** methods with reference dataset that contain transcriptomic and genetic data of the same samples.
 2. Impute **Genetically Regulated gene eXpression (GReX)** from *Individual-level* genetic data
 3. Conduct **TWAS** using both *Individual-level* and *Summary-level* GWAS data for studying *Univariate* and *Multivariate* phenotypes.
-4. Note: please use our most recently updated scripts to conduct TWAS.
+4. **Note:** please use our most recently updated scripts to conduct TWAS.
 
 
 ### Software Setup
@@ -21,8 +21,8 @@
 #### 2. Setup Executable Files
 - Change `*.sh` files under **TIGAR** directory into executable files
 ```
-cd [TIGAR_directory]
-chmod 755 *.sh 
+TIGAR_dir="/home/jyang/GIT/TIGAR"
+chmod 755 ${TIGAR_dir}/*.sh 
 ```
 
 
@@ -72,7 +72,6 @@ Example input files provided under `./ExampleData/` are generated artificially. 
 - Two columns with the first column specifying the Phenotype (P) and Covariate variables (C) from the PED file, and the second column specifying the corresponding column headers in the PED file. 
 
 |P|PHENO|
-|:-----:|:---:|
 |C|COV1|
 |C|COV2|
 |C|SEX|
@@ -150,7 +149,6 @@ Example input files provided under `./ExampleData/` are generated artificially. 
 	- Example bash command
 ```
 # Setup input file paths
-TIGAR_dir="/home/jyang/GIT/TIGAR"
 Gene_Exp_train_file="${TIGAR_dir}/ExampleData/gene_exp.txt"
 train_sample_ID_file="${TIGAR_dir}/ExampleData/sampleID.txt"
 genofile="${TIGAR_dir}/ExampleData/example.vcf.gz"
@@ -266,11 +264,8 @@ ${TIGAR_dir}/TIGAR_TWAS.sh --asso 1 \
 	- `--TIGAR_dir` : Specify the directory of **TIGAR** source code
 
 ```
-gene_anno_file="${TIGAR_dir}/ExampleData/gene_anno.txt"
 Zscore_file="${TIGAR_dir}/CHR1_GWAS_Zscore.txt.gz"
-eQTL_ES_file="${TIGAR_dir}/ExampleData/eQTLweights.txt"
 LD_file="${TIGAR_dir}/CHR1_LD.txt.gz"
-out_dir="${TIGAR_dir}/ExampleData/output"
 
 ${TIGAR_dir}/TIGAR_TWAS.sh --asso 2 \
 --gene_anno ${gene_anno_file} \
