@@ -1,11 +1,7 @@
-### Scripts used for model training and prediction
+### Scripts and tools used for model training and prediction
 
-#### 1. Elastic-Net
-- Scripts : Elastic_Net.py, Elastic_Net.sh
+1. **PrediXcan Elastic-Net** `Elastic_Net.py`
 
-#### 2. DPR
-- Scripts : DPR_Train.py, call_DPR.sh, DPR.sh
-- DPR executible file: DPR
+2. **Nonparametric Bayesian DPR** `DPR_Train.py`, `call_DPR.sh`, `DPR`
 
-#### 3. Prediction
-- Scripts : Prediction.py
+3. **GReX Prediction**  `Prediction.py`

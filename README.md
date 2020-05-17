@@ -127,12 +127,12 @@ Example input files provided under `./ExampleData/` are generated artificially. 
 
 - Variables to specify
 	- `--model`: Gene expression imputation model: `elastic_net` or `DPR`
-	- `--Gene_Exp`: Path for Gene annotation and Expression file
+	- `--gene_exp`: Path for Gene annotation and Expression file
 	- `--train_sampleID`: Path for a file with sampleIDs that will be used for training
 	- `--genofile`: Path for the training genotype file (bgzipped and tabixed) 
 	- `--chr`: Chromosome number need to be specified with respect to the genotype input data (default: `1`)
-	- `--genofile_tye`: Genotype file type: `vcf` or `dosage`
-	- `--Format`: Genotype format in VCF file that should be used: `GT` (default) for genotype data or `DS` for dosage data, only required if the input genotype file is of VCF file
+	- `--genofile_type`: Genotype file type: `vcf` or `dosage`
+	- `--format`: Genotype format in VCF file that should be used: `GT` (default) for genotype data or `DS` for dosage data, only required if the input genotype file is of VCF file
 	- `--maf`: Minor Allele Frequency threshold (ranges from 0 to 1; default `0.01`) to exclude rare variants
 	- `--hwe`: Hardy Weinberg Equilibrium p-value threshold (default `0.00001`) to exclude variants that violated HWE
 	- `--window`: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression imputation model (default `1000000` for +- 1MB region around TSS)
@@ -156,16 +156,17 @@ out_dir="${TIGAR_dir}/ExampleData/output"
 
 # Call TIGAR model training shell script
 ${TIGAR_dir}/TIGAR_Model_Train.sh --model DPR \
---Gene_Exp ${Gene_Exp_train_file} \
+--gene_exp ${Gene_Exp_train_file} \
 --train_sampleID ${train_sample_ID_file} \
 --genofile ${genofile} --chr 1 \
---genofile_type vcf --Format GT \
+--genofile_type vcf --format GT \
 --maf 0.01 \
 --hwe 0.0001 \
 --cvR2 1 \
 --dpr 1 --ES fixed \
+--thread 2 \
 --TIGAR_dir ${TIGAR_dir} \
---out_dir ${out_dir}
+--out_dir ${out_dir} 
 ```
 
 - Train *Elastic-Net* imputation model
@@ -178,14 +179,15 @@ ${TIGAR_dir}/TIGAR_Model_Train.sh --model DPR \
 	- Example bash command
 ```
 ${TIGAR_dir}/TIGAR_Model_Train.sh --model elastic_net \
---Gene_Exp ${Gene_Exp_train_file} \
+--gene_exp ${Gene_Exp_train_file} \
 --train_sampleID ${train_sample_ID_file} \
 --genofile ${genofile} --chr 1 \
---genofile_type vcf --Format GT \
+--genofile_type vcf --format GT \
 --maf 0.01 \
 --hwe 0.0001 \
 --cvR2 1 \
 --alpha 0.5 \
+--thread 2 \
 --TIGAR_dir ${TIGAR_dir} \
 --out_dir ${out_dir}
 ```
@@ -202,8 +204,8 @@ ${TIGAR_dir}/TIGAR_Model_Train.sh --model elastic_net \
 	- `--weight`: Path for SNP weight (eQTL effect size) file 
 	- `--test_sampleID`: Path for a file with sampleIDs that should be contained in the genotype file
 	- `--genofile`: Path for the training genotype file (bgzipped and tabixed) 
-	- `--genofile_tye`: Genotype file type: `vcf` or `dosage`
-	- `--Format`: Genotype format in VCF file that should be used: `GT` (default) for genotype data or `DS` for dosage data, only required if the input genotype file is of VCF file
+	- `--genofile_type`: Genotype file type: `vcf` or `dosage`
+	- `--format`: Genotype format in VCF file that should be used: `GT` (default) for genotype data or `DS` for dosage data, only required if the input genotype file is of VCF file
 	- `--window`: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression prediction model (default `1000000` for `+- 1MB` region around TSS)
 	- `--maf_diff`: MAF difference threshold for matching SNPs from eQTL weight file and test genotype file. If SNP MAF difference is greater than `maf_diff` (default `0.2`), the SNP will be excluded
 	- `--TIGAR_dir` : Specify the directory of TIGAR source code
@@ -220,8 +222,9 @@ ${TIGAR_dir}/TIGAR_GReX_Pred.sh --chr 1 \
 --gene_anno ${gene_anno_file} \
 --test_sampleID ${test_sample_ID_file} \
 --genofile ${genofile} \
---genofile_type vcf --Format GT \
+--genofile_type vcf --format GT \
 --TIGAR_dir ${TIGAR_dir} \
+--thread 2 \
 --out_dir ${out_dir}
 ```
 - GReX prediction output

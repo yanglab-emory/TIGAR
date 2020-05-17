@@ -14,7 +14,7 @@
 # --train_sampleID: Path for a file with sampleIDs that will be used for training
 # --genofile: Path for the training genotype file (bgzipped and tabixed) 
 # --chr: Chromosome number need to be specified with respect to the genotype input data
-# --genofile_tye: Genotype file type: "vcf" or "dosage"
+# --genofile_type: Genotype file type: "vcf" or "dosage"
 # --format: Genotype format in VCF file that should be used: "GT" (default) for genotype data or "DS" for dosage data, only required if the input genotype file is of VCF file
 # --maf: Minor Allele Frequency threshold (ranges from 0 to 1; default 0.01) to exclude rare variants
 # --hwe: Hardy Weinberg Equilibrium p-value threshold (default 0.00001) to exclude variants that violated HWE
@@ -213,7 +213,7 @@ elif [[ "$model"x == "DPR"x ]]; then
     if [ ${cvR2} == "1" ] ; then
         rm -fr ${out_dir}/DPR_CHR${chr}/CV_Files
     fi
-    
+
 else
     echo "Error: Please specify --model to be either elastic_net or DPR "
 fi

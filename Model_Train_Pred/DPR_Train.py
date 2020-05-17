@@ -443,7 +443,7 @@ def thread_process(num):
                 TargetID_CV = TargetID+'_CV'+str(i+1)
                 stop_CV=0
                 try:
-                    subprocess.check_call(shlex.split(str(args.TIGAR_dir) + ' ' +  '/Model_Train_Pred/call_DPR.sh'+' '+CV_file_dir+' '+str(args.dpr)+' '+TargetID_CV + ' ' + str(args.TIGAR_dir) ) )
+                    subprocess.check_call(shlex.split(str(args.TIGAR_dir) + '/Model_Train_Pred/call_DPR.sh'+' '+CV_file_dir+' '+str(args.dpr)+' '+TargetID_CV + ' ' + str(args.TIGAR_dir) ) )
                 except subprocess.CalledProcessError as err:
                     stop_CV=1
                     print("DPR failed in CV"+str(i+1)+" for TargetID:"+TargetID)
@@ -503,7 +503,7 @@ def thread_process(num):
             
             stop_DPR=0
             try:
-                subprocess.check_call(shlex.split(str(args.TIGAR_dir) + ' ' +  '/Model_Train_Pred/call_DPR.sh'+' '+file_dir+' '+str(args.dpr)+' '+TargetID + ' ' + str(args.TIGAR_dir)))
+                subprocess.check_call(shlex.split(str(args.TIGAR_dir) +  '/Model_Train_Pred/call_DPR.sh'+' '+file_dir+' '+str(args.dpr)+' '+TargetID + ' ' + str(args.TIGAR_dir)))
             except subprocess.CalledProcessError as err:
                 stop_DPR=1
                 print("DPR failed for TargetID:"+TargetID)

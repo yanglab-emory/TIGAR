@@ -10,10 +10,6 @@ train_sample_ID_file="${TIGAR_dir}/ExampleData/sampleID.txt"
 genofile="${TIGAR_dir}/ExampleData/example.vcf.gz"
 out_dir="${TIGAR_dir}/ExampleData/output"
 
-
-mafval=0.01
-hweval=0.00001
-
 ### Load Anaconda3 module, set up PATHONPATH to include required libraries
 module load Anaconda3/4.2.0
 conda activate myenv
@@ -25,8 +21,8 @@ ${TIGAR_dir}/TIGAR_Model_Train.sh --model DPR \
 --train_sampleID ${train_sample_ID_file} \
 --genofile ${genofile} --chr 1 \
 --genofile_type vcf --format GT \
---maf ${mafval} \
---hwe ${hweval} \
+--maf 0.01 \
+--hwe 0.0001 \
 --cvR2 1 \
 --dpr 1 --ES fixed \
 --thread 2 \
@@ -39,8 +35,8 @@ ${TIGAR_dir}/TIGAR_Model_Train.sh --model elastic_net \
 --train_sampleID ${train_sample_ID_file} \
 --genofile ${genofile} --chr 1 \
 --genofile_type vcf --format GT \
---maf ${mafval} \
---hwe ${hweval} \
+--maf 0.01 \
+--hwe 0.0001 \
 --cvR2 1 \
 --alpha 0.5 \
 --thread 2 \
@@ -62,6 +58,7 @@ ${TIGAR_dir}/TIGAR_Model_Pred.sh --chr 1 \
 --genofile ${genofile} \
 --genofile_type vcf --format GT \
 --TIGAR_dir ${TIGAR_dir} \
+--thread 2 \
 --out_dir ${out_dir}
 
 ### TWAS using individual-level data
