@@ -36,7 +36,7 @@
 
 #################################
 VARS=`getopt -o "" -a -l \
-model:,gene_exp:,train_sampleID:,chr:,genofile_type:,genofile:,Format:,maf:,hwe:,window:,cvR2:,cv:,alpha:,dpr:,ES:,TIGAR_dir:,thread:,out_dir: \
+model:,gene_exp:,train_sampleID:,chr:,genofile_type:,genofile:,format:,maf:,hwe:,window:,cvR2:,cv:,alpha:,dpr:,ES:,TIGAR_dir:,thread:,out_dir: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -56,7 +56,7 @@ do
         --chr|-chr) chr=$2; shift 2;;
         --genofile_type|-genofile_type) genofile_type=$2; shift 2;;
         --genofile|-genofile) genofile=$2; shift 2;;
-        --Format|-Format) Format=$2; shift 2;;
+        --format|-format) format=$2; shift 2;;
         --maf|-maf) maf=$2; shift 2;;
         --hwe|-hwe) hwe=$2; shift 2;;
         --window|-window) window=$2; shift 2;;
@@ -123,58 +123,101 @@ fi
 if [[ "$model"x == "elastic_net"x ]];then
     echo "Train gene expression imputation models by Elastic-Net method..."
 
-    # Make shell script executible
-    if [[ ! -x ${TIGAR_dir}/Model_Train_Pred/Elastic_Net.sh ]] ; then
-        chmod 755 ${TIGAR_dir}/Model_Train_Pred/Elastic_Net.sh
+    # Make python script executible
+    if [[ ! -x ${TIGAR_dir}/Model_Train_Pred/Elastic_Net_Train.py ]] ; then
+        chmod 755 ${TIGAR_dir}/Model_Train_Pred/Elastic_Net_Train.py
     fi
 
-    ${TIGAR_dir}/Model_Train_Pred/Elastic_Net.sh \
-    --model ${model} \
+    mkdir -p ${out_dir}/EN_CHR${chr}
+    zcat ${genofile} | grep 'CHROM' > ${out_dir}/EN_CHR${chr}/geno_colnames.txt
+
+    python ${TIGAR_dir}/Model_Train_Pred/Elastic_Net_Train.py \
     --gene_exp ${gene_exp} \
     --train_sampleID ${train_sampleID} \
     --chr ${chr} \
-    --genofile_type ${genofile_type} \
     --genofile ${genofile} \
+    --genofile_type ${genofile_type} \
+    --geno_colnames ${out_dir}/EN_CHR${chr}/geno_colnames.txt \
     --format ${format} \
     --maf ${maf} \
     --hwe ${hwe} \
     --window ${window} \
     --cvR2 ${cvR2} \
     --cv ${cv} \
-    --alpha ${alpha} \
-    --TIGAR_dir ${TIGAR_dir} \
     --thread ${thread} \
-    --out_dir ${out_dir}
+    --alpha ${alpha} \
+    --out_dir ${out_dir}/EN_CHR${chr} \
+    > ${out_dir}/EN_CHR${chr}/CHR${chr}_EN_train_Log.txt
+
+    ### Remove file
+    rm -f ${out_dir}/EN_CHR${chr}/geno_colnames.txt
+
 elif [[ "$model"x == "DPR"x ]]; then
     echo "Train gene expression imputation models by Nonparametric Bayesian DPR method..."
-    if [ ! -x "$(command -v DPR)" ]; then
-        echo 'Error: please add DPR executible file into your PATH.' >&2
-        exit 1
+
+    ### Store DPR Results
+    mkdir -p ${out_dir}/DPR_CHR${chr}
+
+    ### Store files for DPR under DPR_Files
+    mkdir -p ${out_dir}/DPR_CHR${chr}/DPR_Files
+
+    ### Extract column names from training genotype file
+    if [ -f ${genofile} ] ; then
+        zcat ${genofile} | grep 'CHROM' > ${out_dir}/DPR_CHR${chr}/geno_colnames.txt
     else
-        # Make shell script executible
-        if [[ ! -x ${TIGAR_dir}/Model_Train_Pred/DPR.sh ]] ; then
-            chmod 755 ${TIGAR_dir}/Model_Train_Pred/DPR.sh
-        fi
-        
-        ${TIGAR_dir}/Model_Train_Pred/DPR.sh \
-        --model ${model} \
-        --gene_exp ${gene_exp} \
-        --train_sampleID ${train_sampleID} \
-        --chr ${chr} \
-        --genofile_type ${genofile_type} \
-        --genofile ${genofile} \
-        --format ${format} \
-        --maf ${maf} \
-        --hwe ${hwe} \
-        --window ${window} \
-        --cvR2 ${cvR2} \
-        --dpr ${dpr_num} \
-        --ES ${ES} \
-        --TIGAR_dir ${TIGAR_dir} \
-        --thread ${thread} \
-        --out_dir ${out_dir}
+        echo Error: ${genofile} dose not exist or empty. >&2
+        exit 1
     fi
+
+    ### Store Cross Validation DPR input files and outputs
+    if [ ${cvR2} == "1" ] ; then
+        mkdir -p ${out_dir}/DPR_CHR${chr}/CV_Files
+        echo "Run 5-fold cross validation to evaluate DPR model."
+    else
+        echo "Skip 5-fold CV."
+    fi
+
+    # Make DPR file executible
+    if [[ ! -x ${TIGAR_dir}/Model_Train_Pred/DPR ]] ; then
+        chmod 755 ${TIGAR_dir}/Model_Train_Pred/DPR
+    fi
+
+    # Make python script executible
+    if [[ ! -x ${TIGAR_dir}/Model_Train_Pred/DPR_Train.py ]] ; then
+        chmod 755 ${TIGAR_dir}/Model_Train_Pred/DPR_Train.py
+    fi
+
+    python ${TIGAR_dir}/Model_Train_Pred/DPR_Train.py \
+    --gene_exp ${gene_exp} \
+    --train_sampleID ${train_sampleID} \
+    --chr ${chr} \
+    --train_geno_file ${genofile} \
+    --geno_colnames ${out_dir}/DPR_CHR${chr}/geno_colnames.txt \
+    --genofile_type ${genofile_type} \
+    --format ${format} \
+    --hwe ${hwe} \
+    --maf ${maf} \
+    --window ${window} \
+    --cvR2 ${cvR2} \
+    --dpr ${dpr_num} \
+    --ES ${ES} \
+    --TIGAR_dir ${TIGAR_dir} \
+    --thread ${thread} \
+    --out_dir ${out_dir}/DPR_CHR${chr} \
+    > ${out_dir}/DPR_CHR${chr}/CHR${chr}_DPR_train_Log.txt
+
+    ### 4. Remove DPR input files
+    rm -f ${out_dir}/CHR${chr}_geno_colnames.txt
+    rm -fr ${out_dir}/DPR_CHR${chr}/DPR_Files
+
+    if [ ${cvR2} == "1" ] ; then
+        rm -fr ${out_dir}/DPR_CHR${chr}/CV_Files
+    fi
+    
 else
     echo "Error: Please specify --model to be either elastic_net or DPR "
 fi
 
+echo "Training ${model} model job completed for CHR ${chr}."
+
+exit

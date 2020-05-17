@@ -260,7 +260,7 @@ parser.add_argument('--train_geno_file',type=str,default = None)
 parser.add_argument('--geno_colnames',type=str,default = None)
 
 ### specified input file type(vcf or dosages)
-parser.add_argument('--geno',type=str,default = None)
+parser.add_argument('--genofile_type',type=str,default = None)
 
 ### 'DS' or 'GT'
 parser.add_argument('--format',type=str,default=None)
@@ -299,9 +299,9 @@ print("Number of threads: "+str(args.thread)+ "\n")
 print("Training genotype file: "+args.train_geno_file+ "\n")
 print("Column names of genotype file:"+args.geno_colnames+ "\n")
 
-if args.geno=='vcf':
+if args.genofile_type=='vcf':
     print("VCF genotype file is used for training with genotype format : " + args.format + "\n")
-elif args.geno=='dosage':
+elif args.genofile_type=='dosage':
     print("Dosage genotype file is used for Training."+ "\n")
 else:
     raise SystemExit("Please specify input genotype file as either 'vcf' or 'dosage'."+ "\n")
@@ -400,12 +400,12 @@ def thread_process(num):
         Chr_temp.columns=np.array(tuple(geno_colnames))
         Chr_temp=Chr_temp.reset_index(drop=True)
 
-        if args.geno=='vcf':
+        if args.genofile_type=='vcf':
             if args.format not in unique(Chr_temp.FORMAT)[0].split(":"):
                 print("Format needed for training is not provided in input vcf file.")
             else:
                 Chrom = CHR_Reform_vcf(Chr_temp,args.format,args.hwe,args.maf)
-        elif args.geno=='dosages':
+        elif args.genofile_type=='dosages':
             Chrom = CHR_Reform_DS(Chr_temp,args.hwe,args.maf)
         else:
             print("geno file can not identify")
@@ -443,7 +443,7 @@ def thread_process(num):
                 TargetID_CV = TargetID+'_CV'+str(i+1)
                 stop_CV=0
                 try:
-                    subprocess.check_call(shlex.split('./Model_Train_Pred/call_DPR.sh'+' '+CV_file_dir+' '+str(args.dpr)+' '+TargetID_CV + ' ' + args.TIGAR_dir))
+                    subprocess.check_call(shlex.split(str(args.TIGAR_dir) + ' ' +  '/Model_Train_Pred/call_DPR.sh'+' '+CV_file_dir+' '+str(args.dpr)+' '+TargetID_CV + ' ' + str(args.TIGAR_dir) ) )
                 except subprocess.CalledProcessError as err:
                     stop_CV=1
                     print("DPR failed in CV"+str(i+1)+" for TargetID:"+TargetID)
@@ -503,7 +503,7 @@ def thread_process(num):
             
             stop_DPR=0
             try:
-                subprocess.check_call(shlex.split('./Model_Train_Pred/call_DPR.sh'+' '+file_dir+' '+str(args.dpr)+' '+TargetID + ' ' + args.TIGAR_dir))
+                subprocess.check_call(shlex.split(str(args.TIGAR_dir) + ' ' +  '/Model_Train_Pred/call_DPR.sh'+' '+file_dir+' '+str(args.dpr)+' '+TargetID + ' ' + str(args.TIGAR_dir)))
             except subprocess.CalledProcessError as err:
                 stop_DPR=1
                 print("DPR failed for TargetID:"+TargetID)

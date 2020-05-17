@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-##############################################################################################
+#########################################################
 # Import packages needed
 import argparse
 import warnings
@@ -308,7 +308,7 @@ def elastic_net(trainX,trainY,k,Alpha):
 parser = argparse.ArgumentParser(description='manual to this script')
 
 ### Gene Annotation and Expression level file
-parser.add_argument('--Gene_Exp',type=str,default = None)
+parser.add_argument('--gene_exp',type=str,default = None)
 
 ### Training sampleID
 parser.add_argument('--train_sampleID',type=str,default = None)
@@ -324,10 +324,10 @@ parser.add_argument('--genofile',type=str,default = None)
 parser.add_argument('--geno_colnames',type=str,default = None)
 
 ### Specified input file type(vcf or dosages)
-parser.add_argument('--geno',type=str,default = None)
+parser.add_argument('--genofile_type',type=str,default = None)
 
 ### 'DS' or 'GT' for VCF genotype file
-parser.add_argument('--Format',type=str,default=None)
+parser.add_argument('--format',type=str,default=None)
 
 ### for data selection
 ### Folded Minor Allele Frequency (range from 0-0.5)
@@ -356,15 +356,15 @@ args = parser.parse_args()
 
 ### Print all variables for model training
 print("********************************\n   Imput Arguments\n********************************\n")
-print("Gene Annotation and Expression data file : "+args.Gene_Exp + "\n")
+print("Gene Annotation and Expression data file : "+args.gene_exp + "\n")
 print("Training sampleID file : "+args.train_sampleID+ "\n")
 print("Chrmosome : "+str(args.chr)+ "\n")
 print("Training genotype file : "+args.genofile+ "\n")
 # print("Column names of genotype file:"+args.geno_colnames+ "\n")
 
-if args.geno=='vcf':
-    print("VCF genotype file is used for training with genotype format : " + args.Format + "\n")
-elif args.geno=='dosage':
+if args.genofile_type=='vcf':
+    print("VCF genotype file is used for training with genotype format : " + args.format + "\n")
+elif args.genofile_type=='dosage':
     print("Dosage genotype file is used for Training."+ "\n")
 else:
     raise SystemExit("Please specify input genotype file as either 'vcf' or 'dosage'."+ "\n")
@@ -392,7 +392,7 @@ print("********************************\n\n")
 ### 3.GeneEnd Position
 ### 4.TargetID (i.e.GeneID, treated as unique annotation for each gene)
 ### 5.Gene Name
-Gene_Exp = pd.read_csv(args.Gene_Exp,sep='\t',low_memory=False)
+Gene_Exp = pd.read_csv(args.gene_exp,sep='\t',low_memory=False)
 Gene_header = np.array(Gene_Exp.columns)
 Gene_header[0:5] = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName']
 Gene_Exp.columns = Gene_header
@@ -462,12 +462,12 @@ def thread_process(num):
         Chr_temp.columns=np.array(tuple(train_names))
         Chr_temp=Chr_temp.reset_index(drop=True)
        
-        if args.geno=='vcf':
-            if args.Format not in unique(Chr_temp.FORMAT)[0].split(":"):
+        if args.genofile_type=='vcf':
+            if args.format not in unique(Chr_temp.FORMAT)[0].split(":"):
                 print("Specified genotype format is not provided in the FORMAT column of VCF file.")
             else:
-                Chrom = CHR_Reform_vcf(Chr_temp,args.Format,args.hwe,args.maf)
-        elif args.geno=='dosages':
+                Chrom = CHR_Reform_vcf(Chr_temp,args.format,args.hwe,args.maf)
+        elif args.genofile_type=='dosages':
             Chrom = CHR_Reform_DS(Chr_temp,args.hwe,args.maf)
         
         print("Running 5-fold CV to tune Elastic-Net penalty parameter for Gene:"+TargetID+"\n")
@@ -539,7 +539,7 @@ def thread_process(num):
             Info.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_EN_train_GeneInfo.txt',
                         header=None,index=None,sep='\t',mode='a')
 
-###############################################################################################################
+##################################################################
 ### Start thread
 if (args.thread < int(len(EXP)/100) | args.thread > len(EXP)):
     args.thread = (int(len(EXP)/100)+1)*100
@@ -551,7 +551,7 @@ pool.map(thread_process,[num for num in range(len(EXP))])
 pool.close()
 pool.join()
 
-####################################################################################################################
+#########################################################
 ### time calculation
 time=round((time.clock()-start_time)/60,2)
 

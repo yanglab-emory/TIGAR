@@ -21,29 +21,31 @@ export PYTHONPATH=/home/rparrish/.conda/envs/myenv/lib/python3.5/site-packages/:
 
 ### Train DPR model
 ${TIGAR_dir}/TIGAR_Model_Train.sh --model DPR \
---Gene_Exp ${Gene_Exp_train_file} \
+--gene_exp ${Gene_Exp_train_file} \
 --train_sampleID ${train_sample_ID_file} \
 --genofile ${genofile} --chr 1 \
---genofile_type vcf --Format GT \
+--genofile_type vcf --format GT \
 --maf ${mafval} \
 --hwe ${hweval} \
 --cvR2 1 \
 --dpr 1 --ES fixed \
+--thread 2 \
 --TIGAR_dir ${TIGAR_dir} \
 --out_dir ${out_dir} &
 
 ### Train elastic_net model
 ${TIGAR_dir}/TIGAR_Model_Train.sh --model elastic_net \
---Gene_Exp ${Gene_Exp_train_file} \
+--gene_exp ${Gene_Exp_train_file} \
 --train_sampleID ${train_sample_ID_file} \
 --genofile ${genofile} --chr 1 \
---genofile_type vcf --Format GT \
+--genofile_type vcf --format GT \
 --maf ${mafval} \
 --hwe ${hweval} \
 --cvR2 1 \
 --alpha 0.5 \
+--thread 2 \
 --TIGAR_dir ${TIGAR_dir} \
---out_dir ${out_dir} 
+--out_dir ${out_dir} &
 
 ### Predict GReX for the same group of samples used for model training
 eQTL_ES_file="${TIGAR_dir}/ExampleData/eQTLweights.txt"
@@ -58,7 +60,7 @@ ${TIGAR_dir}/TIGAR_Model_Pred.sh --chr 1 \
 --gene_anno ${gene_anno_file} \
 --test_sampleID ${test_sample_ID_file} \
 --genofile ${genofile} \
---genofile_type vcf --Format GT \
+--genofile_type vcf --format GT \
 --TIGAR_dir ${TIGAR_dir} \
 --out_dir ${out_dir}
 
