@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-##############################################################################################
+######################################################
 # Import packages needed
 import argparse
 import warnings
@@ -17,7 +17,7 @@ import statsmodels.api as sm
 from scipy import stats
 stats.chisqprob = lambda chisq, df: stats.chi2.sf(chisq, df)
 
-##############################################################################################
+#######################################################
 # For single phenotype
 def regression_single(method,X,Y,TargetID):
     ### add intercept column for design matrix
@@ -85,12 +85,12 @@ args = parser.parse_args()
 
 ###########################################################
 # Print out variables or path using
-print("Gene-expression file:"+args.gene_exp)
-print("PED file using:"+args.PED)
-print("Assosiation Information file:"+args.PED_info)
-print("Regression method using:"+args.method)
-print("Number of thread:"+str(args.thread))
-print("Output dir:"+args.out_dir)
+print("Predicted GReX data file : "+args.gene_exp + "\n")
+print("PED phenotype and covariate data file using : "+args.PED+ "\n")
+print("PED phenotype and covariates information file : "+args.PED_info+ "\n")
+print("Regression model used for association test : "+ args.method + "\n")
+print("Number of threads : "+str(args.thread)+ "\n")
+print("Output directory : "+args.out_dir+ "\n")
 ############################################################
 # Read in PED file
 PED = pd.read_csv(args.PED,sep='\t').rename(columns={'#FAM_ID':'FAM_ID'})
@@ -155,7 +155,7 @@ def thread_single(num):
     
     out = Gene_annot.merge(lm,left_on='TargetID',right_on='TargetID',how='outer')
     
-    out.to_csv(args.out_dir+"/asso_"+args.method+".txt",sep='\t',header=None,index=None,mode='a')
+    out.to_csv(args.out_dir+"/asso_" + args.method+".txt",sep='\t',header=None,index=None,mode='a')
 
 # Multiple Phenotype
 def thread_multi(num):
@@ -170,7 +170,7 @@ def thread_multi(num):
     Gene_annot = Genecode >> mask(Genecode.TargetID==TargetID[num]) >> select(Genecode.columns[0:5])
     out = Gene_annot.merge(lm,left_on='TargetID',right_on='TargetID',how='outer')
     
-    out.to_csv(args.out_dir+"/asso_"+args.method+".txt",sep='\t',header=None,index=None,mode='a')
+    out.to_csv(args.out_dir+"/asso_" + args.method+".txt",sep='\t',header=None,index=None,mode='a')
 
 ###################################################
 # Association Study
@@ -181,7 +181,7 @@ if len(pheno)==1:
     out_temp = pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName',
                                      'R2','BETA','BETA_SE','T_STAT','PVALUE','N'])
     
-    out_temp.to_csv(args.out_dir+"/asso"+args.method+".txt",sep='\t',header=True,index=None,mode='w')
+    out_temp.to_csv(args.out_dir+"/asso_"+args.method+".txt",sep='\t',header=True,index=None,mode='w')
 
     pool = multiprocessing.Pool(args.thread)
     pool.map(thread_single,[num for num in range(len(TargetID))])
@@ -198,7 +198,7 @@ elif len(pheno)>1:
     out_temp = pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName',
                                      'R2','F_STAT','F_PVALUE','N'])
     
-    out_temp.to_csv(args.out_dir+"/asso"+args.method+".txt",sep='\t',header=True,index=None,mode='w')
+    out_temp.to_csv(args.out_dir+"/asso_"+args.method+".txt",sep='\t',header=True,index=None,mode='w')
     
     Target = res.merge(Gene_temp,left_on='IND_ID',right_on='IND_ID',how='outer')
     Target = pd.DataFrame((Target >> drop(Target.IND_ID)),dtype='float')

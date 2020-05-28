@@ -120,7 +120,7 @@ def CHR_Reform_DS(data,sampleID):
 # --genofile: Path for the training genotype file (bgzipped and tabixed) 
 # --genofile_tye: Genotype file type: "vcf" or "dosage"
 # --test_geno_colnames : File with column heads of genotype file
-# --Format: Genotype format in VCF file that should be used: "GT" (default) for genotype data or "DS" for dosage data, only required if the input genotype file is of VCF file
+# --format: Genotype format in VCF file that should be used: "GT" (default) for genotype data or "DS" for dosage data, only required if the input genotype file is of VCF file
 # --window: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression prediction model (default 1000000 for +- 1MB region around TSS)
 # --maf_diff: MAF difference threshold for matching SNPs from eQTL weight file and test genotype file. If SNP MAF difference is greater than maf_diff (default 0.2), , the SNP will be excluded
 # --thread: Number of threads for parallel computation (default 1)
@@ -147,7 +147,7 @@ parser.add_argument('--test_geno_colnames', type=str, default = None)
 parser.add_argument('--geno',type=str,default = None)
 
 ### 'DS' or 'GT' for VCF genotype file
-parser.add_argument('--Format',type=str,default=None)
+parser.add_argument('--format',type=str,default=None)
 
 ### window
 parser.add_argument('--window',type=int,default=None)
@@ -176,7 +176,7 @@ print("Test genotype file : "+args.genofile+ "\n")
 # print("Column names of test genotype file:"+args.geno_colnames+ "\n")
 
 if args.geno=='vcf':
-    print("VCF genotype file is used for prediction with genotype format : " + args.Format + "\n")
+    print("VCF genotype file is used for prediction with genotype format : " + args.format + "\n")
 elif args.geno=='dosage':
     print("Dosage genotype file is used for prediction."+ "\n")
 else:
@@ -243,10 +243,10 @@ def thread_process(num):
         Test_temp=Test_temp.reset_index(drop=True)
     
         if args.geno=='vcf':
-            if args.Format not in unique(Test_temp.FORMAT)[0].split(":"):
+            if args.format not in unique(Test_temp.FORMAT)[0].split(":"):
                 raise SystemExit('Given genotype Format (e.g., GT or ES) need to be specified in the FORMAT column of test VCF genotype file.')
             else:
-                Chrom = CHR_Reform_vcf(Test_temp,args.Format,sampleID)
+                Chrom = CHR_Reform_vcf(Test_temp,args.format,sampleID)
         elif args.geno=='dosages':
             Chrom = CHR_Reform_DS(Test_temp,sampleID)
         

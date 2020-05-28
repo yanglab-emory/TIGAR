@@ -158,4 +158,4 @@ elif [[ "$asso"x == "2"x ]];then
 
 fi
 
-
+echo "Completed TWAS."

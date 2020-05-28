@@ -297,7 +297,7 @@ print("Training sampleID file: "+args.train_sampleID+ "\n")
 print("Chromosome number: "+str(args.chr)+ "\n")
 print("Number of threads: "+str(args.thread)+ "\n")
 print("Training genotype file: "+args.train_geno_file+ "\n")
-print("Column names of genotype file:"+args.geno_colnames+ "\n")
+# print("Column names of genotype file:"+args.geno_colnames+ "\n")
 
 if args.genofile_type=='vcf':
     print("VCF genotype file is used for training with genotype format : " + args.format + "\n")
@@ -363,14 +363,14 @@ geno_colnames=pd.read_csv(args.geno_colnames,sep='\t').rename(columns={'#CHROM':
 
 ### Initialize output dataframe
 
-param_out=pd.DataFrame(columns=['CHROM','POS','REF','ALT','TargetID','n_miss',
-                                'b','beta','ES','gamma','p_HWE','MAF'])
+param_out=pd.DataFrame(columns=['CHROM','POS', 'ID', 'REF','ALT','TargetID', 'MAF', 'p_HWE', 'ES',
+                                'b','beta'])
 
 param_out.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_DPR_train_eQTLweights.txt',
                  sep='\t',header=True,index=None,mode='w')
 
-Info_out=pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName',
-                               'n_snp', 'n_effect_snp', 'sample_size','CVR2','TrainPVALUE','TrainR2'])
+Info_out=pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName', 'sample_size',
+                               'n_snp', 'n_effect_snp', 'CVR2','TrainPVALUE','TrainR2'])
 
 Info_out.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_DPR_train_GeneInfo.txt',
                 sep='\t',header=True,index=None,mode='w')
@@ -412,7 +412,6 @@ def thread_process(num):
 
 
         Info,sampleID = Info_Gene(Chrom,Exp_temp)
-
         
         if (args.cvR2 == 1) :
             ### create bimbam file for 5-folds cross validation
@@ -436,7 +435,9 @@ def thread_process(num):
                 pheno_train.T.to_csv(CV_file_dir+ "/"+TargetID+'_CV'+str(i+1)+'_pheno.txt',
                                      header=False,index=None,sep='\t',mode='w')
                 ### SNP annotation file
-                SNP_annot_train = (Info_trainCV >> select(Info_trainCV.snpID,Info_trainCV.POS,Info_trainCV.CHROM)).dropna(axis=0,how='any')
+                SNP_annot_train = (Info_trainCV >> select(Info_trainCV.snpID, Info_trainCV.POS, Info_trainCV.CHROM)).dropna(axis=0,how='any')
+                SNP_annot_train['POS'] = SNP_annot_train['POS'].astype('int')
+                SNP_annot_train['CHROM'] = SNP_annot_train['CHROM'].astype('int')
                 SNP_annot_train.to_csv(CV_file_dir+ "/" +TargetID+'_CV'+str(i+1)+'_snp_annot.txt',
                                        header=False,index=None,sep='\t',mode='w')
                 ### call DPR
@@ -498,12 +499,14 @@ def thread_process(num):
                            header=False,index=None,sep='\t',mode='w')
             
             SNP_annot = (Info >> select(Info.snpID,Info.POS,Info.CHROM)).dropna(axis=0,how='any')
+            SNP_annot['POS'] = SNP_annot['POS'].astype('int')
+            SNP_annot['CHROM'] = SNP_annot['CHROM'].astype('int')
             SNP_annot.to_csv(file_dir+'/'+TargetID+'_snp_annot.txt',
                              header=False,index=None,sep='\t',mode='w')
             
             stop_DPR=0
             try:
-                subprocess.check_call(shlex.split(str(args.TIGAR_dir) +  '/Model_Train_Pred/call_DPR.sh'+' '+file_dir+' '+str(args.dpr)+' '+TargetID + ' ' + str(args.TIGAR_dir)))
+                subprocess.check_call(shlex.split(str(args.TIGAR_dir) +  '/Model_Train_Pred/call_DPR.sh'+' '+file_dir + ' ' + str(args.dpr)+' '+TargetID + ' ' + str(args.TIGAR_dir)))
             except subprocess.CalledProcessError as err:
                 stop_DPR=1
                 print("DPR failed for TargetID:"+TargetID)
@@ -520,7 +523,13 @@ def thread_process(num):
                 elif args.ES=='additive':
                     result['ES']=result['beta']+result['b']
 
+                ### read in phenotype file
+                pheno = pd.DataFrame(pheno, dtype=np.float).reset_index(drop=True)
+                # print(TargetID + " with pheno/gene_exp shape" + str(pheno.shape) + "\n")
+                Info_Train['sample_size']=np.array(len(pheno.T)).ravel()
+
                 Info_Train['n_snp']=np.array(len(result.ES)).ravel()
+
                 ### only keep snps with ES!=0
                 result = result >> mask(result.ES!=0)
                 Info_Train['n_effect_snp']=np.array(len(result.ES)).ravel()
@@ -529,7 +538,7 @@ def thread_process(num):
                 result=result.rename(columns={'chr':'CHROM','rs':'snpID','ps':'POS'})
 
                 result=result >> select(result.CHROM,result.snpID,result.POS,result.TargetID,
-                                        result.n_miss,result.b,result.beta,result.ES,result.gamma)
+                                        result.b,result.beta,result.ES)
 
                 ### Store Filter information
                 Filter = Chrom >> select(Chrom.snpID,Chrom.p_HWE,Chrom.MAF)
@@ -541,8 +550,8 @@ def thread_process(num):
                 param['REF'] = param['snpID'].apply(lambda x:x.split(":")[2])
                 param['ALT'] = param['snpID'].apply(lambda x:x.split(":")[3])
 
-                param = param >> select(param.CHROM,param.POS,param.REF,param.ALT,param.TargetID,
-                                        param.n_miss,param.b,param.beta,param.ES,param.gamma,param.p_HWE,param.MAF)
+                param = param >> select(param.CHROM,param.POS,param.snpID,param.REF,param.ALT,param.TargetID,param.MAF,param.p_HWE,param.ES,
+                    param.b,param.beta)
                 param['CHROM'] = param['CHROM'].astype('int')
                 param['POS'] = param['POS'].astype('int')
 
@@ -554,9 +563,7 @@ def thread_process(num):
                 ### for R2 calculation
                 bimbam = bimbam >> drop(bimbam.REF,bimbam.ALT)
 
-                ### read in phenotype file
-                pheno = pd.DataFrame(pheno,dtype=np.float).reset_index(drop=True)
-                Info_Train['sample_size']=np.array(len(pheno)).ravel()
+                
 
                 ID = np.intersect1d(np.array(result.snpID),np.array(bimbam.snpID))
 
@@ -577,8 +584,8 @@ def thread_process(num):
                 Info_Train['TrainR2'] = np.array(lm_final.rsquared).ravel()
 
                 Info = (Exp_temp
-                        >> select(Exp_temp[['CHROM','GeneStart','GeneEnd',
-                                            'GeneName','TargetID']])).merge(Info_Train,
+                        >> select(Exp_temp[['CHROM','GeneStart','GeneEnd','TargetID',
+                                            'GeneName']])).merge(Info_Train,
                                                                             left_on='TargetID',
                                                                             right_on='TargetID',
                                                                             how='outer')

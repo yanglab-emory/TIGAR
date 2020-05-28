@@ -207,10 +207,12 @@ elif [[ "$model"x == "DPR"x ]]; then
     > ${out_dir}/DPR_CHR${chr}/CHR${chr}_DPR_train_Log.txt
 
     ### 4. Remove DPR input files
+    echo Remove DPR input files 
     rm -f ${out_dir}/CHR${chr}_geno_colnames.txt
     rm -fr ${out_dir}/DPR_CHR${chr}/DPR_Files
 
     if [ ${cvR2} == "1" ] ; then
+        echo Remove files for CV
         rm -fr ${out_dir}/DPR_CHR${chr}/CV_Files
     fi
 

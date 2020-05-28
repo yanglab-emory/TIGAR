@@ -1,9 +1,6 @@
-P	Amyloid
-P	Tangles
+P	PHENO
+P	PHENO2
 C	PC1
 C	PC2
-C	PC3
 C	SEX
 C	AGE
-C	SMOKING
-C	STUDY

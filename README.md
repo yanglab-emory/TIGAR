@@ -237,7 +237,7 @@ ${TIGAR_dir}/TIGAR_GReX_Pred.sh --chr 1 \
 	- `--thread` : Number of threads for parallel computation (default `1`)
 	- `--out_dir`: Output directory (will be created if not exist)
 
-- Variables to specify for using *individual-level* GWAS data. 
+- Variables to specify for TWAS using *individual-level* GWAS data. 
 	- `--gene_exp` : Path for predicted GReX file
 	- `--PED` : Path for PED file that contains phenotype and covariate data
 	- `--PED_info` : Specify culumn names for phenotypes and covariates that will be used in TWAS.
@@ -246,18 +246,20 @@ ${TIGAR_dir}/TIGAR_GReX_Pred.sh --chr 1 \
 	- `--method` : `OLS` (default) for studying quantitative phenotype or multivariate phenotypes or `Logit` for studying dichotomous univariate phenotype
 
 ```
-GReX_pred_file="${TIGAR_dir}/CHR1_Pred_GReX.txt"
-PED="${TIGAR_dir}/example_PED.ped"
-PED_info="${TIGAR_dir}/PED_Info_SinglePheno.txt"
+GReX_pred_file="${TIGAR_dir}/ExampleData/CHR1_Pred_GReX.txt"
+PED="${TIGAR_dir}/ExampleData/example_PED.ped"
 
 ${TIGAR_dir}/TIGAR_TWAS.sh --asso 1 \
 --gene_exp ${GReX_pred_file} \
---PED ${PED} --PED_info ${PED_info} \
+--PED ${PED} \
+--PED_info ${TIGAR_dir}/ExampleData/PED_Info_SinglePheno.txt \
 --method OLS \
+--TIGAR_dir ${TIGAR_dir} \
+--thread 2 \
 --out ${out_dir}
 ```
 
-- Variables to specify for using *summary-level* GWAS data.
+- Variables to specify for TWAS using *summary-level* GWAS data.
 	- `--gene_anno` : Path for gene annotation file to specify a list of gene for TWAS. The first six columns of the gene expression file can be used here.
 	- `--chr`: Chromosome number need to be specified to conduct TWAS per chromosome 
 	- `--weight`: Path for SNP weight (eQTL effect size) file. Output file by model training can be used here. 
@@ -279,7 +281,7 @@ ${TIGAR_dir}/TIGAR_TWAS.sh --asso 2 \
 --out ${out_dir}
 ```
 
-#### 4. Generate reference covariance files
+#### 4. Generate reference LD genotype covariance files
 ```
 ${TIGAR_dir}/TIGAR_LD.sh --block ${block_annotation} \
 --geno_path ${geno_path} --geno vcf \
