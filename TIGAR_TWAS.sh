@@ -9,7 +9,6 @@
 
 ############### Variables for asso=1 ###############
 # --gene_exp: Path for predicted GReX file
-
 # --PED : Path for PED file that contains phenotype and covariate data
 # --PED_info : Specify culumn names for phenotypes and covariates that will be used in TWAS.
 #             1) P : phenotype column names
@@ -68,6 +67,9 @@ method=${method:-'OLS'}
 
 ############# TWAS 
 
+## make output directory
+mkdir -p ${out_dir}/TWAS_Results
+
 if [[ "$asso"x == "1"x ]];then
     echo "Conducting TWAS using individual-level GReX and phenotype data ... "
 
@@ -89,9 +91,6 @@ if [[ "$asso"x == "1"x ]];then
         exit 1
     fi
 
-    ## make output directory
-    mkdir -p ${out_dir}/TWAS_Ind
-
     #### TWAS
     if [[ ! -x  ${TIGAR_dir}/TWAS/Asso_Study_01.py ]] ; then
         chmod 755  ${TIGAR_dir}/TWAS/Asso_Study_01.py
@@ -103,7 +102,7 @@ if [[ "$asso"x == "1"x ]];then
     --PED_info ${PED_info} \
     --method ${method} \
     --thread ${thread} \
-    --out_dir ${out_dir}/TWAS_Ind
+    --out_dir ${out_dir}/TWAS_Results
 
 elif [[ "$asso"x == "2"x ]];then
     echo "Conducting TWAS using summary-level GWAS Z-score statistics and reference LD covariance file ... "
@@ -136,12 +135,9 @@ elif [[ "$asso"x == "2"x ]];then
         zcat ${weight} | head -n1 > ${out_dir}/CHR${chr}_weight_colnames.txt
     fi
 
-    if [[ ! -x  ${TIGAR_dir}/TWAS/Asso_Study_02.sh ]] ; then
-        chmod 755  ${TIGAR_dir}/TWAS/Asso_Study_02.sh
+    if [[ ! -x  ${TIGAR_dir}/TWAS/Asso_Study_02.py ]] ; then
+        chmod 755  ${TIGAR_dir}/TWAS/Asso_Study_02.py
     fi
-
-    ## make output directory
-    mkdir -p ${out_dir}/TWAS_Sum
 
     ## TWAS
     python ${TIGAR_dir}/TWAS/Asso_Study_02.py \
@@ -154,7 +150,7 @@ elif [[ "$asso"x == "2"x ]];then
     --chr ${chr} \
     --window ${window} \
     --thread ${thread} \
-    --out_dir ${out_dir}/TWAS_Sum
+    --out_dir ${out_dir}/TWAS_Results
 
 fi
 

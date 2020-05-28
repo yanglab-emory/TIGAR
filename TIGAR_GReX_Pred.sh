@@ -7,6 +7,7 @@
 # --chr: Chromosome number need to be specified with respect to the genotype input data
 # --weight: Path for SNP weight (eQTL effect size) file 
 # --gene_anno : Path for gene annotation file to specify a list of gene for GReX prediction
+# `--gene_anno`: Gene annotation file to specify the list of genes, which is of the same format as the first five columsn of gene expression file
 # --test_sampleID: Path for a file with sampleIDs that should be contained in the genotype file
 # --genofile: Path for the training genotype file (bgzipped and tabixed) 
 # --genofile_tye: Genotype file type: "vcf" or "dosage"

@@ -63,12 +63,12 @@ print("Gene annotation file : "+args.gene_anno + "\n")
 print("GWAS summary-level Z-score file : " + args.Zscore+ "\n")
 print("cis-eQTL weight file : "+args.weight+ "\n")
 print("Reference LD genotype covariance file:"+args.LD + "\n")
-print("Chromosome number : "+str(args.chr))
+print("Chromosome number : "+str(args.chr)+ "\n")
 print("Test gene region including SNPs within +- window = "+str(args.window) + " base paire of GeneStart/GeneEnd positions \n")
 print("Number of threads : "+str(args.thread) + "\n")
 print("Output directory : "+args.out_dir+ "\n")
 
-################################################################################################
+##################################################
 ### Read in gene annotation 
 Gene = pd.read_csv(args.gene_anno,sep='\t')
 
@@ -76,7 +76,7 @@ Gene = (Gene >> mask(Gene['CHROM'].astype('str')==str(args.chr))).reset_index(dr
 
 TargetID = np.array(Gene.TargetID)
 
-pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName','Zscore','Pvalue']).to_csv(args.out_dir+'/CHR'+str(args.chr)+'_asso_study.txt',
+pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName','Zscore','PVALUE']).to_csv(args.out_dir+'/CHR'+str(args.chr)+'_sumstat_asso.txt',
                      sep='\t',index=None,header=True,mode='w')
 
 Weight_names = pd.read_csv(args.weight_colnames,sep='\t')
@@ -181,7 +181,7 @@ def thread_process(num):
             ### p-value for chi-square test
             result['Pvalue'] = 1-chi2.cdf(burden_Z**2,1)
 
-            result.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_asso_study.txt',
+            result.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_sumstat_asso.txt',
                           sep='\t',index=None,header=None,mode='a')
 
 ###############################################################

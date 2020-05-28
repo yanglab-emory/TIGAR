@@ -58,9 +58,9 @@ ${TIGAR_dir}/TIGAR_GReX_Pred.sh --chr 1 \
 --genofile_type vcf --format GT \
 --TIGAR_dir ${TIGAR_dir} \
 --thread 2 \
---out_dir ${out_dir}
+--out_dir ${out_dir} &
 
-### TWAS using individual-level data
+### TWAS using Predicted GReX from individual level GWAS data
 GReX_pred_file="${TIGAR_dir}/ExampleData/CHR1_Pred_GReX.txt"
 PED="${TIGAR_dir}/ExampleData/example_PED.ped"
 
@@ -71,7 +71,7 @@ ${TIGAR_dir}/TIGAR_TWAS.sh --asso 1 \
 --method OLS \
 --TIGAR_dir ${TIGAR_dir} \
 --thread 2 \
---out ${out_dir}
+--out ${out_dir} &
 
 ### Generate reference LD file
 

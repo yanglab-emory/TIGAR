@@ -54,7 +54,7 @@ def regression_multi(X,Y,TargetID):
     result['TargetID'] = np.array(TargetID).ravel()
     result['R2'] = np.array(lm.rsquared).ravel()
     result['F_STAT'] = np.array(lm.fvalue).ravel()
-    result['F_PVALUE'] = np.array(lm.f_pvalue).ravel()
+    result['PVALUE'] = np.array(lm.f_pvalue).ravel()
     result['N'] = np.array(len(X))
     
     return result
@@ -96,7 +96,7 @@ print("Output directory : "+args.out_dir+ "\n")
 PED = pd.read_csv(args.PED,sep='\t').rename(columns={'#FAM_ID':'FAM_ID'})
 
 # Gene annotation and Expression level file
-Genecode = pd.read_csv(args.gene_exp,sep='\t')
+Genecode = pd.read_csv(args.gene_exp, sep='\t')
 
 # Read in Association information
 # P:phenotype
@@ -132,9 +132,11 @@ if len(sampleID)==0:
 PED = PED >> mask(PED.IND_ID.isin(sampleID)) >> select(PED.IND_ID,PED[pheno],PED[cov])
 PED[PED=='X']=np.nan
 
-Genecode=Genecode >> select(Genecode[Genecode.columns[0:5]],Genecode[sampleID])
+Genecode=Genecode >> select(Genecode[['CHROM', 'GeneStart', 'GeneEnd', 'TargetID', 'GeneName']], 
+                                        Genecode[sampleID])
 
-Gene_temp = (Genecode[Genecode.columns[4:]]).T
+Gene_temp = (Genecode[Genecode.columns[ 3: ]]).T
+Gene_temp = Gene_temp.drop(['GeneName'])
 Gene_temp.columns = Gene_temp.loc['TargetID']
 Gene_temp = Gene_temp.drop(['TargetID'])
 Gene_temp['IND_ID'] = Gene_temp.index
@@ -155,7 +157,7 @@ def thread_single(num):
     
     out = Gene_annot.merge(lm,left_on='TargetID',right_on='TargetID',how='outer')
     
-    out.to_csv(args.out_dir+"/asso_" + args.method+".txt",sep='\t',header=None,index=None,mode='a')
+    out.to_csv(args.out_dir+"/ind_" + args.method+"_assoc.txt",sep='\t',header=None,index=None,mode='a')
 
 # Multiple Phenotype
 def thread_multi(num):
@@ -170,7 +172,7 @@ def thread_multi(num):
     Gene_annot = Genecode >> mask(Genecode.TargetID==TargetID[num]) >> select(Genecode.columns[0:5])
     out = Gene_annot.merge(lm,left_on='TargetID',right_on='TargetID',how='outer')
     
-    out.to_csv(args.out_dir+"/asso_" + args.method+".txt",sep='\t',header=None,index=None,mode='a')
+    out.to_csv(args.out_dir+"/ind_" + args.method+"_assoc.txt",sep='\t',header=None,index=None,mode='a')
 
 ###################################################
 # Association Study
@@ -181,7 +183,7 @@ if len(pheno)==1:
     out_temp = pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName',
                                      'R2','BETA','BETA_SE','T_STAT','PVALUE','N'])
     
-    out_temp.to_csv(args.out_dir+"/asso_"+args.method+".txt",sep='\t',header=True,index=None,mode='w')
+    out_temp.to_csv(args.out_dir+"/ind_"+args.method+"_assoc.txt",sep='\t',header=True,index=None,mode='w')
 
     pool = multiprocessing.Pool(args.thread)
     pool.map(thread_single,[num for num in range(len(TargetID))])
@@ -196,9 +198,9 @@ elif len(pheno)>1:
         res[pheno[i]] = np.array(sm.OLS(PED[pheno[i]],sm.add_constant(PED[cov])).fit().resid).ravel()
     
     out_temp = pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName',
-                                     'R2','F_STAT','F_PVALUE','N'])
+                                     'R2','F_STAT','PVALUE','N'])
     
-    out_temp.to_csv(args.out_dir+"/asso_"+args.method+".txt",sep='\t',header=True,index=None,mode='w')
+    out_temp.to_csv(args.out_dir+"/ind_"+args.method+"_assoc.txt",sep='\t',header=True,index=None,mode='w')
     
     Target = res.merge(Gene_temp,left_on='IND_ID',right_on='IND_ID',how='outer')
     Target = pd.DataFrame((Target >> drop(Target.IND_ID)),dtype='float')
