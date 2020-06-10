@@ -5,7 +5,7 @@
 2. Impute **Genetically Regulated gene eXpression (GReX)** from *Individual-level* genetic data
 3. Conduct **TWAS** using both *Individual-level* and *Summary-level* GWAS data for studying *Univariate* and *Multivariate* phenotypes.
 4. **Note:** please use our most recently updated scripts to conduct TWAS.
-5. Please cite our TIGAR paper, [*TIGAR: An Improved Bayesian Tool for Transcriptomic Data Imputation Enhances Gene Mapping of Complex Traits.* 2019 AJHG.](https://www.cell.com/ajhg/fulltext/S0002-9297(19)30205-8).
+5. Please cite our TIGAR paper, [*TIGAR: An Improved Bayesian Tool for Transcriptomic Data Imputation Enhances Gene Mapping of Complex Traits.* 2019 AJHG.](https://www.cell.com/ajhg/fulltext/S0002-9297(19)30205-8)
 
 
 ### Software Setup
