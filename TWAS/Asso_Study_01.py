@@ -157,7 +157,7 @@ def thread_single(num):
     
     out = Gene_annot.merge(lm,left_on='TargetID',right_on='TargetID',how='outer')
     
-    out.to_csv(args.out_dir+"/ind_" + args.method+"_assoc.txt",sep='\t',header=None,index=None,mode='a')
+    out.to_csv(args.out_dir+"/indv_" + args.method+"_assoc.txt",sep='\t',header=None,index=None,mode='a')
 
 # Multiple Phenotype
 def thread_multi(num):
@@ -172,7 +172,7 @@ def thread_multi(num):
     Gene_annot = Genecode >> mask(Genecode.TargetID==TargetID[num]) >> select(Genecode.columns[0:5])
     out = Gene_annot.merge(lm,left_on='TargetID',right_on='TargetID',how='outer')
     
-    out.to_csv(args.out_dir+"/ind_" + args.method+"_assoc.txt",sep='\t',header=None,index=None,mode='a')
+    out.to_csv(args.out_dir+"/indv_" + args.method+"_assoc.txt",sep='\t',header=None,index=None,mode='a')
 
 ###################################################
 # Association Study
@@ -183,7 +183,7 @@ if len(pheno)==1:
     out_temp = pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName',
                                      'R2','BETA','BETA_SE','T_STAT','PVALUE','N'])
     
-    out_temp.to_csv(args.out_dir+"/ind_"+args.method+"_assoc.txt",sep='\t',header=True,index=None,mode='w')
+    out_temp.to_csv(args.out_dir+"/indv_"+args.method+"_assoc.txt",sep='\t',header=True,index=None,mode='w')
 
     pool = multiprocessing.Pool(args.thread)
     pool.map(thread_single,[num for num in range(len(TargetID))])
@@ -200,7 +200,7 @@ elif len(pheno)>1:
     out_temp = pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName',
                                      'R2','F_STAT','PVALUE','N'])
     
-    out_temp.to_csv(args.out_dir+"/ind_"+args.method+"_assoc.txt",sep='\t',header=True,index=None,mode='w')
+    out_temp.to_csv(args.out_dir+"/indv_"+args.method+"_assoc.txt",sep='\t',header=True,index=None,mode='w')
     
     Target = res.merge(Gene_temp,left_on='IND_ID',right_on='IND_ID',how='outer')
     Target = pd.DataFrame((Target >> drop(Target.IND_ID)),dtype='float')

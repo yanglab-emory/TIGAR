@@ -50,7 +50,7 @@ do
         --Zscore|-Zscore) Zscore=$2; shift 2;;
         --weight|-weight) weight=$2; shift 2;;
         --LD|-LD) LD=$2; shift 2;;
-        --chr|-chr) chr_num=$2; shift 2;;
+        --chr|-chr) chr=$2; shift 2;;
         --window|-window) window=$2; shift 2;;
         --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
         --thread|-thread) thread=$2; shift 2;;
@@ -109,7 +109,7 @@ elif [[ "$asso"x == "2"x ]];then
 
     # Check gene_annotation file
     if [ ! -f "${gene_anno}" ] ; then
-        echo Error: Gene expression file ${gene_exp} dose not exist or empty. >&2
+        echo Error: Gene annotation file ${gene_anno} dose not exist or empty. >&2
         exit 1
     fi
 
@@ -124,33 +124,40 @@ elif [[ "$asso"x == "2"x ]];then
         echo Error: Gene expression file ${Zscore} dose not exist or empty. >&2
         exit 1
     else
-        zcat ${Zscore} | head -n1 > ${out_dir}/CHR${chr}_Zscore_colnames.txt
+        zcat ${Zscore} | head -n1 > ${out_dir}/TWAS_Results/temp_CHR${chr}_Zscore_colnames.txt
     fi
 
-    # Check weight file
+    # Check weight file and tabix weight file
     if [ ! -f "${weight}" ] ; then
         echo Error: Gene expression file ${weight} dose not exist or empty. >&2
         exit 1
     else
-        zcat ${weight} | head -n1 > ${out_dir}/CHR${chr}_weight_colnames.txt
+        cat ${weight} | head -n1 > ${out_dir}/TWAS_Results/temp_CHR${chr}_weight_colnames.txt
+        cat ${weight} | head -n1 > ${out_dir}/TWAS_Results/temp_CHR${chr}.weight.txt
+        cat ${weight} | tail -n+2 | sort -nk1 -nk2  >> ${out_dir}/TWAS_Results/temp_CHR${chr}.weight.txt
+        bgzip -f ${out_dir}/TWAS_Results/temp_CHR${chr}.weight.txt
+        tabix -f -b 2 -e 2 -S 1  ${out_dir}/TWAS_Results/temp_CHR${chr}.weight.txt.gz
     fi
 
     if [[ ! -x  ${TIGAR_dir}/TWAS/Asso_Study_02.py ]] ; then
         chmod 755  ${TIGAR_dir}/TWAS/Asso_Study_02.py
     fi
 
+
     ## TWAS
     python ${TIGAR_dir}/TWAS/Asso_Study_02.py \
     --gene_anno ${gene_anno} \
     --Zscore ${Zscore} \
-    --Zscore_colnames ${out_dir}/CHR${chr}_Zscore_colnames.txt \
-    --weight ${weight} \
-    --weight_colnames ${out_dir}/CHR${chr}_weight_colnames.txt \
+    --Zscore_colnames ${out_dir}/TWAS_Results/temp_CHR${chr}_Zscore_colnames.txt \
+    --weight ${out_dir}/TWAS_Results/temp_CHR${chr}.weight.txt.gz \
+    --weight_colnames ${out_dir}/TWAS_Results/temp_CHR${chr}_weight_colnames.txt \
     --LD ${LD} \
     --chr ${chr} \
     --window ${window} \
     --thread ${thread} \
     --out_dir ${out_dir}/TWAS_Results
+
+    rm -f ${out_dir}/TWAS_Results/temp* 
 
 fi
 

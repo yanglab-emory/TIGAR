@@ -59,14 +59,14 @@ args = parser.parse_args()
 
 ################################################################################################
 ### variable checking
-print("Gene annotation file : "+args.gene_anno + "\n")
-print("GWAS summary-level Z-score file : " + args.Zscore+ "\n")
-print("cis-eQTL weight file : "+args.weight+ "\n")
+print("Gene annotation file to specify the list of genes for TWAS : "+args.gene_anno + "\n")
+print("GWAS summary statistics Z-score file : " + args.Zscore+ "\n")
+print("cis-eQTL weight file : " + args.weight + "\n")
 print("Reference LD genotype covariance file:"+args.LD + "\n")
 print("Chromosome number : "+str(args.chr)+ "\n")
-print("Test gene region including SNPs within +- window = "+str(args.window) + " base paire of GeneStart/GeneEnd positions \n")
+print("Test gene region including SNPs within +- window = "+str(args.window) + " base pair of GeneStart/GeneEnd positions \n")
 print("Number of threads : "+str(args.thread) + "\n")
-print("Output directory : "+args.out_dir+ "\n")
+print("Output directory : " + args.out_dir + "\n")
 
 ##################################################
 ### Read in gene annotation 
@@ -76,7 +76,7 @@ Gene = (Gene >> mask(Gene['CHROM'].astype('str')==str(args.chr))).reset_index(dr
 
 TargetID = np.array(Gene.TargetID)
 
-pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName','Zscore','PVALUE']).to_csv(args.out_dir+'/CHR'+str(args.chr)+'_sumstat_asso.txt',
+pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName','Zscore','PVALUE']).to_csv(args.out_dir+'/CHR'+str(args.chr)+'_sumstat_assoc.txt',
                      sep='\t',index=None,header=True,mode='w')
 
 Weight_names = pd.read_csv(args.weight_colnames,sep='\t')
@@ -94,7 +94,7 @@ def thread_process(num):
                                       stderr=subprocess.PIPE)
     Zscore_out = Zscore_process.communicate()[0]
 
-    Weight_process = subprocess.Popen(["tabix"+" "+args.Weight+" "+str(args.chr)+":"+str(start)+"-"+str(end)],
+    Weight_process = subprocess.Popen(["tabix"+" "+args.weight+" "+str(args.chr)+":"+str(start)+"-"+str(end)],
                                       shell=True,
                                       stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE)
@@ -177,11 +177,11 @@ def thread_process(num):
             result['GeneEnd'] = np.array(Gene_temp.GeneEnd).ravel()
             result['TargetID'] = np.array(TargetID[num]).ravel()
             result['GeneName'] = np.array(Gene_temp.GeneName).ravel()
-            result['Zscore'] = burden_Z
+            result['TWAS_Zscore'] = burden_Z
             ### p-value for chi-square test
-            result['Pvalue'] = 1-chi2.cdf(burden_Z**2,1)
+            result['PVALUE'] = 1-chi2.cdf(burden_Z**2,1)
 
-            result.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_sumstat_asso.txt',
+            result.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_sumstat_assoc.txt',
                           sep='\t',index=None,header=None,mode='a')
 
 ###############################################################

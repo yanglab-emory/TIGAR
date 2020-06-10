@@ -71,18 +71,14 @@ ${TIGAR_dir}/TIGAR_TWAS.sh --asso 1 \
 --method OLS \
 --TIGAR_dir ${TIGAR_dir} \
 --thread 2 \
---out ${out_dir} &
-
-######## Work from here #########
-### Generate reference LD file
-
+--out_dir ${out_dir} &
 
 
 ### TWAS using summary-level data
 gene_anno_file="${TIGAR_dir}/ExampleData/gene_anno.txt"
-Zscore_file="${TIGAR_dir}/CHR1_GWAS_Zscore.txt.gz"
+Zscore_file="${TIGAR_dir}/ExampleData/CHR1_GWAS_Zscore.txt.gz"
 eQTL_ES_file="${TIGAR_dir}/ExampleData/eQTLweights.txt"
-LD_file="${TIGAR_dir}/CHR1_LD.txt.gz"
+LD_file="${TIGAR_dir}/ExampleData/CHR1_reference_cov.txt.gz"
 out_dir="${TIGAR_dir}/ExampleData/output"
 
 ${TIGAR_dir}/TIGAR_TWAS.sh --asso 2 \
@@ -91,7 +87,20 @@ ${TIGAR_dir}/TIGAR_TWAS.sh --asso 2 \
 --weight ${eQTL_ES_file} \
 --LD ${LD_file} \
 --chr 1 \
---out ${out_dir}
+--thread 2 \
+--TIGAR_dir ${TIGAR_dir} \
+--out_dir ${out_dir} &
+
+### Generate reference LD file
+block_annotation="/home/jyang/GIT/TIGAR/ExampleData/example_genome_block_CHR1.txt"
+
+${TIGAR_dir}/TIGAR_LD.sh \
+--genome_block ${block_annotation} \
+--genofile ${genofile} --genofile_type vcf \
+--chr 1 --format GT --maf 0.01 \
+--thread 2 \
+--TIGAR_dir ${TIGAR_dir} \
+--out_dir ${out_dir} &
 
 
 

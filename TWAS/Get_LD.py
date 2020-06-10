@@ -114,19 +114,19 @@ def CHR_Reform_DS(data,maf):
 parser = argparse.ArgumentParser(description='manual to this script')
 
 ### chromosome block information
-parser.add_argument('--block',type=str,default = None)
+parser.add_argument('--genome_block',type=str,default = None)
 
 ### genotype file dir
-parser.add_argument('--geno_path',type=str,default = None)
+parser.add_argument('--genofile',type=str,default = None)
 
 ### specified input file type(vcf or doasges)
-parser.add_argument('--geno',type=str,default = None)
+parser.add_argument('--genofile_type',type=str,default = None)
 
 ### chromosome number
-parser.add_argument('--chr_num',type=int,default = None)
+parser.add_argument('--chr',type=int,default = None)
 
 ### 'DS' or 'GT'
-parser.add_argument('--Format',type=str,default = None)
+parser.add_argument('--format',type=str,default = None)
 
 ### maf threshold for seleting genotype data to calculate covariance matrix
 parser.add_argument('--maf',type=float,default = None)
@@ -135,35 +135,35 @@ parser.add_argument('--maf',type=float,default = None)
 parser.add_argument('--thread',type=int,default = None)
 
 ### output dir
-parser.add_argument('--out_prefix',type=str,default = None)
+parser.add_argument('--out_dir',type=str,default = None)
 
 args = parser.parse_args()
 
 ######################################################################################
 ### variable checking
-print("Block information:"+args.block)
-print("Genotype file:"+args.geno_path)
+print("\n \nGenome block annotation based on LD structure : " + args.genome_block + "\n")
+print("Reference genotype file: " + args.genofile + "\n")
 
-if args.geno=='vcf':
-	print("Using "+args.Format+" Format for association study.")
+if args.genofile_type=='vcf':
+	print("Using genotype data of format " + args.format + " in the VCF file.\n")
 elif args.geno=='dosage':
-	print("Using DS format for association study.")
+	print("Using genotype data from the dosage file."+ "\n")
 else:
-	raise SystemExit("Geno file can not identify.")
+	raise SystemExit("Genotype file type should be specified as either vcf or dosage."+ "\n")
 
-print("Chromosome number:"+str(args.chr_num))
-print("Number of thread:"+str(args.thread))
-print("Threshold of maf value:"+str(args.maf))
-print("Output dir:"+args.out_prefix)
+print("Chromosome number: "+str(args.chr)+ "\n")
+print("Number of threads: "+str(args.thread)+ "\n")
+print("Only using variants with MAF > "+str(args.maf) + " to calculate reference LD covariance file."+ "\n")
+print("Output directory : "+args.out_dir + "\n")
 
 #######################################################################################
 ### Read in block information
-Block = pd.read_csv(args.block,sep='\t')
+Block = pd.read_csv(args.genome_block,sep='\t')
 
-Block = Block >> mask(Block.CHROM==args.chr_num)
+Block = Block >> mask(Block.CHROM==args.chr)
 Block = Block.reset_index(drop=True)
 
-file_path=args.geno_path+'/'+unique(Block.File)[0]
+file_path=args.genofile
 
 header_process = subprocess.Popen(["zcat"+" "+file_path+"|"+"grep"+" "+"'CHROM'"],
                                   shell=True,
@@ -171,8 +171,8 @@ header_process = subprocess.Popen(["zcat"+" "+file_path+"|"+"grep"+" "+"'CHROM'"
                                   stderr=subprocess.PIPE)
 header=header_process.communicate()[0]
 
-pd.DataFrame(columns=['CHROM', 'POS', 'ID', 'REF', 'ALT','COV']).to_csv(args.out_prefix+'/CHR'+str(args.chr_num)+'_reference_cov.txt',
-                                                                        sep='\t',index=None,header=True)
+pd.DataFrame(columns=['#CHROM', 'POS', 'ID', 'REF', 'ALT','COV']).to_csv(args.out_dir+'/CHR'+str(args.chr)+'_reference_cov.txt',
+                                                                        sep='\t', index=None, header=True, mode='w')
 
 def thread_process(num):
     block_temp = Block.loc[num]
@@ -185,19 +185,19 @@ def thread_process(num):
     out=chr_process.communicate()[0]
 
     if len(out)==0:
-        print("No corresponding genotype data in this block.")
+        print("There is no genotype data in this block.")
     else:
         CHR = pd.read_csv(StringIO(out.decode('utf-8')),sep='\t',low_memory=False)
         CHR.columns = (pd.read_csv(StringIO(header.decode('utf-8')),sep='\t',low_memory=False)).columns
         CHR = CHR.rename(columns={'#CHROM':'CHROM'})
         CHR = CHR.reset_index(drop=True)
 
-    if args.geno=='vcf':
-        if args.Format not in unique(CHR.FORMAT)[0].split(':'):
-            print("Format needed is not provided in input file.")
+    if args.genofile_type=='vcf':
+        if args.format not in unique(CHR.FORMAT)[0].split(':'):
+            print("Specified genotype format does not exist in the FORMAT column of input VCF file.")
         else:
-            Chrom,sampleID = CHR_Reform_vcf(CHR,args.Format,args.maf)
-    elif args.geno=='doasges':
+            Chrom,sampleID = CHR_Reform_vcf(CHR,args.format,args.maf)
+    elif args.genofile_type=='dosage':
         Chrom,sampleID = CHR_Reform_DS(CHR,args.maf)
     
     Chrom = Chrom.sort_values(by='POS')
@@ -208,10 +208,10 @@ def thread_process(num):
     for i in range(len(Chrom)):
         covar_info=np.append([Chrom.loc[i][0:5].ravel()],','.join(mcovar[i,i:].astype('str')))
 
-        pd.DataFrame(covar_info).T.to_csv(args.out_prefix+'/CHR'+str(args.chr_num)+'_reference_cov.txt',
+        pd.DataFrame(covar_info).T.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_reference_cov.txt',
                                           sep='\t',index=None,header=None,mode='a')
 
-########################################################################################################
+##################################################################
 ### thread process
 pool = multiprocessing.Pool(args.thread)
 
@@ -220,11 +220,11 @@ pool.map(thread_process,[num for num in range(len(Block))])
 pool.close()
 pool.join()
 
-#########################################################################################################
+################################################################
 ### time calculation
-time=round((time.clock()-start_time)/60,2)
+# time=round((time.clock()-start_time)/60,2)
 
-print(str(time)+' minutes')
+# print(str(time)+' minutes')
 
 
 

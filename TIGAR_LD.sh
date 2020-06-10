@@ -5,19 +5,19 @@
 #######################################################################
 
 ###
-# block : Block annotation
-# --genofile: Path for the training genotype file (bgzipped and tabixed) 
-# --genofile_tye: Genotype file type: "vcf" or "dosage"
+# genom_block : Genome segmentation block annotation based on LD
+# --genofile: Path for the reference genotype file (bgzipped and tabixed) 
+# --genofile_type: Genotype file type: "vcf" or "dosage"
 # --format: Genotype format in VCF file that should be used: "GT" (default) for genotype data or "DS" for dosage data, only required if the input genotype file is of VCF file
-# --chr: Chromosome number need to be specified with respect to the genotype input data# Format : GT or DS
-# --maf : Filter SNPs by Minor Allele Frequency (range from 0-1),default 0.05
+# --chr: Chromosome number need to be specified with respect to the genotype input data
+# --maf: Minor Allele Frequency threshold (ranges from 0 to 1; default 0.01) to exclude rare variants
 # --TIGAR_dir : Specify the directory of TIGAR source code
 # --thread: Number of threads for parallel computation (default 1)
 # --out_dir: Output directory (will be created if not exist)
 ###
 
 VARS=`getopt -o "" -a -l \
-genom_block:,genofile:,genofile_type:,chr:,format:,maf:,TIGAR_dir:,thread:,out_dir: \
+genome_block:,genofile:,genofile_type:,chr:,format:,maf:,TIGAR_dir:,thread:,out_dir: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -31,11 +31,11 @@ eval set -- "$VARS"
 while true
 do
     case "$1" in
-        --genom_block|-genom_block) genom_block=$2; shift 2;;
+        --genome_block|-genome_block) genome_block=$2; shift 2;;
         --genofile|-genofile) genofile=$2; shift 2;;
         --genofile_type|-genofile_type) genofile_type=$2; shift 2;;
-        --chr|-chr) chr_num=$2; shift 2;;
-        --format|-format) Format=$2; shift 2;;
+        --chr|-chr) chr=$2; shift 2;;
+        --format|-format) format=$2; shift 2;;
         --maf|-maf) maf=$2; shift 2;;
         --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
         --thread|-thread) thread=$2; shift 2;;
@@ -49,28 +49,59 @@ done
 thread=${thread:-1}
 maf=${maf:-0}
 
-###############################################################################################
-### 1. Run covariance calculation
-python ./TWAS/covar_calculation.py \
---block ${block} \
---geno_path ${genofile_path} \
---geno ${genofile_type} \
---chr_num ${chr_num} \
---Format ${Format} \
+###
+mkdir -p ${out_dir}
+
+# check tabix command
+if [ ! -x "$(command -v tabix)" ]; then
+    echo 'Error: required tool TABIX is not available.' >&2
+    exit 1
+fi
+
+# Check genotype file 
+if [ ! -f "${genofile}" ] ; then
+    echo Error: Reference genotype file ${genofile} dose not exist or empty. >&2
+    exit 1
+fi
+
+
+################################################
+### 1. Calculate covariance matrix (LD) of genetic variants
+
+# Make python script executible
+if [[ ! -x ${TIGAR_dir}/TWAS/Get_LD.py ]] ; then
+    chmod 755 ${TIGAR_dir}/TWAS/Get_LD.py
+fi
+
+python ${TIGAR_dir}/TWAS/Get_LD.py \
+--genome_block ${genome_block} \
+--genofile ${genofile} \
+--genofile_type ${genofile_type} \
+--chr ${chr} \
+--format ${format} \
 --maf ${maf} \
 --thread ${thread} \
---out ${out_prefix}
+--out_dir ${out_dir}/RefLD
 
-### 2. tabix output file
-sort -n -k2 ${out_prefix}/CHR${chr_num}_reference_cov.txt | bgzip -c \
-> ${out_prefix}/CHR${chr_num}_reference_cov.txt.gz
+### 2. TABIX output file
+# Check genotype file 
+if [ ! -f ${out_dir}/CHR${chr}_reference_cov.txt ] ; then
+    echo Error: Reference LD covariance file ${out_dir}/CHR${chr}_reference_cov.txt was not generated successfully. >&2
+    exit 1
+else
+    sort -n -k2 ${out_dir}/CHR${chr}_reference_cov.txt | bgzip -c > ${out_dir}/CHR${chr}_reference_cov.txt.gz
+    tabix -f -p vcf ${out_dir}/CHR${chr}_reference_cov.txt.gz
+    rm -f ${out_dir}/CHR${chr}_reference_cov.txt
+fi
 
-tabix -p vcf ${out_prefix}/CHR${chr_num}_reference_cov.txt.gz
 
-rm ${out_prefix}/CHR${chr_num}_reference_cov.txt
+# Check genotype file 
+if [ ! -f ${out_dir}/CHR${chr}_reference_cov.txt.gz.tbi ] ; then
+    echo Error: Tabix reference LD covariance file ${out_dir}/CHR${chr}_reference_cov.txt.gz failed. >&2
+    exit 1
+fi
 
-
-
+echo Generate reference LD covariance file successfully ... 
 
 
 
