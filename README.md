@@ -313,5 +313,5 @@ ${TIGAR_dir}/TIGAR_LD.sh \
 ```
 
 ### Reference
-- PrediXcan : https://github.com/hakyimlab/PrediXcan  
-- DPR: https://github.com/biostatpzeng/DPR
+- [PrediXcan](https://github.com/hakyimlab/PrediXcan)  
+- [DPR](https://github.com/biostatpzeng/DPR)
