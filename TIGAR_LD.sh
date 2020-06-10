@@ -51,6 +51,7 @@ maf=${maf:-0}
 
 ###
 mkdir -p ${out_dir}
+mkdir -p ${out_dir}/RefLD
 
 # check tabix command
 if [ ! -x "$(command -v tabix)" ]; then
@@ -81,7 +82,9 @@ python ${TIGAR_dir}/TWAS/Get_LD.py \
 --format ${format} \
 --maf ${maf} \
 --thread ${thread} \
---out_dir ${out_dir}/RefLD
+--out_dir ${out_dir}
+
+#/RefLD
 
 ### 2. TABIX output file
 # Check genotype file 
