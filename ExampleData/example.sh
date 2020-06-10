@@ -73,6 +73,7 @@ ${TIGAR_dir}/TIGAR_TWAS.sh --asso 1 \
 --thread 2 \
 --out ${out_dir} &
 
+######## Work from here #########
 ### Generate reference LD file
 
 

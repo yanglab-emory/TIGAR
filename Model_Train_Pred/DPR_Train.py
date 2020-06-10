@@ -402,7 +402,7 @@ def thread_process(num):
 
         if args.genofile_type=='vcf':
             if args.format not in unique(Chr_temp.FORMAT)[0].split(":"):
-                print("Format needed for training is not provided in input vcf file.")
+                print("Format needed for training is not provided in the FORMAT column of input vcf file.")
             else:
                 Chrom = CHR_Reform_vcf(Chr_temp,args.format,args.hwe,args.maf)
         elif args.genofile_type=='dosages':
