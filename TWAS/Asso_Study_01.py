@@ -85,12 +85,15 @@ args = parser.parse_args()
 
 ###########################################################
 # Print out variables or path using
+print("********************************\n   Imput Arguments\n********************************\n")
 print("Predicted GReX data file : "+args.gene_exp + "\n")
 print("PED phenotype and covariate data file using : "+args.PED+ "\n")
 print("PED phenotype and covariates information file : "+args.PED_info+ "\n")
 print("Regression model used for association test : "+ args.method + "\n")
 print("Number of threads : "+str(args.thread)+ "\n")
 print("Output directory : "+args.out_dir+ "\n")
+print("********************************\n")
+
 ############################################################
 # Read in PED file
 PED = pd.read_csv(args.PED,sep='\t').rename(columns={'#FAM_ID':'FAM_ID'})

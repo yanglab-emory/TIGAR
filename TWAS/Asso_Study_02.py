@@ -59,6 +59,7 @@ args = parser.parse_args()
 
 ################################################################################################
 ### variable checking
+print("********************************\n   Imput Arguments\n********************************\n")
 print("Gene annotation file to specify the list of genes for TWAS : "+args.gene_anno + "\n")
 print("GWAS summary statistics Z-score file : " + args.Zscore+ "\n")
 print("cis-eQTL weight file : " + args.weight + "\n")
@@ -67,6 +68,7 @@ print("Chromosome number : "+str(args.chr)+ "\n")
 print("Test gene region including SNPs within +- window = "+str(args.window) + " base pair of GeneStart/GeneEnd positions \n")
 print("Number of threads : "+str(args.thread) + "\n")
 print("Output directory : " + args.out_dir + "\n")
+print("********************************\n")
 
 ##################################################
 ### Read in gene annotation 
