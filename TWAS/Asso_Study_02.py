@@ -100,7 +100,7 @@ def thread_process(num):
                                       stderr=subprocess.PIPE)
     Weight_out = Weight_process.communicate()[0]
 
-    if (len(Zscore_out)==0) | (len(Weight_out) == 0):
+    if (len(Zscore_out) == 0) | (len(Weight_out) == 0):
         print("There is no test SNP with non-zero cis-eQTL weights for gene:"+TargetID[num])
         return None
 
@@ -200,7 +200,6 @@ def thread_process(num):
     result.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_sumstat_assoc.txt',
                   sep='\t',index=None,header=None,mode='a')
 
-    burden_Z=None
 
 ###############################################################
 ### thread process
