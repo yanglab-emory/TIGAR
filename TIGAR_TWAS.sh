@@ -68,7 +68,7 @@ method=${method:-'OLS'}
 ############# TWAS 
 
 ## make output directory
-mkdir -p ${out_dir}/TWAS_Results
+mkdir -p ${out_dir}/TWAS_CHR${chr}
 
 if [[ "$asso"x == "1"x ]];then
     echo "Conducting TWAS using individual-level GReX and phenotype data ... "
@@ -102,7 +102,7 @@ if [[ "$asso"x == "1"x ]];then
     --PED_info ${PED_info} \
     --method ${method} \
     --thread ${thread} \
-    --out_dir ${out_dir}/TWAS_Results
+    --out_dir ${out_dir}/TWAS_CHR${chr}
 
 elif [[ "$asso"x == "2"x ]];then
     echo "Conducting TWAS using summary-level GWAS Z-score statistics and reference LD covariance file ... "
@@ -124,7 +124,7 @@ elif [[ "$asso"x == "2"x ]];then
         echo Error: Gene expression file ${Zscore} dose not exist or empty. >&2
         exit 1
     else
-        zcat ${Zscore} | head -n1 > ${out_dir}/TWAS_Results/temp_CHR${chr}_Zscore_colnames.txt
+        zcat ${Zscore} | head -n1 > ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}_Zscore_colnames.txt
     fi
 
     # Check weight file and tabix weight file
@@ -132,11 +132,11 @@ elif [[ "$asso"x == "2"x ]];then
         echo Error: Gene expression file ${weight} dose not exist or empty. >&2
         exit 1
     else
-        cat ${weight} | head -n1 > ${out_dir}/TWAS_Results/temp_CHR${chr}_weight_colnames.txt
-        cat ${weight} | head -n1 > ${out_dir}/TWAS_Results/temp_CHR${chr}.weight.txt
-        cat ${weight} | tail -n+2 | sort -nk1 -nk2  >> ${out_dir}/TWAS_Results/temp_CHR${chr}.weight.txt
-        bgzip -f ${out_dir}/TWAS_Results/temp_CHR${chr}.weight.txt
-        tabix -f -b 2 -e 2 -S 1  ${out_dir}/TWAS_Results/temp_CHR${chr}.weight.txt.gz
+        cat ${weight} | head -n1 > ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}_weight_colnames.txt
+        cat ${weight} | head -n1 > ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
+        cat ${weight} | tail -n+2 | sort -nk1 -nk2  >> ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
+        bgzip -f ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
+        tabix -f -b 2 -e 2 -S 1  ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt.gz
     fi
 
     if [[ ! -x  ${TIGAR_dir}/TWAS/Asso_Study_02.py ]] ; then
@@ -148,16 +148,16 @@ elif [[ "$asso"x == "2"x ]];then
     python ${TIGAR_dir}/TWAS/Asso_Study_02.py \
     --gene_anno ${gene_anno} \
     --Zscore ${Zscore} \
-    --Zscore_colnames ${out_dir}/TWAS_Results/temp_CHR${chr}_Zscore_colnames.txt \
-    --weight ${out_dir}/TWAS_Results/temp_CHR${chr}.weight.txt.gz \
-    --weight_colnames ${out_dir}/TWAS_Results/temp_CHR${chr}_weight_colnames.txt \
+    --Zscore_colnames ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}_Zscore_colnames.txt \
+    --weight ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt.gz \
+    --weight_colnames ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}_weight_colnames.txt \
     --LD ${LD} \
     --chr ${chr} \
     --window ${window} \
     --thread ${thread} \
-    --out_dir ${out_dir}/TWAS_Results
+    --out_dir ${out_dir}/TWAS_CHR${chr}
 
-    rm -f ${out_dir}/TWAS_Results/temp* 
+    rm -f ${out_dir}/TWAS_CHR${chr}/temp* 
 
 fi
 
