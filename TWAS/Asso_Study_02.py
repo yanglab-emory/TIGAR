@@ -70,30 +70,34 @@ print("Output directory : " + args.out_dir + "\n")
 
 ##################################################
 ### Read in gene annotation 
+print("Reading gene annotation file.")
 Gene = pd.read_csv(args.gene_anno,sep='\t')
 
+print("line76")
 Gene = (Gene >> mask(Gene['CHROM'].astype('str')==str(args.chr))).reset_index(drop=True)
 
 TargetID = np.array(Gene.TargetID)
-
+print("Creating data frame:"+'CHR'+str(args.chr)+'_sumstat_assoc.txt')
 pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName','Zscore','PVALUE']).to_csv(args.out_dir+'/CHR'+str(args.chr)+'_sumstat_assoc.txt',
                      sep='\t',index=None,header=True,mode='w')
-
+print("Reading weight file.")
 Weight_names = pd.read_csv(args.weight_colnames,sep='\t')
+print("Reading Zscore file.")
 Zscore_names = pd.read_csv(args.Zscore_colnames,sep='\t')
 
 def thread_process(num):
+    print("Starting thread process for gene:"+TargetID[num])
     Gene_temp = Gene >> mask(Gene.TargetID == TargetID[num])
 
     start=max(int(Gene_temp.GeneStart)-args.window,0)
     end=max(int(Gene_temp.GeneEnd)+args.window,0)
-    
+    print("Calling tabix for Zscore file.")
     Zscore_process = subprocess.Popen(["tabix"+" "+args.Zscore+" "+str(args.chr)+":"+str(start)+"-"+str(end)],
                                       shell=True,
                                       stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE)
     Zscore_out = Zscore_process.communicate()[0]
-
+    print("Calling tabix for Weight file.")
     Weight_process = subprocess.Popen(["tabix"+" "+args.weight+" "+str(args.chr)+":"+str(start)+"-"+str(end)],
                                       shell=True,
                                       stdout=subprocess.PIPE,
@@ -204,7 +208,7 @@ def thread_process(num):
 ###############################################################
 ### thread process
 pool = multiprocessing.Pool(args.thread)
-
+print("Starting thread process.")
 pool.map(thread_process,[num for num in range(len(TargetID))])
 
 pool.close()

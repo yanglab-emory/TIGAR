@@ -58,8 +58,12 @@ def geno_reform(data,Format):
 ###    8) MAF: Minor Allele Frequency (range from 0~1)
 ###    9) Samples gene variance splited by Format (GT or DS)
 
-def CHR_Reform_vcf(data,Format,maf):
-    sampleID = data.columns[9:]
+def CHR_Reform_vcf(data,Format,maf,IDs):
+    # sampleID = data.columns[9:]
+    # sampleID = pd.read_csv(args.sampleID, sep='\t', header=None)
+    # sampleID = sampleID[0].drop_duplicates().tolist()
+    # sampleID=data[sampleID].columns
+    sampleID=data[IDs].columns
 
     data['snpID']=(data['CHROM'].astype('str')+":"+data['POS'].astype('str')
                    +":"+data.REF+":"+data.ALT)
@@ -137,6 +141,9 @@ parser.add_argument('--thread',type=int,default = None)
 ### output dir
 parser.add_argument('--out_dir',type=str,default = None)
 
+### sampleID path
+parser.add_argument('--sampleID',type=str,default = None)
+
 args = parser.parse_args()
 
 ######################################################################################
@@ -155,6 +162,7 @@ print("Chromosome number: "+str(args.chr)+ "\n")
 print("Number of threads: "+str(args.thread)+ "\n")
 print("Only using variants with MAF > "+str(args.maf) + " to calculate reference LD covariance file."+ "\n")
 print("Output directory : "+args.out_dir + "\n")
+print("SampleID path: "+args.sampleID + "\n")
 
 #######################################################################################
 ### Read in block information
@@ -165,7 +173,7 @@ Block = Block.reset_index(drop=True)
 
 file_path=args.genofile
 
-header_process = subprocess.Popen(["zcat"+" "+file_path+"|"+"grep"+" "+"'CHROM'"],
+header_process = subprocess.Popen(["zcat "+file_path+" | grep -m1 'CHROM'"],
                                   shell=True,
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE)
@@ -173,6 +181,9 @@ header=header_process.communicate()[0]
 
 pd.DataFrame(columns=['#CHROM', 'POS', 'ID', 'REF', 'ALT','COV']).to_csv(args.out_dir+'/CHR'+str(args.chr)+'_reference_cov.txt',
                                                                         sep='\t', index=None, header=True, mode='w')
+
+LDsampleID = pd.read_csv(args.sampleID, sep='\t', header=None)
+LDsampleID = LDsampleID[0].drop_duplicates().tolist()
 
 def thread_process(num):
     block_temp = Block.loc[num]
@@ -186,17 +197,18 @@ def thread_process(num):
 
     if len(out)==0:
         print("There is no genotype data in this block.")
-    else:
-        CHR = pd.read_csv(StringIO(out.decode('utf-8')),sep='\t',low_memory=False)
-        CHR.columns = (pd.read_csv(StringIO(header.decode('utf-8')),sep='\t',low_memory=False)).columns
-        CHR = CHR.rename(columns={'#CHROM':'CHROM'})
-        CHR = CHR.reset_index(drop=True)
+        return None
+
+    CHR = pd.read_csv(StringIO(out.decode('utf-8')),sep='\t',low_memory=False)
+    CHR.columns = (pd.read_csv(StringIO(header.decode('utf-8')),sep='\t',low_memory=False)).columns
+    CHR = CHR.rename(columns={'#CHROM':'CHROM'})
+    CHR = CHR.reset_index(drop=True)
 
     if args.genofile_type=='vcf':
         if args.format not in unique(CHR.FORMAT)[0].split(':'):
             print("Specified genotype format does not exist in the FORMAT column of input VCF file.")
         else:
-            Chrom,sampleID = CHR_Reform_vcf(CHR,args.format,args.maf)
+            Chrom,sampleID = CHR_Reform_vcf(CHR,args.format,args.maf,LDsampleID)
     elif args.genofile_type=='dosage':
         Chrom,sampleID = CHR_Reform_DS(CHR,args.maf)
     

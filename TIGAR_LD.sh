@@ -17,7 +17,7 @@
 ###
 
 VARS=`getopt -o "" -a -l \
-genome_block:,genofile:,genofile_type:,chr:,format:,maf:,TIGAR_dir:,thread:,out_dir: \
+genome_block:,genofile:,genofile_type:,chr:,format:,maf:,TIGAR_dir:,thread:,out_dir:,sampleID: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -40,6 +40,7 @@ do
         --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
         --thread|-thread) thread=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
+        --sampleID|-sampleID) sampleID=$2; shift 2;;
         --) shift;break;;
         *) echo "Please check input arguments!";exit 1;;
         esac
@@ -51,7 +52,7 @@ maf=${maf:-0}
 
 ###
 mkdir -p ${out_dir}
-mkdir -p ${out_dir}/RefLD
+# mkdir -p ${out_dir}/RefLD
 
 # check tabix command
 if [ ! -x "$(command -v tabix)" ]; then
@@ -82,7 +83,8 @@ python ${TIGAR_dir}/TWAS/Get_LD.py \
 --format ${format} \
 --maf ${maf} \
 --thread ${thread} \
---out_dir ${out_dir}
+--out_dir ${out_dir} \
+--sampleID ${sampleID}
 
 #/RefLD
 
