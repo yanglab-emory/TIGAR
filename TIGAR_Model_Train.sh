@@ -90,6 +90,7 @@ thread=${thread:-1}
 
 #### Create output directory if not existed
 mkdir -p ${out_dir}
+mkdir -p ${out_dir}/logs
 
 # check tabix command
 if [ ! -x "$(command -v tabix)" ]; then
@@ -99,19 +100,19 @@ fi
 
 # Check gene expression file
 if [ ! -f "${gene_exp}" ] ; then
-    echo Error: Gene expression file ${gene_exp} dose not exist or empty. >&2
+    echo Error: Gene expression file ${gene_exp} does not exist or is empty. >&2
     exit 1
 fi
 
 # Check training sample ID file
 if [ ! -f "${train_sampleID}" ] ; then
-    echo Error: Training sample ID file ${train_sampleID} dose not exist or empty. >&2
+    echo Error: Training sample ID file ${train_sampleID} does not exist or is empty. >&2
     exit 1
 fi
 
 # Check genotype file 
 if [ ! -f "${genofile}" ] ; then
-    echo Error: Training genotype file ${genofile} dose not exist or empty. >&2
+    echo Error: Training genotype file ${genofile} does not exist or is empty. >&2
     exit 1
 fi
 
@@ -129,6 +130,7 @@ if [[ "$model"x == "elastic_net"x ]];then
     fi
 
     mkdir -p ${out_dir}/EN_CHR${chr}
+
     zcat ${genofile} | grep 'CHROM' > ${out_dir}/EN_CHR${chr}/geno_colnames.txt
 
     python ${TIGAR_dir}/Model_Train_Pred/Elastic_Net_Train.py \
@@ -147,7 +149,8 @@ if [[ "$model"x == "elastic_net"x ]];then
     --thread ${thread} \
     --alpha ${alpha} \
     --out_dir ${out_dir}/EN_CHR${chr} \
-    > ${out_dir}/EN_CHR${chr}/CHR${chr}_EN_train_Log.txt
+    > ${out_dir}/logs/CHR${chr}_EN_train_log.txt
+    # > ${out_dir}/EN_CHR${chr}/CHR${chr}_EN_train_log.txt
 
     ### Remove file
     rm -f ${out_dir}/EN_CHR${chr}/geno_colnames.txt
@@ -165,7 +168,7 @@ elif [[ "$model"x == "DPR"x ]]; then
     if [ -f ${genofile} ] ; then
         zcat ${genofile} | grep 'CHROM' > ${out_dir}/DPR_CHR${chr}/geno_colnames.txt
     else
-        echo Error: ${genofile} dose not exist or empty. >&2
+        echo Error: ${genofile} does not exist or is empty. >&2
         exit 1
     fi
 
@@ -204,7 +207,8 @@ elif [[ "$model"x == "DPR"x ]]; then
     --TIGAR_dir ${TIGAR_dir} \
     --thread ${thread} \
     --out_dir ${out_dir}/DPR_CHR${chr} \
-    > ${out_dir}/DPR_CHR${chr}/CHR${chr}_DPR_train_Log.txt
+    > ${out_dir}/logs/CHR${chr}_DPR_train_log.txt
+    # > ${out_dir}/DPR_CHR${chr}/CHR${chr}_DPR_train_log.txt
 
     ### 4. Remove DPR input files
     echo Remove DPR input files 

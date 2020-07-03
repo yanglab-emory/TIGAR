@@ -52,6 +52,7 @@ maf=${maf:-0}
 
 ###
 mkdir -p ${out_dir}
+mkdir -p ${out_dir}/logs
 # mkdir -p ${out_dir}/RefLD
 
 # check tabix command
@@ -62,7 +63,7 @@ fi
 
 # Check genotype file 
 if [ ! -f "${genofile}" ] ; then
-    echo Error: Reference genotype file ${genofile} dose not exist or empty. >&2
+    echo Error: Reference genotype file ${genofile} does not exist or is empty. >&2
     exit 1
 fi
 
@@ -84,7 +85,8 @@ python ${TIGAR_dir}/TWAS/Get_LD.py \
 --maf ${maf} \
 --thread ${thread} \
 --out_dir ${out_dir} \
---sampleID ${sampleID}
+--sampleID ${sampleID} \
+> ${out_dir}/logs/CHR${chr}_LD_log.txt
 
 #/RefLD
 

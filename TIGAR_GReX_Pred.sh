@@ -59,6 +59,7 @@ thread=${thread:-1}
 
 #### Create output directory if not existed
 mkdir -p ${out_dir}
+mkdir -p ${out_dir}/logs
 mkdir -p ${out_dir}/Pred_CHR${chr}
 
 ####################################################
@@ -70,7 +71,7 @@ fi
 
 # Check genotype file 
 if [ ! -f "${genofile}" ] ; then
-    echo Error: Training genotype file ${genofile} dose not exist or empty. >&2
+    echo Error: Training genotype file ${genofile} does not exist or is empty. >&2
     exit 1
 else
     zcat ${genofile} | grep 'CHROM' > ${out_dir}/Pred_CHR${chr}/test_geno_colnames.txt
@@ -78,19 +79,19 @@ fi
 
 # Check training sample ID file
 if [ ! -f "${test_sampleID_file}" ] ; then
-    echo Error: Test sample ID file ${test_sampleID_file} dose not exist or empty. >&2
+    echo Error: Test sample ID file ${test_sampleID_file} does not exist or is empty. >&2
     exit 1
 fi
 
 # Check eQTL weight file
 if [ ! -f "${weight_file}" ] ; then
-    echo Error: eQTL weight file ${weight_file} dose not exist or empty. >&2
+    echo Error: eQTL weight file ${weight_file} does not exist or is empty. >&2
     exit 1
 fi
 
 # Check gene annotation file
 if [ ! -f "${gene_anno}" ] ; then
-    echo Error: eQTL weight file ${gene_anno} dose not exist or empty. >&2
+    echo Error: eQTL weight file ${gene_anno} does not exist or is empty. >&2
     exit 1
 fi
 
@@ -112,7 +113,8 @@ python ${TIGAR_dir}/Model_Train_Pred/Prediction.py \
 --thread ${thread} \
 --maf_diff ${maf_diff} \
 --out_dir ${out_dir}/Pred_CHR${chr} \
-> ${out_dir}/Pred_CHR${chr}/CHR${chr}_Pred_Log.txt
+> ${out_dir}/logs/CHR${chr}_pred_log.txt
+# > ${out_dir}/Pred_CHR${chr}/CHR${chr}_Pred_Log.txt
     
 # rm -f ${out_dir}/Pred_CHR${chr}/test_geno_colnames.txt
 

@@ -69,25 +69,26 @@ method=${method:-'OLS'}
 
 ## make output directory
 mkdir -p ${out_dir}/TWAS_CHR${chr}
+mkdir -p ${out_dir}/logs
 
 if [[ "$asso"x == "1"x ]];then
     echo "Conducting TWAS using individual-level GReX and phenotype data ... "
 
     # Check gene expression file
     if [ ! -f "${gene_exp}" ] ; then
-        echo Error: Gene expression file ${gene_exp} dose not exist or empty. >&2
+        echo Error: Gene expression file ${gene_exp} does not exist or is empty. >&2
         exit 1
     fi
 
     # Check PED file
     if [ ! -f "${PED}" ] ; then
-        echo Error: PED file ${PED} dose not exist or empty. >&2
+        echo Error: PED file ${PED} does not exist or is empty. >&2
         exit 1
     fi
 
     # Check PED_info file
     if [ ! -f "${PED_info}" ] ; then
-        echo Error: PED information file ${PED_info} dose not exist or empty. >&2
+        echo Error: PED information file ${PED_info} does not exist or is empty. >&2
         exit 1
     fi
 
@@ -109,19 +110,19 @@ elif [[ "$asso"x == "2"x ]];then
 
     # Check gene_annotation file
     if [ ! -f "${gene_anno}" ] ; then
-        echo Error: Gene annotation file ${gene_anno} dose not exist or empty. >&2
+        echo Error: Gene annotation file ${gene_anno} does not exist or is empty. >&2
         exit 1
     fi
 
     # Check LD file
     if [ ! -f "${LD}" ] ; then
-        echo Error: Reference LD genotype covariance file ${LD} dose not exist or empty. >&2
+        echo Error: Reference LD genotype covariance file ${LD} does not exist or is empty. >&2
         exit 1
     fi
 
     # Check Zscore file
     if [ ! -f "${Zscore}" ] ; then
-        echo Error: Gene expression file ${Zscore} dose not exist or empty. >&2
+        echo Error: Gene expression file ${Zscore} does not exist or is empty. >&2
         exit 1
     else
         zcat ${Zscore} | head -n1 > ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}_Zscore_colnames.txt
@@ -129,7 +130,7 @@ elif [[ "$asso"x == "2"x ]];then
 
     # Check weight file and tabix weight file
     if [ ! -f "${weight}" ] ; then
-        echo Error: Gene expression file ${weight} dose not exist or empty. >&2
+        echo Error: Gene expression file ${weight} does not exist or is empty. >&2
         exit 1
     else
         cat ${weight} | head -n1 > ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}_weight_colnames.txt
@@ -155,7 +156,8 @@ elif [[ "$asso"x == "2"x ]];then
     --chr ${chr} \
     --window ${window} \
     --thread ${thread} \
-    --out_dir ${out_dir}/TWAS_CHR${chr}
+    --out_dir ${out_dir}/TWAS_CHR${chr} \
+    > ${out_dir}/logs/CHR${chr}_TWAS_log.txt
 
     rm -f ${out_dir}/TWAS_CHR${chr}/temp* 
 

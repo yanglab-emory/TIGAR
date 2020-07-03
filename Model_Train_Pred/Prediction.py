@@ -312,8 +312,10 @@ def thread_process(num):
 
 ########################################################################################################
 # thread begin
+# if (args.thread < int(len(TargetID)/100) | args.thread > len(TargetID)):
+#     args.thread = (int(len(EXP)/100)+1)*100
 if (args.thread < int(len(TargetID)/100) | args.thread > len(TargetID)):
-    args.thread = (int(len(EXP)/100)+1)*100
+    args.thread = (int(len(TargetID)/100)+1)*100
 
 pool = multiprocessing.Pool(args.thread)
 

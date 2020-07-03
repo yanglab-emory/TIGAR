@@ -84,6 +84,7 @@ print("Reading weight file.")
 Weight_names = pd.read_csv(args.weight_colnames,sep='\t')
 print("Reading Zscore file.")
 Zscore_names = pd.read_csv(args.Zscore_colnames,sep='\t')
+print("Done reading Zscore file.")
 
 def thread_process(num):
     print("Starting thread process for gene:"+TargetID[num])
@@ -207,12 +208,51 @@ def thread_process(num):
 
 ###############################################################
 ### thread process
+## ADDED TO MATCH WHAT WAS DONE IN OTHER TIGAR SCRIPTS
+if (args.thread < int(len(TargetID)/100) | args.thread > len(TargetID)):
+    args.thread = (int(len(TargetID)/100)+1)*100
+
+print("Making pool.")
 pool = multiprocessing.Pool(args.thread)
 print("Starting thread process.")
 pool.map(thread_process,[num for num in range(len(TargetID))])
 
 pool.close()
 pool.join()
+
+### OLD FORMAT
+# ### thread process
+# print("Making pool.")
+# pool = multiprocessing.Pool(args.thread)
+# print("Starting thread process.")
+# pool.map(thread_process,[num for num in range(len(TargetID))])
+
+# pool.close()
+# pool.join()
+
+### NEW FORMAT TO DO:
+# # thread begin
+# if (args.thread < int(len(TargetID)/100) | args.thread > len(TargetID)):
+#     args.thread = (int(len(TargetID)/100)+1)*100
+
+# pool = multiprocessing.Pool(args.thread)
+
+# pool.map(thread_process,[num for num in range(len(TargetID))])
+
+
+### NEW FORMAT
+# if (args.thread < int(len(TargetID)/100) | args.thread > len(TargetID)):
+#     args.thread = (int(len(TargetID)/100)+1)*100
+
+# pool = multiprocessing.Pool(args.thread)
+
+# print("Starting thread process.")
+# pool.map(thread_process,[num for num in range(len(TargetID))])
+
+# pool.close()
+# pool.join()
+
+
 
 ############################################################
 ### time calculation
