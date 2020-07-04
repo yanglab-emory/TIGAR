@@ -80,15 +80,21 @@ TargetID = np.array(Gene.TargetID)
 print("Creating data frame:"+'CHR'+str(args.chr)+'_sumstat_assoc.txt')
 pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName','Zscore','PVALUE']).to_csv(args.out_dir+'/CHR'+str(args.chr)+'_sumstat_assoc.txt',
                      sep='\t',index=None,header=True,mode='w')
-print("Reading weight file.")
-Weight_names = pd.read_csv(args.weight_colnames,sep='\t')
-print("Reading Zscore file.")
-Zscore_names = pd.read_csv(args.Zscore_colnames,sep='\t')
-print("Done reading Zscore file.")
+# print("Reading weight file.")
+# Weight_names = pd.read_csv(args.weight_colnames,sep='\t')
+# print("Reading Zscore file.")
+# Zscore_names = pd.read_csv(args.Zscore_colnames,sep='\t')
+# print("Done reading Zscore file.")
 
 def thread_process(num):
     print("Starting thread process for gene:"+TargetID[num])
     Gene_temp = Gene >> mask(Gene.TargetID == TargetID[num])
+
+    print("Reading weight file.")
+    Weight_names = pd.read_csv(args.weight_colnames,sep='\t')
+
+    print("Reading Zscore file.")
+    Zscore_names = pd.read_csv(args.Zscore_colnames,sep='\t')
 
     start=max(int(Gene_temp.GeneStart)-args.window,0)
     end=max(int(Gene_temp.GeneEnd)+args.window,0)
@@ -209,8 +215,8 @@ def thread_process(num):
 ###############################################################
 ### thread process
 ## ADDED TO MATCH WHAT WAS DONE IN OTHER TIGAR SCRIPTS
-if (args.thread < int(len(TargetID)/100) | args.thread > len(TargetID)):
-    args.thread = (int(len(TargetID)/100)+1)*100
+# if (args.thread < int(len(TargetID)/100) | args.thread > len(TargetID)):
+#     args.thread = (int(len(TargetID)/100)+1)*100
 
 print("Making pool.")
 pool = multiprocessing.Pool(args.thread)
