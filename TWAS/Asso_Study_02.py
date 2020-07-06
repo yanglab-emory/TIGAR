@@ -87,6 +87,8 @@ pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName','Zscor
 # print("Done reading Zscore file.")
 
 def thread_process(num):
+	time_elapsed=round((time.clock()-start_time)/60,2)
+	print("Time Elapsed: "+str(time_elapsed))
     print("Starting thread process for gene:"+TargetID[num])
     Gene_temp = Gene >> mask(Gene.TargetID == TargetID[num])
 
@@ -218,6 +220,8 @@ def thread_process(num):
 # if (args.thread < int(len(TargetID)/100) | args.thread > len(TargetID)):
 #     args.thread = (int(len(TargetID)/100)+1)*100
 
+time_elapsed=round((time.clock()-start_time)/60,2)
+print("Time Elapsed: "+str(time_elapsed))
 print("Making pool.")
 pool = multiprocessing.Pool(args.thread)
 print("Starting thread process.")
@@ -264,7 +268,7 @@ pool.join()
 ### time calculation
 time=round((time.clock()-start_time)/60,2)
 
-# print(str(time)+' minutes')
+print("Time:"+str(time)+' minutes')
 
 
 
