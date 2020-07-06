@@ -87,8 +87,8 @@ pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName','Zscor
 # print("Done reading Zscore file.")
 
 def thread_process(num):
-	time_elapsed=round((time.clock()-start_time)/60,2)
-	print("Time Elapsed: "+str(time_elapsed))
+    time_elapsed=round((time.clock()-start_time)/60,2)
+    print("Time Elapsed: "+str(time_elapsed))
     print("Starting thread process for gene:"+TargetID[num])
     Gene_temp = Gene >> mask(Gene.TargetID == TargetID[num])
 
