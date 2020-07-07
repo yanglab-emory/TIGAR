@@ -87,8 +87,8 @@ pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName','Zscor
 # print("Done reading Zscore file.")
 
 def thread_process(num):
-    time_elapsed=round((time.clock()-start_time)/60,2)
-    print("Time Elapsed: "+str(time_elapsed))
+    # time_elapsed=round((time.clock()-start_time)/60,2)
+    # print("Time Elapsed: "+str(time_elapsed))
     print("Starting thread process for gene:"+TargetID[num])
     Gene_temp = Gene >> mask(Gene.TargetID == TargetID[num])
 
@@ -213,6 +213,8 @@ def thread_process(num):
     result.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_sumstat_assoc.txt',
                   sep='\t',index=None,header=None,mode='a')
 
+    return None
+
 
 ###############################################################
 ### thread process
@@ -220,15 +222,22 @@ def thread_process(num):
 # if (args.thread < int(len(TargetID)/100) | args.thread > len(TargetID)):
 #     args.thread = (int(len(TargetID)/100)+1)*100
 
-time_elapsed=round((time.clock()-start_time)/60,2)
-print("Time Elapsed: "+str(time_elapsed))
-print("Making pool.")
-pool = multiprocessing.Pool(args.thread, maxtasksperchild=2)
-print("Starting thread process.")
-pool.map(thread_process,[num for num in range(len(TargetID))])
+# time_elapsed=round((time.clock()-start_time)/60,2)
+# print("Time Elapsed: "+str(time_elapsed))
 
-pool.close()
-pool.join()
+if __name__ == '__main__':
+    print("Making pool.")
+    pool = multiprocessing.Pool(args.thread)
+    print("Starting thread process.")
+
+    pool.imap(thread_process,[num for num in range(len(TargetID))])
+
+    pool.close()
+    pool.join()
+
+
+
+# pool = multiprocessing.Pool(args.thread, maxtasksperchild=2)
 
 ### OLD FORMAT
 # ### thread process
