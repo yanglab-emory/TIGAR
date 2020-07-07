@@ -223,7 +223,7 @@ def thread_process(num):
 time_elapsed=round((time.clock()-start_time)/60,2)
 print("Time Elapsed: "+str(time_elapsed))
 print("Making pool.")
-pool = multiprocessing.Pool(args.thread)
+pool = multiprocessing.Pool(args.thread, maxtasksperchild=2)
 print("Starting thread process.")
 pool.map(thread_process,[num for num in range(len(TargetID))])
 
