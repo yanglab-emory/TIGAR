@@ -239,10 +239,12 @@ def thread_process(num):
         Zscore = Zscore.drop(['CHROM','POS','REF','ALT'], axis=1)
 
         # if handle any flipped matches in Zscore using Weight snpIDs as reference
-        if snp_overlap_flip.size > 0:
-          Zscore['snpID'], Zscore['Zscore'] = handle_flip(Zscore,'IDorig','IDflip','Zscore',snp_overlap_orig, snp_overlap_flip)
+        if (snp_overlap_orig.size > 0) and (snp_overlap_flip.size > 0):
+            Zscore['snpID'], Zscore['Zscore'] = handle_flip(Zscore,'IDorig','IDflip','Zscore',snp_overlap_orig, snp_overlap_flip)
+        elif snp_overlap_orig.size == snp_overlap.size:   
+            Zscore['snpID'], Zscore['Zscore'] = Zscore['IDorig'], Zscore['Zscore']
         else:
-          Zscore['snpID'], Zscore['Zscore'] = Zscore['IDorig'], Zscore['Zscore']
+            Zscore['snpID'], Zscore['Zscore'] = Zscore['IDflip'], -Zscore['Zscore']
 
         # merge Zscore and Weight dataframes on snpIDs
         ZW = Weight.merge(Zscore[['snpID','Zscore']], 
@@ -261,7 +263,7 @@ def thread_process(num):
             usecols=['snpID','COV'], 
             dtype={'snpID': object, 'COV': object})
 
-        MCOV = pd.concat([x[x.snpID.isin(snp_search_ids)] for x in MCOV_chunks])
+        MCOV = pd.concat([x[x.snpID.isin(snp_search_ids)] for x in MCOV_chunks]).drop_duplicates(['snpID'], keep='first')
 
         if MCOV.empty:
           print("No reference covariance information for target SNPs for gene="+TargetID[num])
