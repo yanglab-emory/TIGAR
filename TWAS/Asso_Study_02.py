@@ -5,16 +5,12 @@
 import argparse
 import time
 import subprocess
-from subprocess import *
 import pandas as pd
 import numpy as np
-from numpy import *
-from dfply import *
 import io
 from io import StringIO
-from io import *
 from scipy.stats import chi2
-
+import sys
 import multiprocessing
 
 #########################################################################
@@ -26,251 +22,322 @@ start_time=time.clock()
 parser = argparse.ArgumentParser(description='Help: ')
 
 ### Gene annotation file
-parser.add_argument("--gene_anno",type=str,default = None)
+parser.add_argument("--gene_anno",type=str,default=None,dest='annot_path')
 
 ### GWAS Z score file
-parser.add_argument('--Zscore',type=str,default = None)
+parser.add_argument('--Zscore',type=str,default=None,dest='z_path')
 
 ### Header of GWAS Z score file
-parser.add_argument('--Zscore_colnames',type=str,default=None)
+parser.add_argument('--Zscore_colnames',type=str,default=None,dest='zcol_path')
 
 ### Weight
-parser.add_argument('--weight',type=str,default = None)
+parser.add_argument('--weight',type=str,default=None,dest='w_path')
 
 ### Header of Weight file
-parser.add_argument('--weight_colnames',type=str,default=None)
+parser.add_argument('--weight_colnames',type=str,default=None,dest='wcol_path')
 
 ### Reference covariance file
-parser.add_argument('--LD',type=str,default = None)
+parser.add_argument('--LD',type=str,default=None,dest='ld_path')
 
 ### chromosome number
-parser.add_argument('--chr',type=int,default = None)
+parser.add_argument('--chr',type=str,default=None)
 
 ### window
-parser.add_argument('--window',type=int,default = None)
+parser.add_argument('--window',type=int,default=None)
 
 ### Number of thread
-parser.add_argument('--thread',type=int,default = None)
+parser.add_argument('--thread',type=int,default=None)
 
 ### Output dir
-parser.add_argument('--out_dir',type=str,default = None)
+parser.add_argument('--out_dir',type=str,default=None)
 
 args = parser.parse_args()
 
 ################################################################################################
 ### variable checking
-print("Gene annotation file to specify the list of genes for TWAS : "+args.gene_anno + "\n")
-print("GWAS summary statistics Z-score file : " + args.Zscore+ "\n")
-print("cis-eQTL weight file : " + args.weight + "\n")
-print("Reference LD genotype covariance file:"+args.LD + "\n")
-print("Chromosome number : "+str(args.chr)+ "\n")
+print("Gene annotation file to specify the list of genes for TWAS : "+args.annot_path + "\n")
+print("GWAS summary statistics Z-score file : " + args.z_path+ "\n")
+print("cis-eQTL weight file : " + args.w_path + "\n")
+print("Reference LD genotype covariance file:"+args.ld_path + "\n")
+print("Chromosome number : "+args.chr+ "\n")
 print("Test gene region including SNPs within +- window = "+str(args.window) + " base pair of GeneStart/GeneEnd positions \n")
 print("Number of threads : "+str(args.thread) + "\n")
 print("Output directory : " + args.out_dir + "\n")
 
 ##################################################
+# Call tabix, read in lines into byt array
+def call_tabix(path, chr, start, end):
+    proc = subprocess.Popen(
+        ["tabix "+path+" "+chr+":"+start+"-"+end],
+        shell=True,
+        stdout=subprocess.PIPE,
+        bufsize=1)
+    proc_out = bytearray()
+    while proc.poll() is None:
+        line =  proc.stdout.readline()
+        if len(line) == 0:
+            break
+        proc_out += line
+    return proc_out
+
+# Determine index of required columns,
+# assigns correct dtype to correct index
+def default_cols_dtype(file_cols,df_name):
+  df_dict = {
+  'Weight': {'cols': ['CHROM','POS','REF','ALT','TargetID','ES'], 
+             'dtype': [object,np.int64,object,object,object,np.float64]},
+  'Zscore': {'cols': ['CHROM','POS','REF','ALT','Zscore'], 
+             'dtype': [object,np.int64,object,object,np.float64]}
+  }
+  file_cols_ind = tuple(map(lambda col: file_cols.index(col), df_dict[df_name]['cols']))
+  file_dtype = {c:d for c,d in zip(file_cols_ind, df_dict[df_name]['dtype'])}
+
+  return file_cols_ind, file_dtype    
+
+# Decrease memory by downcasting 'CHROM' column to integer, integer and float columns to minimum size that will not lose info
+def optimize_cols(df: pd.DataFrame):
+  if 'CHROM' in df.columns:
+    df['CHROM'] = df['CHROM'].astype(str).astype(int)
+
+  ints = df.select_dtypes(include=['int64']).columns.tolist()
+  df[ints] = df[ints].apply(pd.to_numeric, downcast='integer')
+
+  floats = df.select_dtypes(include=['float64']).columns.tolist()
+  df[floats] = df[floats].apply(pd.to_numeric, downcast='float')
+
+  return df
+
+# return correct snpID and Zscore value
+# change sign of Zscore value if matching snpID is flipped wrt Weight snpID
+def handle_flip(df: pd.DataFrame, origID, flipID, origValCol, orig_overlap, flip_overlap):
+  orig = df[origID].values
+  flip = df[flipID].values
+  origval = df[origValCol].values
+
+  ids = np.empty_like(orig)
+  val = np.empty_like(origval)
+
+  for i in range(len(df)):
+    if orig[i] in orig_overlap:
+      ids[i], val[i] = orig[i], origval[i]
+    elif flip[i] in flip_overlap:
+      ids[i], val[i] = flip[i], -origval[i]
+  
+  return ids, val
+##################################################
 ### Read in gene annotation 
 print("Reading gene annotation file.")
-Gene = pd.read_csv(args.gene_anno,sep='\t')
+Gene_chunks = pd.read_csv(
+    args.annot_path, 
+    sep='\t', 
+    iterator=True, 
+    chunksize=10000,
+    dtype={'CHROM':object,'GeneStart':np.int64,'GeneEnd':np.int64,'TargetID':object,'GeneName':object}, 
+    usecols=['CHROM','GeneStart','GeneEnd','TargetID','GeneName'])
 
-print("line76")
-Gene = (Gene >> mask(Gene['CHROM'].astype('str')==str(args.chr))).reset_index(drop=True)
+Gene = pd.concat([x[x['CHROM'] == args.chr] for x in Gene_chunks] ).reset_index(drop=True)
+
+Gene = optimize_cols(Gene)
 
 TargetID = np.array(Gene.TargetID)
-print("Creating data frame:"+'CHR'+str(args.chr)+'_sumstat_assoc.txt')
-pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName','Zscore','PVALUE']).to_csv(args.out_dir+'/CHR'+str(args.chr)+'_sumstat_assoc.txt',
+n_targets = len(TargetID)
+
+# read in headers for Weight and Zscore files
+w_cols = tuple(pd.read_csv(args.wcol_path,sep='\t'))
+z_cols = tuple(pd.read_csv(args.zcol_path,sep='\t'))
+
+# get the indices and dtypes for reading files into pandas
+w_cols_ind, w_dtype = default_cols_dtype(w_cols,'Weight')
+z_cols_ind, z_dtype = default_cols_dtype(z_cols,'Zscore')
+
+print("Creating data frame:"+'CHR'+args.chr+'_sumstat_assoc.txt')
+pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName','Zscore','PVALUE']).to_csv(args.out_dir+'/CHR'+args.chr+'_sumstat_assoc.txt',
                      sep='\t',index=None,header=True,mode='w')
-# print("Reading weight file.")
-# Weight_names = pd.read_csv(args.weight_colnames,sep='\t')
-# print("Reading Zscore file.")
-# Zscore_names = pd.read_csv(args.Zscore_colnames,sep='\t')
-# print("Done reading Zscore file.")
 
 def thread_process(num):
-    # time_elapsed=round((time.clock()-start_time)/60,2)
-    # print("Time Elapsed: "+str(time_elapsed))
-    print("Starting thread process for gene:"+TargetID[num])
-    Gene_temp = Gene >> mask(Gene.TargetID == TargetID[num])
+    try: 
+        print("\nnum="+str(num)+"\nTargetID="+TargetID[num])
+        Gene_info = Gene.iloc[[num]]
 
-    print("Reading weight file.")
-    Weight_names = pd.read_csv(args.weight_colnames,sep='\t')
+        # get start and end positions to tabix
+        start = str(int(Gene_info.GeneStart)-args.window)
+        end = str(int(Gene_info.GeneEnd)+args.window)
 
-    print("Reading Zscore file.")
-    Zscore_names = pd.read_csv(args.Zscore_colnames,sep='\t')
+        # tabix Weight file
+        w_proc_out = call_tabix(args.w_path, args.chr, start, end)
 
-    start=max(int(Gene_temp.GeneStart)-args.window,0)
-    end=max(int(Gene_temp.GeneEnd)+args.window,0)
-    print("Calling tabix for Zscore file.")
-    Zscore_process = subprocess.Popen(["tabix"+" "+args.Zscore+" "+str(args.chr)+":"+str(start)+"-"+str(end)],
-                                      shell=True,
-                                      stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE)
-    Zscore_out = Zscore_process.communicate()[0]
-    print("Calling tabix for Weight file.")
-    Weight_process = subprocess.Popen(["tabix"+" "+args.weight+" "+str(args.chr)+":"+str(start)+"-"+str(end)],
-                                      shell=True,
-                                      stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE)
-    Weight_out = Weight_process.communicate()[0]
+        if not w_proc_out:
+            print("No test SNPs with non-zero cis-eQTL weights in window of gene="+TargetID[num])
+            return None
 
-    if (len(Zscore_out) == 0) | (len(Weight_out) == 0):
-        print("There is no test SNP with non-zero cis-eQTL weights for gene:"+TargetID[num])
-        return None
+        # tabix Zscore file
+        z_proc_out = call_tabix(args.z_path, args.chr, start, end)
 
-    print("TWAS for gene:"+TargetID[num])
-    Zscore = pd.read_csv(StringIO(Zscore_out.decode('utf-8')),sep='\t',header=None,low_memory=False)
-    Zscore.columns = np.array(tuple(Zscore_names))
+        if not z_proc_out:
+            print("No test SNPs with GWAS Zscore for gene="+TargetID[num])
+            return None
 
-    Weight = pd.read_csv(StringIO(Weight_out.decode('utf-8')),sep='\t',header=None,low_memory=False)
-    Weight.columns = np.array(tuple(Weight_names))
+        # parse tabix output for Weight, filtered by TargetID[num]
+        Weight_chunks = pd.read_csv(
+            StringIO(w_proc_out.decode('utf-8')),
+            sep='\t',
+            header=None,
+            low_memory=False,
+            iterator=True, 
+            chunksize=10000,
+            usecols=w_cols_ind,
+            dtype=w_dtype)
 
-    
-    Zscore['snpID'] = (Zscore['CHROM'].astype('str')+':'+Zscore['POS'].astype('str')
-                       +':'+Zscore.REF+':'+Zscore.ALT)
+        Weight = pd.concat([x[x[w_cols_ind[4]]==TargetID[num]] for x in Weight_chunks]).reset_index(drop=True)
 
-    Weight['snpID'] = (Weight['CHROM'].astype('str')+':'+Weight['POS'].astype('str')
-                       +':'+Weight.REF+':'+Weight.ALT)
+        if Weight.empty:
+            print("No test SNPs with non-zero cis-eQTL weights for gene="+TargetID[num])
+            return None
 
-    snp_overlap = np.intersect1d(np.array(Weight.snpID),np.array(Zscore.snpID))
+        Weight.columns = [w_cols[i] for i in tuple(Weight.columns)]
+        Weight = optimize_cols(Weight)
 
-    if snp_overlap.size == 0:
-        print("There are no test SNPs with both non-zero cis-eQTL weights and GWAS summary statistics for gene:"+TargetID[num])
-        return None
+        Weight['snpID'] = (Weight['CHROM'].astype('str')
+            +':'+Weight['POS'].astype('str')
+            +':'+Weight.REF
+            +':'+Weight.ALT)
 
-    # merge Zscore and Weight File
-    ZW = (Weight >> mask(Weight.snpID.isin(snp_overlap))).merge((Zscore
-                                                                 >>mask(Zscore.snpID.isin(snp_overlap))
-                                                                 >>select(Zscore.snpID,Zscore.Zscore)),
-                                                                left_on='snpID',
-                                                                right_on='snpID')
-    ZW = ZW.drop_duplicates(['snpID'],keep='first')
-    ZW = ZW.sort_values(by='POS')
-    ZW = ZW.reset_index(drop=True)
-    
-    ### Read in reference covariance matrix file
-    covar_process = subprocess.Popen(["tabix"+" "+args.LD+" "+str(args.chr)+":"+str(min(ZW.POS))+"-"+str(max(ZW.POS))],
-                                     shell=True,
-                                     stdout=subprocess.PIPE,
-                                     stderr=subprocess.PIPE)
-    
-    out=covar_process.communicate()[0]
-    if len(out)==0:
-        print("No reference covariance information for Gene:"+TargetID[num])
-        return None
-    
-    MCOV = pd.read_csv(StringIO(out.decode('utf-8')),sep='\t',header=None,low_memory=False)
-    MCOV.columns = ['CHROM','POS','ID','REF','ALT','COV']
-    
-    MCOV['snpID'] = (MCOV['CHROM'].astype('str')+':'+MCOV['POS'].astype('str')
-                     +':'+MCOV.REF+':'+MCOV.ALT)
-    
-    snp_overlap_cov = np.intersect1d(snp_overlap,np.array(MCOV.snpID))
-    
-    if snp_overlap_cov.size == 0:
-         print("No reference covariance information for target SNPs for gene:"+TargetID[num])
-         return None
+        # parse tabix output for Zscore
+        Zscore = pd.read_csv(
+            StringIO(z_proc_out.decode('utf-8')),
+            sep='\t',
+            header=None,
+            low_memory=False,
+            usecols=z_cols_ind,
+            dtype=z_dtype)
 
-    MCOV = MCOV.drop_duplicates(['snpID'],keep='first')
+        Zscore.columns = [z_cols[i] for i in tuple(Zscore.columns)]
+        Zscore = optimize_cols(Zscore)
 
-    MCOV['COV'] = MCOV['COV'].apply(lambda x:np.array(x.split(',')).astype('float'))
-    MCOV = MCOV.sort_values(by='POS')
-    MCOV = MCOV.reset_index(drop=True)
-    
-    indicates = (MCOV >> mask(MCOV.snpID.isin(ZW.snpID))).index
-    
-    V_temp = np.zeros((len(indicates),len(indicates)))
-    
-    for i in range(len(indicates)):
-        cov_temp = MCOV.COV.loc[indicates[i]]
-        N = len(cov_temp)
+        Zscore['IDorig'] = (Zscore['CHROM'].astype('str')
+            +':'+Zscore['POS'].astype('str')
+            +':'+Zscore.REF
+            +':'+Zscore.ALT)
+
+        Zscore['IDflip'] = (Zscore['CHROM'].astype('str')
+            +':'+Zscore['POS'].astype('str')
+            +':'+Zscore.ALT
+            +':'+Zscore.REF)
+
+        # check for overlapping SNPs in Weight, Zscore data
+        snp_overlap_orig = np.intersect1d(Weight.snpID, Zscore.IDorig)
+        snp_overlap_flip = np.intersect1d(Weight.snpID, Zscore.IDflip)
+        snp_overlap = np.concatenate((snp_overlap_orig, snp_overlap_flip))
+
+        if snp_overlap.size == 0:
+            print("No overlapping test SNPs with both non-zero cis-eQTL weights and with GWAS Zscore for gene="+TargetID[num])
+            return None
+
+        # filter dataframes by overlapping SNPs
+        Weight = Weight[Weight.snpID.isin(snp_overlap)]
+        Zscore = Zscore[Zscore.IDorig.isin(snp_overlap_orig) | Zscore.IDflip.isin(snp_overlap_flip)]
+        Zscore = Zscore.drop(['CHROM','POS','REF','ALT'], axis=1)
+
+        # if handle any flipped matches in Zscore using Weight snpIDs as reference
+        if snp_overlap_flip.size > 0:
+          Zscore['snpID'], Zscore['Zscore'] = handle_flip(Zscore,'IDorig','IDflip','Zscore',snp_overlap_orig, snp_overlap_flip)
+        else:
+          Zscore['snpID'], Zscore['Zscore'] = Zscore['IDorig'], Zscore['Zscore']
+
+        # merge Zscore and Weight dataframes on snpIDs
+        ZW = Weight.merge(Zscore[['snpID','Zscore']], 
+            left_on='snpID', 
+            right_on='snpID').reset_index(drop=True)
+
+        snp_search_ids = ZW.snpID.values
+
+        ### Read in reference covariance matrix file by snpID
+        MCOV_chunks = pd.read_csv(
+            args.ld_path, 
+            sep='\t', 
+            compression='gzip', 
+            iterator=True, 
+            chunksize=10000,
+            usecols=['snpID','COV'], 
+            dtype={'snpID': object, 'COV': object})
+
+        MCOV = pd.concat([x[x.snpID.isin(snp_search_ids)] for x in MCOV_chunks])
+
+        if MCOV.empty:
+          print("No reference covariance information for target SNPs for gene="+TargetID[num])
+          return None
         
-        for j in range(i,len(indicates)):
-            if indicates[j] - indicates[i] < N:
-                V_temp[i,j] = cov_temp[indicates[j]-indicates[i]]
-            else:
-                V_temp[i,j] = 0
-                
-    V=V_temp+V_temp.T-np.diag(V_temp.diagonal())
-    
-    ZW = ZW >> mask(ZW.snpID.isin(MCOV.snpID))
-    ### Calculate burden Z score
-    burden_Z = mat(ZW.Zscore)*mat(ZW.ES).T/sqrt(mat(ZW.ES)*V*mat(ZW.ES).T)
-    
-    if np.isnan(burden_Z):
-    	print("Could not calculate burden_Z: NaN value.")
-    	return None
-    
-    result = pd.DataFrame()
-    result['CHROM'] = np.array(args.chr).ravel()
-    result['GeneStart'] = np.array(Gene_temp.GeneStart).ravel()
-    result['GeneEnd'] = np.array(Gene_temp.GeneEnd).ravel()
-    result['TargetID'] = np.array(TargetID[num]).ravel()
-    result['GeneName'] = np.array(Gene_temp.GeneName).ravel()
-    result['TWAS_Zscore'] = burden_Z
-    ### p-value for chi-square test
-    result['PVALUE'] = 1-chi2.cdf(burden_Z**2,1)
+        MCOV['COV'] = MCOV['COV'].apply(lambda x:np.array(x.split(',')).astype('float'))
 
-    result.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_sumstat_assoc.txt',
-                  sep='\t',index=None,header=None,mode='a')
+        # construct covariance matrix
+        inds = MCOV.index
+        n_inds = len(inds)
+        V_upper = np.zeros((n_inds,n_inds))
+        
+        for i in range(n_inds):
+            cov_i = MCOV.COV.loc[inds[i]]
+            N = len(cov_i)
+            
+            for j in range(i,n_inds):
+                if inds[j] - inds[i] < N:
+                    V_upper[i,j] = cov_i[inds[j]-inds[i]]
+                else:
+                    V_upper[i,j] = 0
+                     
+        V=V_upper+V_upper.T-np.diag(V_upper.diagonal())
+        
+        # filter ZW to include only snpIDs also in MCOV
+        ZW = ZW[ZW.snpID.isin(MCOV.snpID)]
+        n_snps = str(len(ZW.snpID))
 
-    return None
+        print("TWAS for gene="+TargetID[num])
+        print("N SNPs="+n_snps)
+
+        ### Calculate burden Z score
+        burden_Z = np.asscalar(np.mat(ZW.Zscore)*np.mat(ZW.ES).T/np.sqrt(np.mat(ZW.ES)*V*np.mat(ZW.ES).T))
+        
+        if np.isnan(burden_Z):
+        	print("Could not calculate burden_Z: NaN value.")
+        	return None
+
+        ### p-value for chi-square test
+        pval = 1-chi2.cdf(burden_Z**2,1)
+
+        ### create output row
+        result = Gene_info.copy()
+        result['TWAS_Zscore'] = burden_Z
+        result['PVALUE'] = pval
+
+        ### write to file
+        result.to_csv(
+            args.out_dir+'/CHR'+args.chr+'_sumstat_assoc.txt',
+            sep='\t',
+            index=None,
+            header=None,
+            mode='a',
+            float_format='%.4f')
+
+        print('TWAS complete.')
+
+    except Exception as e:
+        print('Caught exception for TargetID='+TargetID[num]+', num='+str(num)+':' )
+        print(e)
+
+    finally:
+        # print info to log do not wait for buffer to fill up
+        sys.stdout.flush()
 
 
 ###############################################################
 ### thread process
-## ADDED TO MATCH WHAT WAS DONE IN OTHER TIGAR SCRIPTS
-# if (args.thread < int(len(TargetID)/100) | args.thread > len(TargetID)):
-#     args.thread = (int(len(TargetID)/100)+1)*100
-
-# time_elapsed=round((time.clock()-start_time)/60,2)
-# print("Time Elapsed: "+str(time_elapsed))
 
 if __name__ == '__main__':
-    print("Making pool.")
+    print("Starting TWAS for "+str(n_targets)+" target genes.")
     pool = multiprocessing.Pool(args.thread)
-    print("Starting thread process.")
-
-    pool.imap(thread_process,[num for num in range(len(TargetID))])
-
+    pool.imap(thread_process,[num for num in range(n_targets)])
     pool.close()
     pool.join()
-
-
-
-# pool = multiprocessing.Pool(args.thread, maxtasksperchild=2)
-
-### OLD FORMAT
-# ### thread process
-# print("Making pool.")
-# pool = multiprocessing.Pool(args.thread)
-# print("Starting thread process.")
-# pool.map(thread_process,[num for num in range(len(TargetID))])
-
-# pool.close()
-# pool.join()
-
-### NEW FORMAT TO DO:
-# # thread begin
-# if (args.thread < int(len(TargetID)/100) | args.thread > len(TargetID)):
-#     args.thread = (int(len(TargetID)/100)+1)*100
-
-# pool = multiprocessing.Pool(args.thread)
-
-# pool.map(thread_process,[num for num in range(len(TargetID))])
-
-
-### NEW FORMAT
-# if (args.thread < int(len(TargetID)/100) | args.thread > len(TargetID)):
-#     args.thread = (int(len(TargetID)/100)+1)*100
-
-# pool = multiprocessing.Pool(args.thread)
-
-# print("Starting thread process.")
-# pool.map(thread_process,[num for num in range(len(TargetID))])
-
-# pool.close()
-# pool.join()
-
+    print("Done.")
 
 
 ############################################################
