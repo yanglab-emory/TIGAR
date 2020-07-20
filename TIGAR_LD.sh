@@ -65,8 +65,10 @@ fi
 if [ ! -f "${genofile}" ] ; then
     echo Error: Reference genotype file ${genofile} does not exist or is empty. >&2
     exit 1
+else
+    zgrep -m1 -E '^#CHROM' ${genofile} > ${out_dir}/temp_CHR${chr}_geno_colnames.txt
 fi
-
+echo $genofile
 
 ################################################
 ### 1. Calculate covariance matrix (LD) of genetic variants
@@ -80,6 +82,7 @@ python ${TIGAR_dir}/TWAS/Get_LD.py \
 --genome_block ${genome_block} \
 --genofile ${genofile} \
 --genofile_type ${genofile_type} \
+--genofile_colnames ${out_dir}/temp_CHR${chr}_geno_colnames.txt \
 --chr ${chr} \
 --format ${format} \
 --maf ${maf} \
@@ -109,6 +112,8 @@ if [ ! -f ${out_dir}/CHR${chr}_reference_cov.txt.gz.tbi ] ; then
 fi
 
 echo Generate reference LD covariance file successfully ... 
+
+rm -f ${out_dir}/temp*
 
 
 

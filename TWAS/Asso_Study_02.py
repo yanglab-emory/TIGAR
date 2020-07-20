@@ -43,10 +43,13 @@ parser.add_argument('--LD',type=str,default=None,dest='ld_path')
 parser.add_argument('--chr',type=str,default=None)
 
 ### window
-parser.add_argument('--window',type=int,default=None)
+parser.add_argument('--window',type=float,default=None)
 
 ### Number of thread
 parser.add_argument('--thread',type=int,default=None)
+
+### Weight threshold to include SNP in TWAS
+parser.add_argument('--threshold',type=float,default=None)
 
 ### Output dir
 parser.add_argument('--out_dir',type=str,default=None)
@@ -62,6 +65,7 @@ print("Reference LD genotype covariance file:"+args.ld_path + "\n")
 print("Chromosome number : "+args.chr+ "\n")
 print("Test gene region including SNPs within +- window = "+str(args.window) + " base pair of GeneStart/GeneEnd positions \n")
 print("Number of threads : "+str(args.thread) + "\n")
+print("SNP weight inclusion threshold : "+str(args.threshold) + "\n")
 print("Output directory : " + args.out_dir + "\n")
 
 ##################################################
@@ -82,7 +86,7 @@ def call_tabix(path, chr, start, end):
 
 # Determine index of required columns,
 # assigns correct dtype to correct index
-def default_cols_dtype(file_cols,df_name):
+def default_cols_dtype(file_cols, df_name):
   df_dict = {
   'Weight': {'cols': ['CHROM','POS','REF','ALT','TargetID','ES'], 
              'dtype': [object,np.int64,object,object,object,np.float64]},
@@ -92,8 +96,7 @@ def default_cols_dtype(file_cols,df_name):
   file_cols_ind = tuple(map(lambda col: file_cols.index(col), df_dict[df_name]['cols']))
   file_dtype = {c:d for c,d in zip(file_cols_ind, df_dict[df_name]['dtype'])}
 
-  return file_cols_ind, file_dtype    
-
+  return file_cols_ind, file_dtype
 # Decrease memory by downcasting 'CHROM' column to integer, integer and float columns to minimum size that will not lose info
 def optimize_cols(df: pd.DataFrame):
   if 'CHROM' in df.columns:
@@ -177,7 +180,7 @@ def thread_process(num):
             print("No test SNPs with GWAS Zscore for gene="+TargetID[num])
             return None
 
-        # parse tabix output for Weight, filtered by TargetID[num]
+        # parse tabix output for Weight, filtered by TargetID[num], threshold
         Weight_chunks = pd.read_csv(
             StringIO(w_proc_out.decode('utf-8')),
             sep='\t',
@@ -188,10 +191,11 @@ def thread_process(num):
             usecols=w_cols_ind,
             dtype=w_dtype)
 
-        Weight = pd.concat([x[x[w_cols_ind[4]]==TargetID[num]] for x in Weight_chunks]).reset_index(drop=True)
+        Weight = pd.concat([x[ (x[w_cols_ind[4]]==TargetID[num]) & (abs(x[w_cols_ind[5]]) > args.threshold )  ] for x in Weight_chunks]).reset_index(drop=True)
 
         if Weight.empty:
-            print("No test SNPs with non-zero cis-eQTL weights for gene="+TargetID[num])
+            # print("No test SNPs with non-zero cis-eQTL weights for gene="+TargetID[num])
+            print("No test SNPs with cis-eQTL weights with magnitude that exceeds specified threshold for gene="+TargetID[num])
             return None
 
         Weight.columns = [w_cols[i] for i in tuple(Weight.columns)]
