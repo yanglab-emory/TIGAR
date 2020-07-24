@@ -86,6 +86,8 @@ def call_tabix(path, chr, start, end):
 
 # Determine index of required columns,
 # assigns correct dtype to correct index
+# 'ID' column does not exist in TIGAR training output from previous versions
+# check to see if it is in the file, if not will need to generate snpIDs later
 def default_cols_dtype(file_cols, df_name):
   df_dict = {
   'Weight': {'cols': ['CHROM','POS','REF','ALT','TargetID','ES'], 
@@ -93,10 +95,16 @@ def default_cols_dtype(file_cols, df_name):
   'Zscore': {'cols': ['CHROM','POS','REF','ALT','Zscore'], 
              'dtype': [object,np.int64,object,object,np.float64]}
   }
+
+  if (df_name =='Weight') & ('ID' in file_cols):
+    df_dict['Weight']['cols'].append('ID')
+    df_dict['Weight']['dtype'].append('object')
+
   file_cols_ind = tuple(map(lambda col: file_cols.index(col), df_dict[df_name]['cols']))
   file_dtype = {c:d for c,d in zip(file_cols_ind, df_dict[df_name]['dtype'])}
 
   return file_cols_ind, file_dtype
+
 # Decrease memory by downcasting 'CHROM' column to integer, integer and float columns to minimum size that will not lose info
 def optimize_cols(df: pd.DataFrame):
   if 'CHROM' in df.columns:
@@ -127,6 +135,16 @@ def handle_flip(df: pd.DataFrame, origID, flipID, origValCol, orig_overlap, flip
       ids[i], val[i] = flip[i], -origval[i]
   
   return ids, val
+
+def get_snpIDs(df: pd.DataFrame, flip=False):
+    chroms = df['CHROM'].astype('str').values
+    pos = df['POS'].astype('str').values
+    ref = df['REF'].values
+    alt = df['ALT'].values
+    if flip:
+        return [':'.join(i) for i in zip(chroms,pos,alt,ref)]
+    else:
+        return [':'.join(i) for i in zip(chroms,pos,ref,alt)]  
 ##################################################
 ### Read in gene annotation 
 print("Reading gene annotation file.")
@@ -201,10 +219,18 @@ def thread_process(num):
         Weight.columns = [w_cols[i] for i in tuple(Weight.columns)]
         Weight = optimize_cols(Weight)
 
-        Weight['snpID'] = (Weight['CHROM'].astype('str')
-            +':'+Weight['POS'].astype('str')
-            +':'+Weight.REF
-            +':'+Weight.ALT)
+        # Weight['snpID'] = (Weight['CHROM'].astype('str')
+        #     +':'+Weight['POS'].astype('str')
+        #     +':'+Weight.REF
+        #     +':'+Weight.ALT)
+
+
+        # 'ID' snpID column does not exist in TIGAR training output from previous versions
+        # check to see if it is in the file, if not will need to generate snpIDs later
+        if 'ID' in Weight.columns:
+            Weight.rename(columns={'ID':'snpID'})
+        else:
+            Weight['snpID'] = get_snpIDs(Weight)
 
         # parse tabix output for Zscore
         Zscore = pd.read_csv(
@@ -218,15 +244,17 @@ def thread_process(num):
         Zscore.columns = [z_cols[i] for i in tuple(Zscore.columns)]
         Zscore = optimize_cols(Zscore)
 
-        Zscore['IDorig'] = (Zscore['CHROM'].astype('str')
-            +':'+Zscore['POS'].astype('str')
-            +':'+Zscore.REF
-            +':'+Zscore.ALT)
+        # Zscore['IDorig'] = (Zscore['CHROM'].astype('str')
+        #     +':'+Zscore['POS'].astype('str')
+        #     +':'+Zscore.REF
+        #     +':'+Zscore.ALT)
+        Zscore['IDorig'] = get_snpIDs(Zscore)
 
-        Zscore['IDflip'] = (Zscore['CHROM'].astype('str')
-            +':'+Zscore['POS'].astype('str')
-            +':'+Zscore.ALT
-            +':'+Zscore.REF)
+        # Zscore['IDflip'] = (Zscore['CHROM'].astype('str')
+        #     +':'+Zscore['POS'].astype('str')
+        #     +':'+Zscore.ALT
+        #     +':'+Zscore.REF)
+        Zscore['IDflip'] = get_snpIDs(Zscore, flip=True)
 
         # check for overlapping SNPs in Weight, Zscore data
         snp_overlap_orig = np.intersect1d(Weight.snpID, Zscore.IDorig)
