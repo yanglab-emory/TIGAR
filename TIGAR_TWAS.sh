@@ -22,13 +22,13 @@
 # --Zscore : Path for GWAS summary Zscore statistics
 # --LD : Path for reference LD (SNP genotype covariance matrix) that should be bgzipped and tabixed. Can be generated using our `covar_calculation.py` script
 # --window: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression prediction model (default 1000000 for +- 1MB region around TSS)
-# --threshold : for asso=2, only include SNPs with magnitude of weight greater than the threshold value; default is 0.0001
+# --weight_threshold : for asso=2, only include SNPs with magnitude of weight greater than the weight_threshold value; default is 0.0001
 # --TIGAR_dir : Specify the directory of TIGAR source code
 
 
 ###############################################################
 VARS=`getopt -o "" -a -l \
-asso:,gene_exp:,gene_anno:,PED:,PED_info:,method:,Zscore:,weight:,LD:,chr:,window:,TIGAR_dir:,thread:,threshold:,out_dir: \
+asso:,gene_exp:,gene_anno:,PED:,PED_info:,method:,Zscore:,weight:,LD:,chr:,window:,TIGAR_dir:,thread:,weight_threshold:,out_dir:,sampleID:,test_stat: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -55,7 +55,9 @@ do
         --window|-window) window=$2; shift 2;;
         --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
         --thread|-thread) thread=$2; shift 2;;
-        --threshold|-threshold) threshold=$2; shift 2;;
+        --weight_threshold|-weight_threshold) weight_threshold=$2; shift 2;;
+        --test_stat|-test_stat) test_stat=$2; shift 2;;
+        --sampleID|-sampleID) sampleID=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
         --) shift;break;;
         *) echo "Internal error!";exit 1;;
@@ -66,7 +68,9 @@ done
 thread=${thread:-1}
 window=${window:-$((10**6))}
 method=${method:-'OLS'}
-threshold=${threshold:-0.0001}
+# weight_threshold=${weight_threshold:-0.0001}
+weight_threshold=${weight_threshold:-0}
+test_stat=${test_stat:-'FUSION'}
 
 ############# TWAS 
 
@@ -106,6 +110,8 @@ if [[ "$asso"x == "1"x ]];then
     --PED_info ${PED_info} \
     --method ${method} \
     --thread ${thread} \
+    --sampleID ${sampleID} \
+    --TIGAR_dir ${TIGAR_dir} \
     --out_dir ${out_dir}/TWAS_CHR${chr}
 
 elif [[ "$asso"x == "2"x ]];then
@@ -141,11 +147,6 @@ elif [[ "$asso"x == "2"x ]];then
         tail -n+2 ${weight} | sort -nk1 -nk2  >> ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
         bgzip -f ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
         tabix -f -b 2 -e 2 -S 1  ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt.gz
-        # cat ${weight} | head -n1 > ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}_weight_colnames.txt
-        # cat ${weight} | head -n1 > ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
-        # cat ${weight} | tail -n+2 | sort -nk1 -nk2  >> ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
-        # bgzip -f ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
-        # tabix -f -b 2 -e 2 -S 1  ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt.gz
     fi
 
     if [[ ! -x  ${TIGAR_dir}/TWAS/Asso_Study_02.py ]] ; then
@@ -164,8 +165,10 @@ elif [[ "$asso"x == "2"x ]];then
     --chr ${chr} \
     --window ${window} \
     --thread ${thread} \
-    --threshold ${threshold} \
+    --weight_threshold ${weight_threshold} \
+    --test_stat ${test_stat} \
     --out_dir ${out_dir}/TWAS_CHR${chr} \
+    --TIGAR_dir ${TIGAR_dir} \
     > ${out_dir}/logs/CHR${chr}_TWAS_log.txt
 
     rm -f ${out_dir}/TWAS_CHR${chr}/temp* 
@@ -173,3 +176,8 @@ elif [[ "$asso"x == "2"x ]];then
 fi
 
 echo "Completed TWAS."
+
+
+
+# WANT TO REMOVE MAKING COLNAMES FILE, PASSING COLNAMES TO PYTHON SCRIPTS
+# ALSO TRY MOVING FINAL TWAS FILE DIRECTLY TO OUT DIRECTORY INSTEAD OF HAVING A WHOLE FOLDER FOR 1 FILE?
