@@ -92,20 +92,20 @@ def default_cols_dtype(file_cols, df_name):
 # return correct snpID and Zscore value
 # change sign of Zscore value if matching snpID is flipped wrt Weight snpID
 def handle_flip(df: pd.DataFrame, origID, flipID, origValCol, orig_overlap, flip_overlap):
-  orig = df[origID].values
-  flip = df[flipID].values
-  origval = df[origValCol].values
+    orig = df[origID].values
+    flip = df[flipID].values
+    origval = df[origValCol].values
 
-  ids = np.empty_like(orig)
-  val = np.empty_like(origval)
+    ids = np.empty_like(orig)
+    val = np.empty_like(origval)
 
-  for i in range(len(df)):
-    if orig[i] in orig_overlap:
-      ids[i], val[i] = orig[i], origval[i]
-    elif flip[i] in flip_overlap:
-      ids[i], val[i] = flip[i], -origval[i]
-  
-  return ids, val
+    for i in range(len(df)):
+        if orig[i] in orig_overlap:
+            ids[i], val[i] = orig[i], origval[i]
+        elif flip[i] in flip_overlap:
+            ids[i], val[i] = flip[i], -origval[i]
+
+    return ids, val
 
 ################################################################################################
 ### variable checking
