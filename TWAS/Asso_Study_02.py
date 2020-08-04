@@ -35,9 +35,6 @@ parser.add_argument('--Zscore_colnames',type=str,default=None,dest='zcol_path')
 ### Weight
 parser.add_argument('--weight',type=str,default=None,dest='w_path')
 
-# ### Header of Weight file
-# parser.add_argument('--weight_colnames',type=str,default=None,dest='wcol_path')
-
 ### Reference covariance file
 parser.add_argument('--LD',type=str,default=None,dest='ld_path')
 
@@ -146,18 +143,12 @@ n_targets = TargetID.size
 w_cols = get_header(args.w_path, zipped=True)
 z_cols = get_header(args.z_path, zipped=True)
 
-# w_cols = call_tabix_header(args.w_path)
-# z_cols = call_tabix_header(args.z_path)
-
-# w_cols = tuple(pd.read_csv(args.wcol_path,sep='\t'))
-# z_cols = tuple(pd.read_csv(args.zcol_path,sep='\t'))
-
 # get the indices and dtypes for reading files into pandas
 w_cols_ind, w_dtype = default_cols_dtype(w_cols,'Weight')
 z_cols_ind, z_dtype = default_cols_dtype(z_cols,'Zscore')
 
 print("Creating data frame:"+'CHR'+args.chr+'_sumstat_assoc.txt')
-pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName','Zscore','PVALUE']).to_csv(args.out_dir+'/CHR'+args.chr+'_sumstat_assoc.txt',
+pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName','n_snps','Zscore','PVALUE']).to_csv(args.out_dir+'/CHR'+args.chr+'_sumstat_assoc.txt',
                      sep='\t',index=None,header=True,mode='w')
 
 
@@ -199,7 +190,6 @@ def thread_process(num):
         Weight = pd.concat([x[ (x[w_cols_ind[4]]==TargetID[num]) & (abs(x[w_cols_ind[5]]) > args.weight_threshold )] for x in Weight_chunks]).reset_index(drop=True)
 
         if Weight.empty:
-            # print("No test SNPs with non-zero cis-eQTL weights for gene="+TargetID[num])
             print("No test SNPs with cis-eQTL weights with magnitude that exceeds specified threshold for gene="+TargetID[num])
             return None
 
@@ -235,7 +225,7 @@ def thread_process(num):
         snp_overlap = np.concatenate((snp_overlap_orig, snp_overlap_flip))
 
         if not snp_overlap.size:
-            print("No overlapping test SNPs with both non-zero cis-eQTL weights and with GWAS Zscore for gene="+TargetID[num])
+            print("No overlapping test SNPs that have magnitude of cis-eQTL weights greater than threshold value and with GWAS Zscore for gene="+TargetID[num])
             return None
 
         # filter dataframes by overlapping SNPs
@@ -312,7 +302,6 @@ def thread_process(num):
             z_numer = snp_SD.dot(ZW.ES.values * ZW.Zscore.values)
 
         burden_Z = z_numer/z_denom
-        # burden_Z = np.asscalar(np.mat(ZW.Zscore)*np.mat(ZW.ES).T/np.sqrt(np.mat(ZW.ES)*V*np.mat(ZW.ES).T))
         
         if np.isnan(burden_Z):
         	print("Could not calculate burden_Z: NaN value.")

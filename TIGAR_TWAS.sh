@@ -22,7 +22,7 @@
 # --Zscore : Path for GWAS summary Zscore statistics
 # --LD : Path for reference LD (SNP genotype covariance matrix) that should be bgzipped and tabixed. Can be generated using our `covar_calculation.py` script
 # --window: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression prediction model (default 1000000 for +- 1MB region around TSS)
-# --weight_threshold : for asso=2, only include SNPs with magnitude of weight greater than the weight_threshold value; default is 0.0001
+# --weight_threshold : for asso=2, only include SNPs with magnitude of weight greater than the weight_threshold value; default is 0
 # --TIGAR_dir : Specify the directory of TIGAR source code
 
 
@@ -68,7 +68,6 @@ done
 thread=${thread:-1}
 window=${window:-$((10**6))}
 method=${method:-'OLS'}
-# weight_threshold=${weight_threshold:-0.0001}
 weight_threshold=${weight_threshold:-0}
 test_stat=${test_stat:-'FUSION'}
 
@@ -133,8 +132,6 @@ elif [[ "$asso"x == "2"x ]];then
     if [ ! -f "${Zscore}" ] ; then
         echo Error: Gene expression file ${Zscore} does not exist or is empty. >&2
         exit 1
-    # else
-        # zcat ${Zscore} | head -n1 > ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}_Zscore_colnames.txt
     fi
 
     # Check weight file and tabix weight file
@@ -142,7 +139,6 @@ elif [[ "$asso"x == "2"x ]];then
         echo Error: Gene expression file ${weight} does not exist or is empty. >&2
         exit 1
     else
-        # head -n1 ${weight} > ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}_weight_colnames.txt
         head -n1 ${weight} > ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
         tail -n+2 ${weight} | sort -nk1 -nk2  >> ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
         bgzip -f ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
@@ -167,23 +163,6 @@ elif [[ "$asso"x == "2"x ]];then
     --out_dir ${out_dir}/TWAS_CHR${chr} \
     --TIGAR_dir ${TIGAR_dir} \
     > ${out_dir}/logs/CHR${chr}_TWAS_log.txt
-
-    # ## TWAS
-    # python ${TIGAR_dir}/TWAS/Asso_Study_02.py \
-    # --gene_anno ${gene_anno} \
-    # --Zscore ${Zscore} \
-    # --Zscore_colnames ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}_Zscore_colnames.txt \
-    # --weight ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt.gz \
-    # --weight_colnames ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}_weight_colnames.txt \
-    # --LD ${LD} \
-    # --chr ${chr} \
-    # --window ${window} \
-    # --thread ${thread} \
-    # --weight_threshold ${weight_threshold} \
-    # --test_stat ${test_stat} \
-    # --out_dir ${out_dir}/TWAS_CHR${chr} \
-    # --TIGAR_dir ${TIGAR_dir} \
-    # > ${out_dir}/logs/CHR${chr}_TWAS_log.txt
 
     rm -f ${out_dir}/TWAS_CHR${chr}/temp* 
 
