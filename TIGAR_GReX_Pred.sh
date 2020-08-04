@@ -73,8 +73,6 @@ fi
 if [ ! -f "${genofile}" ] ; then
     echo Error: Training genotype file ${genofile} does not exist or is empty. >&2
     exit 1
-else
-    zcat ${genofile} | grep 'CHROM' > ${out_dir}/Pred_CHR${chr}/test_geno_colnames.txt
 fi
 
 # Check training sample ID file
@@ -104,19 +102,17 @@ python ${TIGAR_dir}/Model_Train_Pred/Prediction.py \
 --chr ${chr} \
 --weight ${weight_file} \
 --genofile ${genofile} \
---test_geno_colnames ${out_dir}/Pred_CHR${chr}/test_geno_colnames.txt \
 --test_sampleID ${test_sampleID_file} \
 --format ${format} \
---geno ${genofile_type} \
+--genofile_type ${genofile_type} \
 --gene_anno ${gene_anno} \
 --window ${window} \
 --thread ${thread} \
 --maf_diff ${maf_diff} \
+--TIGAR_dir ${TIGAR_dir} \
 --out_dir ${out_dir}/Pred_CHR${chr} \
 > ${out_dir}/logs/CHR${chr}_pred_log.txt
-# > ${out_dir}/Pred_CHR${chr}/CHR${chr}_Pred_Log.txt
     
-# rm -f ${out_dir}/Pred_CHR${chr}/test_geno_colnames.txt
 
 
 
