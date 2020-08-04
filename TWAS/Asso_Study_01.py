@@ -192,6 +192,9 @@ def thread_single(num):
     except Exception as e:
         e_type, e_obj, e_tracebk = sys.exc_info()
         e_line_num = e_tracebk.tb_lineno
+
+        e, e_type, e_line_num = [str(x) for x in [e, e_type, e_line_num]]
+
         print('Caught a type '+ e_type +' exception for TargetID='+TargetID[num]+', num=' + str(num) + ' on line'+e_line_num+':\n' + e )
 
     finally:
