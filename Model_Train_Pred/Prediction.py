@@ -3,24 +3,25 @@
 ############################################################
 # import packages needed
 import argparse
-import time
-import subprocess
 import io
 from io import StringIO
-import pandas as pd
-import numpy as np
-import sys
 import multiprocessing
+import subprocess
+import sys
+from time import time
+
+import numpy as np
+import pandas as pd
 
 ##########################################################
 ### time calculation
-start_time=time.clock()
-
+start_time=time()
 
 ###########################################################
 ### variables need
-parser = argparse.ArgumentParser(description='manual to this script')
+parser = argparse.ArgumentParser(description='Prediction')
 
+### Specify tool directory
 parser.add_argument('--TIGAR_dir',type=str)
 
 ### eQTL weight file
@@ -60,7 +61,7 @@ args = parser.parse_args()
 
 sys.path.append(args.TIGAR_dir)
 ###########################################################
-from TIGARutils import calc_maf, call_tabix, call_tabix_header, check_prep_vcf, genofile_cols_dtype, get_header, get_snpIDs, optimize_cols, reformat_sample_vals, reformat_vcf, substr_in_strarray
+import TIGARutils as tg
 
 # return correct snpID and GT value
 # 2-GT value if matching snpID is flipped wrt Weight snpID
@@ -130,18 +131,8 @@ print("Output dir: "+args.out_dir+ "\n")
 
 #########################
 # Load eQTL weights (ES)
-w_cols = get_header(args.w_path)
-
-w_use_cols = ['CHROM','POS','REF','ALT','TargetID','ES','MAF']
-w_dtypes = {'CHROM': object, 'POS': np.int64, 'REF': object, 'ALT': object, 'TargetID': object, 'ES': np.float64, 'MAF': np.float64}
-
-if 'ID' in w_cols:
-    w_use_cols.append('ID')
-    w_dtypes['ID'] = object
-
-elif 'snpID' in w_cols:
-    w_use_cols.append('snpID')
-    w_dtypes['snpID'] = object
+w_cols = tg.get_header(args.w_path)
+w_cols_ind, w_dtype = tg.weight_cols_dtype(w_cols, get_maf=True)
 
 print("Reading eQTL weights file.")
 Weight_chunks=pd.read_csv(
@@ -149,20 +140,22 @@ Weight_chunks=pd.read_csv(
     sep='\t', 
     iterator=True, 
     chunksize=10000,
-    usecols=w_use_cols,
-    dtype=w_dtypes)
-Weight = pd.concat([x[x['CHROM'] == args.chr] for x in Weight_chunks]).reset_index(drop=True)
+    usecols=w_cols_ind,
+    dtype=w_dtype)
+
+Weight = pd.concat([x[x['CHROM']==args.chr] for x in Weight_chunks]).reset_index(drop=True)
 
 if Weight.empty:
     raise SystemExit('There are no valid eQTL weights.')
 
-Weight = optimize_cols(Weight)
+Weight.columns = [w_cols[i] for i in tuple(Weight.columns)]
+Weight = tg.optimize_cols(Weight)
 
 if 'ID' in Weight.columns:
     Weight.rename(columns={'ID':'snpID'})
 
 if not 'snpID' in Weight.columns:
-    Weight['snpID'] = get_snpIDs(Weight)
+    Weight['snpID'] = tg.get_snpIDs(Weight)
 
 Weight = Weight.drop_duplicates(['snpID'], keep='first')
 
@@ -180,10 +173,10 @@ Gene = pd.concat([x[x['CHROM'] == args.chr] for x in Gene_chunks]).reset_index(d
 if Gene.empty:
     raise SystemExit('There are no valid annotations.')
 
-Gene = optimize_cols(Gene)
+Gene = tg.optimize_cols(Gene)
 
 # Load genotype column names of test genotype file
-g_cols = call_tabix_header(args.geno_path)
+g_cols = tg.call_tabix_header(args.geno_path)
 gcol_sampleids = g_cols[gcol_sampleids_strt_ind:]
 
 # if user specified path with sampleids, and at least one sampid from that file, get intersection
@@ -201,15 +194,15 @@ if not sampleID.size:
     raise SystemExit('There are no sampleID in both the genotype data and the specified sampleID file.')
 
 # get the column indices and dtypes for reading genofile into pandas
-g_cols_ind, g_dtype = genofile_cols_dtype(g_cols, args.genofile_type, sampleID)
+g_cols_ind, g_dtype = tg.genofile_cols_dtype(g_cols, args.genofile_type, sampleID)
 
 ### Define TargetID
 TargetID = Weight.TargetID.values
 n_targets = TargetID.size
 
+print("Creating file: "+args.out_dir+'/CHR'+str(args.chr)+'_Pred_GReX.txt')
 out_cols = np.concatenate((
     ['CHROM','GeneStart','GeneEnd','TargetID','GeneName'], sampleID))
-
 pd.DataFrame(columns=out_cols).to_csv(
     args.out_dir+'/CHR'+str(args.chr) + '_Pred_GReX.txt',
     sep='\t', 
@@ -222,17 +215,18 @@ pd.DataFrame(columns=out_cols).to_csv(
 def thread_process(num):
     try:
         Gene_info = Gene.iloc[[num]]
+        target = TargetID[num]
 
         start = str(max(int(Gene_info.GeneStart)-args.window, 0))
         end = str(int(Gene_info.GeneEnd)+args.window)
 
-        g_proc_out = call_tabix(args.geno_path, args.chr, start, end)
+        g_proc_out = tg.call_tabix(args.geno_path, args.chr, start, end)
         
         if not g_proc_out:
-            print("Genotype file has no test SNPs in window of gene="+TargetID[num])
+            print("Genotype file has no test SNPs in window of gene="+target)
             return None  
         
-        print("Predict GReX for Gene : "+TargetID[num])
+        print("Predict GReX for Gene : "+target)
         target_geno = pd.read_csv(StringIO(g_proc_out.decode('utf-8')),
                 sep='\t',
                 low_memory=False,
@@ -240,20 +234,20 @@ def thread_process(num):
                 usecols=g_cols_ind,
                 dtype=g_dtype)
         target_geno.columns = [g_cols[i] for i in target_geno.columns]
-        target_geno = optimize_cols(target_geno)
+        target_geno = tg.optimize_cols(target_geno)
 
         # Get original and flipped snpIDs, filter out duplicates
-        target_geno['IDorig'] = get_snpIDs(target_geno)
-        target_geno['IDflip'] = get_snpIDs(target_geno, flip=True)
+        target_geno['IDorig'] = tg.get_snpIDs(target_geno)
+        target_geno['IDflip'] = tg.get_snpIDs(target_geno, flip=True)
         target_geno = target_geno.drop(columns=['CHROM','POS','REF','ALT'])
         target_geno = target_geno.drop_duplicates(['IDorig'], keep='first')
 
         ### Intersect SNPs from eQTL weight file and test genotype file
         # initial filter to reduce amount of dataframe processing
-        target_weight = Weight[Weight.TargetID==TargetID[num]][['snpID', 'ES', 'MAF']]
+        target_weight = Weight[Weight.TargetID==target][['snpID', 'ES', 'MAF']]
 
         if target_weight.empty:
-            print("No cis-eQTL weights for gene="+TargetID[num])
+            print("No cis-eQTL weights for gene="+target)
             return None       
 
         # get overlapping snps
@@ -262,7 +256,7 @@ def thread_process(num):
         snp_overlap = np.concatenate((snp_overlap_orig, snp_overlap_flip))
 
         if not snp_overlap.size:
-            print("No overlapping test SNPs between weight and genotype file for ="+TargetID[num])
+            print("No overlapping test SNPs between weight and genotype file for ="+target)
             return None
 
         target_weight = target_weight[target_weight.snpID.isin(snp_overlap)]
@@ -270,13 +264,13 @@ def thread_process(num):
 
         # vcf files may have data in multiple formats, check if this is the case and remove unnecessary formats. requires that all rows have data in the user-specified format
         if args.genofile_type=='vcf':
-            target_geno = check_prep_vcf(target_geno, args.format, sampleID)
+            target_geno = tg.check_prep_vcf(target_geno, args.format, sampleID)
 
         # reformat values in target_geno data frame
-        target_geno[sampleID]=target_geno[sampleID].apply(lambda x:reformat_sample_vals(x,args.format), axis=0)
+        target_geno[sampleID]=target_geno[sampleID].apply(lambda x:tg.reformat_sample_vals(x,args.format), axis=0)
 
         # calculate MAF
-        target_geno = calc_maf(target_geno, sampleID, 0, op=operator.ge)
+        target_geno = tg.calc_maf(target_geno, sampleID, 0, op=operator.ge)
 
         # HANDLE FLIPPED SNPS 
         if (snp_overlap_orig.size > 0) and (snp_overlap_flip.size > 0):
@@ -311,10 +305,10 @@ def thread_process(num):
 
         print("Number of SNPs used for prediction after filtering by maf_diff : "+str(Pred.snpID.size))
 
+        # output results
         result = Gene_info.copy()
         result[sampleID] = pd.DataFrame(np.dot(Pred[sampleID].T, Pred['ES'].values)).T
 
-        # output results
         result.to_csv(
             args.out_dir+'/CHR'+str(args.chr)+'_Pred_GReX.txt',
             sep='\t',
@@ -328,7 +322,7 @@ def thread_process(num):
 
         e, e_type, e_line_num = [str(x) for x in [e, e_type, e_line_num]]
 
-        print('Caught a type '+ e_type +' exception for TargetID='+TargetID[num]+', num=' + str(num) + ' on line '+e_line_num+':\n' + e )
+        print('Caught a type '+ e_type +' exception for TargetID='+target+', num=' + str(num) + ' on line '+e_line_num+':\n' + e )
 
     finally:
         # print info to log do not wait for buffer to fill up
@@ -345,8 +339,8 @@ if __name__ == '__main__':
 
 #################################################
 ### time calculation
-time=round((time.clock()-start_time)/60,2)
-
-print(str(time)+' minutes')
+elapsed_sec = time()-start_time
+elapsed_time = tg.format_elapsed_time(elapsed_sec)
+print("Computation time (DD:HH:MM:SS): " + elapsed_time)
 
 

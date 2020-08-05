@@ -3,58 +3,61 @@
 ###################################################################
 # Import packages needed
 import argparse
-import time
-import subprocess
-import pandas as pd
-import numpy as np
 import io
 from io import StringIO
-from scipy.stats import chi2
-import sys
 import multiprocessing
+import subprocess
+import sys
+from time import time
+
+import numpy as np
+import pandas as pd
+
+from scipy.stats import chi2
 
 #########################################################################
 ### timecalculation
-start_time=time.clock()
+start_time = time()
 
 ############################################################
 ### variable needed
-parser = argparse.ArgumentParser(description='Help: ')
+parser = argparse.ArgumentParser(description='Asso Study 02')
 
-parser.add_argument('--TIGAR_dir',type=str,default=None)
+### Specify tool directory
+parser.add_argument('--TIGAR_dir',type=str)
 
 ### Gene annotation file
-parser.add_argument("--gene_anno",type=str,default=None,dest='annot_path')
+parser.add_argument("--gene_anno",type=str,dest='annot_path')
 
 ### GWAS Z score file
-parser.add_argument('--Zscore',type=str,default=None,dest='z_path')
+parser.add_argument('--Zscore',type=str,dest='z_path')
 
 ### Header of GWAS Z score file
-parser.add_argument('--Zscore_colnames',type=str,default=None,dest='zcol_path')
+parser.add_argument('--Zscore_colnames',type=str,dest='zcol_path')
 
 ### Weight
-parser.add_argument('--weight',type=str,default=None,dest='w_path')
+parser.add_argument('--weight',type=str,dest='w_path')
 
 ### Reference covariance file
-parser.add_argument('--LD',type=str,default=None,dest='ld_path')
+parser.add_argument('--LD',type=str,dest='ld_path')
 
 ### chromosome number
-parser.add_argument('--chr',type=str,default=None)
+parser.add_argument('--chr',type=str)
 
 ### window
-parser.add_argument('--window',type=float,default=None)
+parser.add_argument('--window',type=float)
 
 ### Number of thread
-parser.add_argument('--thread',type=int,default=None)
+parser.add_argument('--thread',type=int)
 
 ### Weight threshold to include SNP in TWAS
-parser.add_argument('--weight_threshold',type=float,default=None)
+parser.add_argument('--weight_threshold',type=float)
 
 # specify "FUSION" or "S_PrediXcan" Zscore test statistic to use
 parser.add_argument('--test_stat',type=str,default='FUSION')
 
 ### Output dir
-parser.add_argument('--out_dir',type=str,default=None)
+parser.add_argument('--out_dir',type=str)
 
 args = parser.parse_args()
 
@@ -62,32 +65,12 @@ sys.path.append(args.TIGAR_dir)
 
 ##################################################
 ## Import TIGAR functions, define other functions
-from TIGARutils import call_tabix, call_tabix_header, get_header, optimize_cols, get_snpIDs
+import TIGARutils as tg
 
 # Determine index of required columns,
 # assigns correct dtype to correct index
 # 'ID' column does not exist in TIGAR training output from previous versions
 # check to see if it is in the file, if not will need to generate snpIDs later
-def default_cols_dtype(file_cols, df_name):
-    df_dict = {
-    'Weight': {'cols': ['CHROM','POS','REF','ALT','TargetID','ES'], 
-             'dtype': [object,np.int64,object,object,object,np.float64]},
-    'Zscore': {'cols': ['CHROM','POS','REF','ALT','Zscore'], 
-             'dtype': [object,np.int64,object,object,np.float64]}
-    }
-
-    if (df_name =='Weight'): 
-        if ('snpID' in file_cols):
-            df_dict['Weight']['cols'].append('snpID')
-            df_dict['Weight']['dtype'].append('object')
-        elif ('ID' in file_cols):
-            df_dict['Weight']['cols'].append('ID')
-            df_dict['Weight']['dtype'].append('object')
-
-    file_cols_ind = tuple(map(lambda col: file_cols.index(col), df_dict[df_name]['cols']))
-    file_dtype = {c:d for c,d in zip(file_cols_ind, df_dict[df_name]['dtype'])}
-
-    return file_cols_ind, file_dtype
 
 # return correct snpID and Zscore value
 # change sign of Zscore value if matching snpID is flipped wrt Weight snpID
@@ -134,22 +117,28 @@ Gene_chunks = pd.read_csv(
 
 Gene = pd.concat([x[x['CHROM'] == args.chr] for x in Gene_chunks] ).reset_index(drop=True)
 
-Gene = optimize_cols(Gene)
+Gene = tg.optimize_cols(Gene)
 
 TargetID = np.array(Gene.TargetID)
 n_targets = TargetID.size
 
 # read in headers for Weight and Zscore files
-w_cols = get_header(args.w_path, zipped=True)
-z_cols = get_header(args.z_path, zipped=True)
+w_cols = tg.get_header(args.w_path, zipped=True)
+z_cols = tg.get_header(args.z_path, zipped=True)
 
 # get the indices and dtypes for reading files into pandas
-w_cols_ind, w_dtype = default_cols_dtype(w_cols,'Weight')
-z_cols_ind, z_dtype = default_cols_dtype(z_cols,'Zscore')
+w_cols_ind, w_dtype = tg.weight_cols_dtype(w_cols)
+z_cols_ind, z_dtype = tg.zscore_cols_dtype(z_cols)
 
-print("Creating data frame:"+'CHR'+args.chr+'_sumstat_assoc.txt')
-pd.DataFrame(columns=['CHROM','GeneStart','GeneEnd','TargetID','GeneName','n_snps','Zscore','PVALUE']).to_csv(args.out_dir+'/CHR'+args.chr+'_sumstat_assoc.txt',
-                     sep='\t',index=None,header=True,mode='w')
+
+print("Creating file: "+'CHR'+args.chr+'_sumstat_assoc.txt')
+out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName','n_snps','Zscore','PVALUE']
+pd.DataFrame(columns=out_cols).to_csv(
+    args.out_dir+'/CHR'+args.chr+'_sumstat_assoc.txt',
+    sep='\t',
+    index=None,
+    header=True,
+    mode='w')
 
 
 ##################################################
@@ -163,14 +152,14 @@ def thread_process(num):
         end = str(int(Gene_info.GeneEnd)+args.window)
 
         # tabix Weight file
-        w_proc_out = call_tabix(args.w_path, args.chr, start, end)
+        w_proc_out = tg.call_tabix(args.w_path, args.chr, start, end)
 
         if not w_proc_out:
             print("No test SNPs with non-zero cis-eQTL weights in window of gene="+TargetID[num])
             return None
 
         # tabix Zscore file
-        z_proc_out = call_tabix(args.z_path, args.chr, start, end)
+        z_proc_out = tg.call_tabix(args.z_path, args.chr, start, end)
 
         if not z_proc_out:
             print("No test SNPs with GWAS Zscore for gene="+TargetID[num])
@@ -194,7 +183,7 @@ def thread_process(num):
             return None
 
         Weight.columns = [w_cols[i] for i in tuple(Weight.columns)]
-        Weight = optimize_cols(Weight)
+        Weight = tg.optimize_cols(Weight)
 
         # 'ID' snpID column does not exist in TIGAR training output from previous versions
         # check to see if it is in the file, if not will need to generate snpIDs later
@@ -202,7 +191,7 @@ def thread_process(num):
             Weight = Weight.rename(columns={'ID':'snpID'})
 
         if not 'snpID' in Weight.columns:
-            Weight['snpID'] = get_snpIDs(Weight)
+            Weight['snpID'] = tg.get_snpIDs(Weight)
 
         # parse tabix output for Zscore
         Zscore = pd.read_csv(
@@ -214,10 +203,10 @@ def thread_process(num):
             dtype=z_dtype)
 
         Zscore.columns = [z_cols[i] for i in tuple(Zscore.columns)]
-        Zscore = optimize_cols(Zscore)
+        Zscore = tg.optimize_cols(Zscore)
 
-        Zscore['IDorig'] = get_snpIDs(Zscore)
-        Zscore['IDflip'] = get_snpIDs(Zscore, flip=True)
+        Zscore['IDorig'] = tg.get_snpIDs(Zscore)
+        Zscore['IDflip'] = tg.get_snpIDs(Zscore, flip=True)
 
         # check for overlapping SNPs in Weight, Zscore data
         snp_overlap_orig = np.intersect1d(Weight.snpID, Zscore.IDorig)
@@ -310,7 +299,7 @@ def thread_process(num):
         ### p-value for chi-square test
         pval = 1-chi2.cdf(burden_Z**2,1)
 
-        ### create output row
+        ### create output dataframe
         result = Gene_info.copy()
         result['n_snps'] = n_snps
         result['TWAS_Zscore'] = burden_Z
@@ -330,6 +319,7 @@ def thread_process(num):
     except Exception as e:
         e_type, e_obj, e_tracebk = sys.exc_info()
         e_line_num = e_tracebk.tb_lineno
+
         e, e_type, e_line_num = [str(x) for x in [e, e_type, e_line_num]]
         
         print('Caught a type '+ e_type +' exception for TargetID='+TargetID[num]+', num=' + str(num) + ' on line '+e_line_num+':\n' + e )
@@ -337,7 +327,6 @@ def thread_process(num):
     finally:
         # print info to log do not wait for buffer to fill up
         sys.stdout.flush()
-
 
 ###############################################################
 ### thread process
@@ -353,9 +342,9 @@ if __name__ == '__main__':
 
 ############################################################
 ### time calculation
-time=round((time.clock()-start_time)/60,2)
-
-print("Time:"+str(time)+' minutes')
+elapsed_sec = time()-start_time
+elapsed_time = tg.format_elapsed_time(elapsed_sec)
+print("Computation time (DD:HH:MM:SS): " + elapsed_time)
 
 
 

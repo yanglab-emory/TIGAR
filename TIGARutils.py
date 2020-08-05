@@ -6,21 +6,28 @@ import operator
 import io
 from io import StringIO
 
+#########################################################
+## FUNCTIONS:
 
 # calc_maf
 # call_tabix
 # call_tabix_header
+# format_elapsed_time
 # get_header
-# genofile_cols_dtype
+
 # exp_cols_dtype
+# genofile_cols_dtype
+# weight_cols_dtype
+# zscore_cols_dtype
+
 # get_snpIDs
-# handle_flip # so far only works in Asso_Study_02.py, may remove from utils
 # optimize_cols
 # reformat_sample_vals
 # reformat_vcf
 # check_prep_vcf
 # substr_in_strarray
 
+#########################################################
 
 # Call tabix, read in lines into byt array
 def call_tabix(path, chr, start, end):
@@ -75,6 +82,22 @@ def call_tabix_header(path, out='tuple', rename={}):
 
     return header
 
+# RETURN HUMAN READABLE ELAPSED TIME STRING 
+def format_elapsed_time(time_secs):
+    val = abs(int(time_secs))
+
+    day = val // (3600*24)
+    hour = val % (3600*24) // 3600
+    mins = val % 3600 // 60
+    secs = val % 60
+
+    res = '%02d:%02d:%02d:%02d' % (day, hour, mins, secs)
+
+    if int(time_secs) < 0:
+        res = "-%s" % res
+
+    return res
+
 
 # get header from non-vcf file
 def get_header(path, out='tuple', zipped=False, rename={}):
@@ -100,108 +123,91 @@ def get_header(path, out='tuple', zipped=False, rename={}):
     return header
 
 
-# USED BY PREDICTION, GET LD
-def genofile_cols_dtype(file_cols, type, sampleid):
-    col_dict = {'cols': ['CHROM','POS','REF','ALT'],
-                'dtype': [object,np.int64,object,object]}
 
-    if type == 'vcf':
-        col_dict['cols'].append('FORMAT')
-        col_dict['dtype'].append(object)
+# USED TO DETERMINE INDICES OF EXPRESSION FILE COLS TO READ IN, DTYPE OF EACH COL
+def exp_cols_dtype(file_cols, sampleid):
+    cols = ['CHROM', 'GeneStart', 'GeneEnd', 'TargetID', 'GeneName'] + sampleid.tolist()
+    
+    dtype_dict = {
+        'CHROM': object,
+        'GeneEnd': np.int64,
+        'GeneName': object,
+        'GeneStart': np.int64,
+        'TargetID': object,
+        **{x:np.float64 for x in sampleid}}
 
-    col_dict['cols'].extend(sampleid.tolist())
-    col_dict['dtype'].extend([object] * sampleid.size)
-
-    file_cols_ind = tuple(map(lambda col: file_cols.index(col), col_dict['cols']))
-    file_dtype = {c:d for c,d in zip(file_cols_ind, col_dict['dtype'])}
+    file_cols_ind = tuple([file_cols.index(x) for x in cols])
+    file_dtype = {file_cols.index(x):dtype_dict[x] for x in cols}
 
     return file_cols_ind, file_dtype
 
-####
-# def genofile_cols_dtype(file_cols, type, sampleid, names=False):
 
-#     cols = ['CHROM','POS','REF','ALT'] + sampleid.tolist()
+# USED TO DETERMINE INDICES OF GENOFILE COLS TO READ IN, DTYPE OF EACH COL
+def genofile_cols_dtype(file_cols, type, sampleid):
+    cols = ['CHROM','POS','REF','ALT'] + sampleid.tolist()
 
-#     dtype_dict = {
-#         'CHROM': object,
-#         'POS': np.int64,
-#         'REF': object,
-#         'ALT': object,
-#          **{x:object for x in sampleid}}
+    dtype_dict = {
+        'CHROM': object,
+        'POS': np.int64,
+        'REF': object,
+        'ALT': object,
+         **{x:object for x in sampleid}}
 
-#     if type == 'vcf':
-#         cols.append('FORMAT')
-#         dtype_dict['FORMAT'] = object
+    if type == 'vcf':
+        cols.append('FORMAT')
+        dtype_dict['FORMAT'] = object
 
-#     if names:
-#         return tuple(cols), dtype_dict
-
-#     file_cols_ind = tuple([file_cols.index(x) for x in cols])
-#     file_dtype = {file_cols.index(x):dtype_dict[x] for x in cols}
+    file_cols_ind = tuple([file_cols.index(x) for x in cols])
+    file_dtype = {file_cols.index(x):dtype_dict[x] for x in cols}
     
-#     return file_cols_ind, file_dtype
-####
+    return file_cols_ind, file_dtype
 
+# USED TO DETERMINE INDICES OF WEIGHT FILE COLS TO READ IN, DTYPE OF EACH COL
+def weight_cols_dtype(file_cols, get_id=True, get_maf=False):
+    cols = ['CHROM','POS','REF','ALT','TargetID','ES']
+    dtype_dict = {
+        'CHROM': object,
+        'POS': np.int64,
+        'REF': object,
+        'ALT': object,
+        'TargetID': object,
+        'ES': np.float64}
 
-def exp_cols_dtype(file_cols, sampleid, names=False):
-    col_dict = {'cols': ['CHROM', 'GeneStart', 'GeneEnd', 'TargetID', 'GeneName'],
-                'dtype': [object,np.int64,np.int64,object,object]}
+    if get_maf:
+        cols.append('MAF')
+        dtype_dict['MAF'] = np.float64
 
-    col_dict['cols'].extend(sampleid.tolist())
-    col_dict['dtype'].extend([np.float64] * sampleid.size)
+    if get_id:
+        if ('snpID' in file_cols):
+            cols.append('snpID')
+            dtype_dict['snpID'] = object
 
-    if names:
-        file_cols_return = tuple(col_dict['cols'])
-        file_dtype = {c:d for c,d in zip(file_cols_return, col_dict['dtype'])}
-
-    else:
-        file_cols_return = tuple(map(lambda col: file_cols.index(col), col_dict['cols']))
-        file_dtype = {c:d for c,d in zip(file_cols_return, col_dict['dtype'])}
-
-    return file_cols_return, file_dtype
-
-#####
-# def exp_cols_dtype(file_cols, sampleid, names=False):
-#     cols = ['CHROM', 'GeneStart', 'GeneEnd', 'TargetID', 'GeneName'] + sampleid.tolist()
+        elif ('ID' in file_cols):
+            cols.append('ID')
+            dtype_dict['ID'] = object
     
-#     dtype_dict = {
-#         'CHROM': object,
-#         'GeneEnd': np.int64,
-#         'GeneName': object,
-#         'GeneStart': np.int64,
-#         'TargetID': object,
-#         **{x:np.float64 for x in sampleid}}
+    file_cols_ind = tuple([file_cols.index(x) for x in cols])
+    file_dtype = {file_cols.index(x):dtype_dict[x] for x in cols}
 
-#     if names:
-#         return tuple(cols), dtype_dict
-#         # file_cols_return = tuple(cols)
-#         # file_dtype = dtype_dict
+    return file_cols_ind, file_dtype
 
-#     file_cols_ind = tuple([file_cols.index(x) for x in cols])
-#     file_dtype = {file_cols.index(x):dtype_dict[x] for x in cols}
+# USED TO DETERMINE INDICES OF ZSCORE FILE COLS TO READ IN, DTYPE OF EACH COL
+def zscore_cols_dtype(file_cols):
+    cols = ['CHROM','POS','REF','ALT','Zscore']
+    dtype_dict = {
+        'CHROM': object,
+        'POS': np.int64,
+        'REF': object,
+        'ALT': object,
+        'Zscore': np.float64}
 
-#     return file_cols_ind, file_dtype
-#####
+    file_cols_ind = tuple([file_cols.index(x) for x in cols])
+    file_dtype = {file_cols.index(x):dtype_dict[x] for x in cols}
+
+    return file_cols_ind, file_dtype
 
 
-
-# def weight_cols_dtype(file_cols):
-#     col_dict = {'cols': ['CHROM','POS','REF','ALT','TargetID','ES'], 
-#              'dtype': [object,np.int64,object,object,object,np.float64]}
-
-#     if ('snpID' in file_cols):
-#         col_dict['cols'].append('snpID')
-#         col_dict['dtype'].append('object')
-#     elif ('ID' in file_cols):
-#         col_dict['cols'].append('ID')
-#         col_dict['dtype'].append('object')
-
-#     file_cols_ind = tuple(map(lambda col: file_cols.index(col), col_dict['cols']))
-
-#     file_dtype = {c:d for c,d in zip(file_cols_ind, col_dict['dtype'])}
-
-#     return file_cols_ind, file_dtype
-
+# RETURN SNP IDS
 def get_snpIDs(df: pd.DataFrame, flip=False):
     chroms = df['CHROM'].astype('str').values
     pos = df['POS'].astype('str').values
@@ -241,13 +247,13 @@ def optimize_cols(df: pd.DataFrame):
 def reformat_sample_vals(sample_col, Format):
     vals = sample_col.values
     if Format=='GT':
-        vals[(vals=='0|0')|(vals=='0/0')]=0
-        vals[(vals=='1|0')|(vals=='1/0')|(vals=='0|1')|(vals=='0/1')]=1
-        vals[(vals=='1|1')|(vals=='1/1')]=2
-        vals[(vals=='.|.')|(vals=='./.')]=np.nan
+        vals[(vals=='0|0')|(vals=='0/0')] = 0
+        vals[(vals=='1|0')|(vals=='1/0')|(vals=='0|1')|(vals=='0/1')] = 1
+        vals[(vals=='1|1')|(vals=='1/1')] = 2
+        vals[(vals=='.|.')|(vals=='./.')] = np.nan
         return vals.astype(np.float32)
     elif Format=='DS':
-        vals[(vals==".")]=np.nan
+        vals[(vals==".")] = np.nan
         return vals.astype('float')
 
 

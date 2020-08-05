@@ -3,44 +3,49 @@
 ######################################################
 # Import packages needed
 import argparse
-import warnings
-import time
-import pandas as pd
-import numpy as np
+import multiprocessing
 import sys
+from time import time
+
+import numpy as np
+import pandas as pd
 
 # For OLS and Logistics regression
 import statsmodels.api as sm
 from scipy import stats
 stats.chisqprob = lambda chisq, df: stats.chi2.sf(chisq, df)
 
-import multiprocessing
+############################################################
+### time calculation
+start_time = time()
 
 ##########################################################
 ### variables need
-parser = argparse.ArgumentParser(description='Help: ')
-parser.add_argument('--TIGAR_dir',type=str,default=None)
+parser = argparse.ArgumentParser(description='Asso Study 01')
+
+### Specify tool directory
+parser.add_argument('--TIGAR_dir',type=str)
 
 ### for Gene annotation and Expression level file
-parser.add_argument('--gene_exp',type=str,default=None, dest='geneexp_path')
+parser.add_argument('--gene_exp',type=str,dest='geneexp_path')
 
 ### for PED file
-parser.add_argument('--PED',type=str,default=None, dest='ped_path')
+parser.add_argument('--PED',type=str,dest='ped_path')
 
 ### Association Information file
-parser.add_argument('--PED_info',type=str,default=None, dest='pedinfo_path')
+parser.add_argument('--PED_info',type=str,dest='pedinfo_path')
 
 ### Method use for regression
-parser.add_argument('--method',type=str,default=None)
+parser.add_argument('--method',type=str)
 
 ### number of thread
-parser.add_argument('--thread',type=int,default=None)
+parser.add_argument('--thread',type=int)
 
 ### output dir
-parser.add_argument('--out_dir',type=str,default=None)
+parser.add_argument('--out_dir',type=str)
 
 ### sampleID path
-parser.add_argument('--sampleID',type=str,default=None,dest='sampleid_path')
+parser.add_argument('--sampleID',type=str,dest='sampleid_path')
 
 args = parser.parse_args()
 
@@ -48,13 +53,11 @@ sys.path.append(args.TIGAR_dir)
 
 ##################################################
 ## Import TIGAR functions, define other functions
-from TIGARutils import optimize_cols
+import TIGARutils as tg
 
 # For single phenotype
-def regression_single(method,X,Y,annotdf: pd.DataFrame):
+def regression_single(method,X,Y,annotdf: pd.DataFrame,target):
     result = annotdf.copy()
-
-    target = result['TargetID'].values[0]
 
     ### add intercept column for design matrix
     newX = sm.add_constant(X)
@@ -79,7 +82,6 @@ def regression_single(method,X,Y,annotdf: pd.DataFrame):
 # For multiple phenotype
 def regression_multi(X,Y,annotdf: pd.DataFrame):
     result = annotdf.copy()
-    target = result['TargetID'].values[0]
 
     lm = sm.OLS(Y,X).fit()
 
@@ -102,37 +104,47 @@ if args.sampleid_path:
     print("SampleID path: " + args.sampleid_path + "\n")
 ############################################################
 # Read in PED file
-PED = pd.read_csv(args.ped_path,sep='\t').rename(columns={'#FAM_ID':'FAM_ID'})
-PED = optimize_cols(PED)
+PED = pd.read_csv(
+    args.ped_path,
+    sep='\t').set_index(['IND_ID']).rename(columns={'#FAM_ID':'FAM_ID'})
+PED = tg.optimize_cols(PED)
 
 # Gene annotation and Expression level file
-GeneAnnotExp = pd.read_csv(args.geneexp_path,sep='\t',low_memory=False)
-GeneAnnotExp = optimize_cols(GeneAnnotExp)
+GeneAnnotExp = pd.read_csv(
+    args.geneexp_path,
+    sep='\t',
+    low_memory=False)
+GeneAnnotExp = tg.optimize_cols(GeneAnnotExp)
 
 # Read in Association information
 # P:phenotype
 # C:covariate
-Asso_Info=pd.read_csv(args.pedinfo_path,sep='\t',header=None)
-Asso_Info.columns=['Ind','Var']
+Asso_Info=pd.read_csv(
+    args.pedinfo_path,
+    sep='\t',
+    header=None,
+    names=['Ind','Var'])
 
 ### phenotype
 pheno = Asso_Info[Asso_Info.Ind=='P'].Var.values
+n_pheno = pheno.size
 
-if not pheno.size:
+if not n_pheno:
     raise SystemExit("No phenotype column name is provided by --PED_info.")
 
-print("Phenotypes to be studied : ", pheno)
+print("Phenotypes to be studied: ", pheno)
 
 ### covariates
 cov = Asso_Info[Asso_Info.Ind=='C'].Var.values
 if not cov.size:
     raise SystemExit("No covariates provided.")
 
-print("Covariates to be used:",cov)
+print("Covariates to be used: ",cov)
 
 TargetID = GeneAnnotExp.TargetID.values
+n_targets = TargetID.size
 
-if not TargetID.size:
+if not n_targets:
     raise SystemExit("There is no GREx data in gene expression file provided by --gene_exp ")
 
 
@@ -152,18 +164,13 @@ if not sampleID.size:
     raise SystemExit("There is no overlapped sample IDs between gene expression file and PED file.")
 
 # Organizing PED and Gene-expression file
-ped_cols = np.concatenate((['IND_ID'], pheno, cov))
-PED = PED[PED.IND_ID.isin(sampleID)][ped_cols]
+ped_cols = np.concatenate((pheno, cov))
+PED = PED[PED.index.isin(sampleID)][ped_cols]
 
 gene_cols = np.concatenate((['CHROM', 'GeneStart', 'GeneEnd', 'TargetID', 'GeneName'], sampleID))
 GeneAnnotExp = GeneAnnotExp[gene_cols]
 
-
-GeneExp = (GeneAnnotExp[sampleID]).T
-GeneExp.columns = TargetID
-GeneExp['IND_ID'] = GeneExp.index
-GeneExp = GeneExp.reset_index(drop=True)
-
+GeneExp = (GeneAnnotExp.set_index(['TargetID'])[sampleID]).T
 GeneAnnot = GeneAnnotExp[GeneAnnotExp.columns[0:5]]
 
 ###################################################
@@ -172,15 +179,16 @@ GeneAnnot = GeneAnnotExp[GeneAnnotExp.columns[0:5]]
 # Single Phenotype
 def thread_single(num):
     try:
-        target_cols = np.concatenate((pheno, cov, [TargetID[num]]))
+        target = TargetID[num]
+        target_cols = np.concatenate((pheno, cov, [target]))
         target_data = PEDExp[target_cols].dropna(axis=0, how='any')
         target_annot = GeneAnnot.iloc[[num]]
 
-        X_cols = np.append(cov, TargetID[num])
+        X_cols = np.append(cov, target)
         X = target_data[X_cols]
         Y = target_data[pheno]
 
-        out = regression_single('OLS',X,Y,target_annot)
+        out = regression_single('OLS',X,Y,target_annot,target)
 
         out.to_csv(
             args.out_dir+"/indv_" + args.method+"_assoc.txt",
@@ -195,7 +203,7 @@ def thread_single(num):
 
         e, e_type, e_line_num = [str(x) for x in [e, e_type, e_line_num]]
 
-        print('Caught a type '+ e_type +' exception for TargetID='+TargetID[num]+', num=' + str(num) + ' on line'+e_line_num+':\n' + e )
+        print('Caught a type '+ e_type +' exception for TargetID='+target+', num=' + str(num) + ' on line'+e_line_num+':\n' + e )
 
     finally:
         # print info to log do not wait for buffer to fill up
@@ -204,12 +212,13 @@ def thread_single(num):
 # Multiple Phenotype
 def thread_multi(num):
     try:
-        target_cols = np.insert(pheno,0,TargetID[num])
-        target_data = ResExp[target_cols].dropna(axis=0, how='any')
+        target = TargetID[num]
+        target_cols = np.append(pheno,target)
+        target_data = resid_exp[target_cols].dropna(axis=0, how='any')
         target_annot = GeneAnnot.iloc[[num]]
 
         X = target_data[pheno]
-        Y = target_data[TargetID[num]]
+        Y = target_data[target]
 
         out = regression_multi(X,Y,target_annot)
 
@@ -226,7 +235,7 @@ def thread_multi(num):
         
         e, e_type, e_line_num = [str(x) for x in [e, e_type, e_line_num]]
 
-        print('Caught a type '+ e_type +' exception for TargetID='+TargetID[num]+', num=' + str(num) + ' on line '+e_line_num+':\n' + e )
+        print('Caught a type '+ e_type +' exception for TargetID='+target+', num=' + str(num) + ' on line '+e_line_num+':\n' + e )
 
     finally:
         # print info to log do not wait for buffer to fill up
@@ -235,8 +244,12 @@ def thread_multi(num):
 ###################################################
 # Association Study
 if __name__ == '__main__':
-    if pheno.size == 1:
-        PEDExp = PED.merge(GeneExp,left_on='IND_ID',right_on='IND_ID',how='outer').drop(columns=['IND_ID']).astype('float')
+    if n_pheno == 1:
+        PEDExp = PED.merge(
+            GeneExp,
+            left_index=True, 
+            right_index=True,
+            how='outer')
 
         # output columns to dataframe
         out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName',
@@ -249,18 +262,22 @@ if __name__ == '__main__':
                 mode='w')
 
         pool = multiprocessing.Pool(args.thread)
-        pool.map(thread_single,[num for num in range(TargetID.size)])
+        pool.map(thread_single,[num for num in range(n_targets)])
         pool.close()
         pool.join()
 
-    elif pheno.size > 1:
-        res = pd.DataFrame()
-        res['IND_ID'] = PED.IND_ID.values
+    elif n_pheno > 1:
+        resid = pd.DataFrame(index=PED.index.copy())
         
-        for i in range(pheno.size):
-            res[pheno[i]] = sm.OLS(PED[pheno[i]],sm.add_constant(PED[cov])).fit().resid.values
+        for i in range(n_pheno):
+            resid[pheno[i]] = sm.OLS(PED[pheno[i]],
+                sm.add_constant(PED[cov])).fit().resid.values
 
-        ResExp = res.merge(GeneExp,left_on='IND_ID',right_on='IND_ID',how='outer').drop(columns=['IND_ID']).astype('float')
+        resid_exp = resid.merge(
+            GeneExp,
+            left_index=True,
+            right_index=True,
+            how='outer')
 
         # output columns to dataframe
         out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName',
@@ -273,7 +290,15 @@ if __name__ == '__main__':
                 mode='w')
         
         pool = multiprocessing.Pool(args.thread)
-        pool.map(thread_multi,[num for num in range(TargetID.size)])
+        pool.map(thread_multi,[num for num in range(n_targets)])
         pool.close()
         pool.join()
+
+############################################################
+### time calculation
+elapsed_sec = time()-start_time
+elapsed_time = tg.format_elapsed_time(elapsed_sec)
+print("Computation time (DD:HH:MM:SS): " + elapsed_time)
+
+
 

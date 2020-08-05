@@ -81,12 +81,12 @@ thread=${thread:-1}
 maf=${maf:-0.01}
 hwe=${hwe:-0.00001}
 window=${window:-$((10**6))}
-cvR2=${cvR2:-1} 
+cvR2=${cvR2:-1}
 cv=${cv:-5}
 alpha=${alpha:-0.5}
 dpr_num=${dpr_num:-1} # 1 is for VB ; 2 is for MCMC
 ES=${ES:-"fixed"}
-thread=${thread:-1}
+
 
 #### Create output directory if not existed
 mkdir -p ${out_dir}
@@ -131,15 +131,12 @@ if [[ "$model"x == "elastic_net"x ]];then
 
     mkdir -p ${out_dir}/EN_CHR${chr}
 
-    zcat ${genofile} | grep 'CHROM' > ${out_dir}/EN_CHR${chr}/geno_colnames.txt
-
     python ${TIGAR_dir}/Model_Train_Pred/Elastic_Net_Train.py \
     --gene_exp ${gene_exp} \
     --train_sampleID ${train_sampleID} \
     --chr ${chr} \
     --genofile ${genofile} \
     --genofile_type ${genofile_type} \
-    --geno_colnames ${out_dir}/EN_CHR${chr}/geno_colnames.txt \
     --format ${format} \
     --maf ${maf} \
     --hwe ${hwe} \
@@ -148,12 +145,10 @@ if [[ "$model"x == "elastic_net"x ]];then
     --cv ${cv} \
     --thread ${thread} \
     --alpha ${alpha} \
+    --TIGAR_dir ${TIGAR_dir} \
     --out_dir ${out_dir}/EN_CHR${chr} \
     > ${out_dir}/logs/CHR${chr}_EN_train_log.txt
-    # > ${out_dir}/EN_CHR${chr}/CHR${chr}_EN_train_log.txt
 
-    ### Remove file
-    rm -f ${out_dir}/EN_CHR${chr}/geno_colnames.txt
 
 elif [[ "$model"x == "DPR"x ]]; then
     echo "Train gene expression imputation models by Nonparametric Bayesian DPR method..."
@@ -163,14 +158,6 @@ elif [[ "$model"x == "DPR"x ]]; then
 
     ### Store files for DPR under DPR_Files
     mkdir -p ${out_dir}/DPR_CHR${chr}/DPR_Files
-
-    ### Extract column names from training genotype file
-    if [ -f ${genofile} ] ; then
-        zcat ${genofile} | grep 'CHROM' > ${out_dir}/DPR_CHR${chr}/geno_colnames.txt
-    else
-        echo Error: ${genofile} does not exist or is empty. >&2
-        exit 1
-    fi
 
     ### Store Cross Validation DPR input files and outputs
     if [ ${cvR2} == "1" ] ; then
@@ -194,8 +181,7 @@ elif [[ "$model"x == "DPR"x ]]; then
     --gene_exp ${gene_exp} \
     --train_sampleID ${train_sampleID} \
     --chr ${chr} \
-    --train_geno_file ${genofile} \
-    --geno_colnames ${out_dir}/DPR_CHR${chr}/geno_colnames.txt \
+    --genofile ${genofile} \
     --genofile_type ${genofile_type} \
     --format ${format} \
     --hwe ${hwe} \
@@ -208,11 +194,9 @@ elif [[ "$model"x == "DPR"x ]]; then
     --thread ${thread} \
     --out_dir ${out_dir}/DPR_CHR${chr} \
     > ${out_dir}/logs/CHR${chr}_DPR_train_log.txt
-    # > ${out_dir}/DPR_CHR${chr}/CHR${chr}_DPR_train_log.txt
 
     ### 4. Remove DPR input files
     echo Remove DPR input files 
-    rm -f ${out_dir}/CHR${chr}_geno_colnames.txt
     rm -fr ${out_dir}/DPR_CHR${chr}/DPR_Files
 
     if [ ${cvR2} == "1" ] ; then
@@ -225,5 +209,7 @@ else
 fi
 
 echo "Training ${model} model job completed for CHR ${chr}."
-
+# MAYBE TRY SORTING FILE AT THIS POINT????      
+#   head -n1 ${weight} > ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
+# tail -n+2 ${weight} | sort -nk1 -nk2  >> ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
 exit
