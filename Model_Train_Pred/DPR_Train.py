@@ -83,7 +83,7 @@ DPR_path = args.TIGAR_dir + '/Model_Train_Pred/DPR'
 import TIGARutils as tg
 
 # preps dpr input files, runs DPR, reads in dpr output
-def prep_call_dpr(bimbam_df, pheno_df, dpr_file_dir, targetid):
+def prep_call_dpr(bimbam_df, pheno_df, snpannot_df, dpr_file_dir, targetid):
     ## PATHS FOR DPR INPUT
     bimbam_pth = dpr_file_dir + targetid + '_bimbam.txt'
     pheno_pth = dpr_file_dir + targetid + '_pheno.txt'
@@ -104,7 +104,7 @@ def prep_call_dpr(bimbam_df, pheno_df, dpr_file_dir, targetid):
         sep='\t',
         mode='w')
 
-    target_geno[['snpID','POS','CHROM']].to_csv(
+    snpannot_df.to_csv(
             snpannot_pth,
             header=False,
             index=None,
@@ -182,22 +182,23 @@ def calc_r2(out_weights_df, bimbam_test_df, pheno_test_df, cv=False):
 
 
 # function to do the ith cross validation step
-def do_cv(i):
+def do_cv(i, target, target_geno_df, target_exp_df, snp_annot_df, cv_trainID, cv_testID, ):
     dpr_file_dir_cv = args.out_dir + '/CV_Files/'
     target_cv = target +'_CV'+str(i+1)
 
-    trainID = CV_trainID[i]
-    testID = CV_testID[i]
+    trainID = cv_trainID[i]
+    testID = cv_testID[i]
 
-    bimbam_train = target_geno[np.concatenate((['snpID','REF','ALT'],trainID))]
+    bimbam_train = target_geno_df[np.concatenate((['snpID','REF','ALT'],trainID))]
 
-    pheno_train = target_exp[trainID].T
+    pheno_train = target_exp_df[trainID].T
 
     ### PREP INPUT, CALL DPR
     try:
         dpr_out_cv = prep_call_dpr(
             bimbam_train, 
             pheno_train, 
+            snp_annot_df,
             dpr_file_dir_cv, 
             target_cv)
 
@@ -207,8 +208,8 @@ def do_cv(i):
     
     ### for R2 calculation
     out_weights_cv = dpr_out_cv[['snpID','ES']]
-    bimbam_test = target_geno[np.append(['snpID'],testID)]
-    pheno_test = target_exp[testID].T
+    bimbam_test = target_geno_df[np.append(['snpID'],testID)]
+    pheno_test = target_exp_df[testID].T
 
     cv_rsquared = calc_r2(
         out_weights_cv, 
@@ -253,6 +254,12 @@ print("Threshold for HWE p-value: "+str(args.hwe)+ "\n")
 print("Runing DPR Model: dpr="+args.dpr+ "\n")
 print("Output Effect-size type: "+args.ES+ "\n")
 print("Output directory: "+args.out_dir+ "\n")
+
+out_train_weight_path = args.out_dir+'/CHR'+args.chr+'_DPR_train_eQTLweights.txt'
+print("Training weights output file: " + out_train_weight_path +"\n")
+
+out_train_info_path = args.out_dir+'/CHR'+args.chr+'_DPR_train_GeneInfo.txt'
+print("Training info file: " + out_train_info_path +"\n")
 
 print("********************************\n\n")
 #############################################################
@@ -338,7 +345,7 @@ else:
 ## print output headers to files
 weight_out_cols = ['CHROM','POS', 'snpID', 'REF','ALT','TargetID','MAF','p_HWE','ES','b','beta']
 pd.DataFrame(columns=weight_out_cols).to_csv(
-    args.out_dir+'/CHR'+args.chr+'_DPR_train_eQTLweights.txt',
+    out_train_weight_path,
     sep='\t',
     header=True,
     index=None,
@@ -346,18 +353,19 @@ pd.DataFrame(columns=weight_out_cols).to_csv(
 
 info_out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName','sample_size','n_snp', 'n_effect_snp','CVR2','TrainPVALUE','TrainR2']
 pd.DataFrame(columns=info_out_cols).to_csv(
-    args.out_dir+'/CHR'+args.chr+'_DPR_train_GeneInfo.txt',
+    out_train_info_path,
     sep='\t',
     header=True,
     index=None,
     mode='w')
 
 ###############################################################
-
+### thread function
 def thread_process(num):
     try:
-        target_exp = GeneExp.iloc[[num]]
         target = TargetID[num]
+        print("\nnum="+str(num)+"\nTargetID="+target)
+        target_exp = GeneExp.iloc[[num]]
 
         start=str(max(int(target_exp.GeneStart)-args.window,0))
         end=str(int(target_exp.GeneEnd)+args.window)
@@ -399,12 +407,14 @@ def thread_process(num):
         # get, filter p_HWE
         target_geno = tg.calc_p_hwe(target_geno, sampleID, args.hwe)
 
+        snp_annot = target_geno[['snpID','POS','CHROM']]
 
         # 5-FOLD CROSS-VALIDATION
         if args.cvR2:
             print("Running 5-fold CV for Gene: "+target+"\n")
+            do_cv_args = [target, target_geno, target_exp, snp_annot, CV_trainID, CV_testID]
 
-            k_fold_R2 = [do_cv(i) for i in range(5)]
+            k_fold_R2 = [do_cv(i, *do_cv_args) for i in range(5)]
 
             avg_r2_cv = sum(k_fold_R2)/5
 
@@ -427,7 +437,7 @@ def thread_process(num):
 
         # PREP INPUT FILES, CALL DPR, READ IN DPR OUTPUT
         try:
-            dpr_out = prep_call_dpr(bimbam, pheno, dpr_file_dir, target)
+            dpr_out = prep_call_dpr(bimbam, pheno, snp_annot, dpr_file_dir, target)
 
         except subprocess.CalledProcessError as err:
             print("DPR failed for TargetID: " + target)
@@ -461,7 +471,7 @@ def thread_process(num):
             how='outer')[weight_out_cols]
 
         target_weights.to_csv(
-            args.out_dir+'/CHR'+args.chr+'_DPR_train_eQTLweights.txt',
+            out_train_weight_path,
             sep='\t',
             header=None,
             index=None,
@@ -480,12 +490,11 @@ def thread_process(num):
 
         # output training info
         train_info.to_csv(
-            args.out_dir+'/CHR'+args.chr+'_DPR_train_GeneInfo.txt',
+            out_train_info_path,
             sep='\t',
             header=None,
             index=None,
-            mode='a',
-            float_format='%.4f')
+            mode='a')
 
     except Exception as e:
         e_type, e_obj, e_tracebk = sys.exc_info()
@@ -511,7 +520,7 @@ if __name__ == '__main__':
     pool.map(thread_process,[num for num in range(n_targets)])
     pool.close()
     pool.join()
-    print('Done.')
+    print('Done.\n')
 
 
 ############################################################

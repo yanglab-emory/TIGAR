@@ -28,7 +28,7 @@
 
 ###############################################################
 VARS=`getopt -o "" -a -l \
-asso:,gene_exp:,gene_anno:,PED:,PED_info:,method:,Zscore:,weight:,LD:,chr:,window:,TIGAR_dir:,thread:,weight_threshold:,out_dir:,sampleID:,test_stat: \
+asso:,gene_exp:,gene_anno:,PED:,PED_info:,method:,Zscore:,weight:,LD:,chr:,window:,TIGAR_dir:,thread:,weight_threshold:,out_dir:,sampleID:,test_stat:,test_sampleID: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -58,6 +58,7 @@ do
         --weight_threshold|-weight_threshold) weight_threshold=$2; shift 2;;
         --test_stat|-test_stat) test_stat=$2; shift 2;;
         --sampleID|-sampleID) sampleID=$2; shift 2;;
+        --test_sampleID|-test_sampleID) test_sampleID=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
         --) shift;break;;
         *) echo "Internal error!";exit 1;;
@@ -70,7 +71,7 @@ window=${window:-$((10**6))}
 method=${method:-'OLS'}
 weight_threshold=${weight_threshold:-0}
 test_stat=${test_stat:-'FUSION'}
-
+test_sampleID=${test_sample:-${sampleID}}
 ############# TWAS 
 
 ## make output directory
@@ -109,9 +110,9 @@ if [[ "$asso"x == "1"x ]];then
     --PED_info ${PED_info} \
     --method ${method} \
     --thread ${thread} \
-    --sampleID ${sampleID} \
     --TIGAR_dir ${TIGAR_dir} \
-    --out_dir ${out_dir}/TWAS_CHR${chr}
+    --out_dir ${out_dir}/TWAS_CHR${chr} \
+    > ${out_dir}/logs/indv_${method}_TWAS_log.txt
 
 elif [[ "$asso"x == "2"x ]];then
     echo "Conducting TWAS using summary-level GWAS Z-score statistics and reference LD covariance file ... "

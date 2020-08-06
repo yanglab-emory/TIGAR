@@ -5,6 +5,7 @@
 import argparse
 import io
 from io import StringIO
+import operator
 import multiprocessing
 import subprocess
 import sys
@@ -78,11 +79,11 @@ def handle_flip_pred(df: pd.DataFrame, sampleID, orig_overlap, flip_overlap):
 
     for i in range(len(df)):
         if orig[i] in orig_overlap:
-            ids[i], maf[i] = orig[i], origmaf[i]
-            outdf = outdf.append(df.iloc[i])
+            ids[i], maf[i] = orig[i], origmaf[i].astype('float')
+            outdf = outdf.append(df.iloc[i]).astype('float')
         elif flip[i] in flip_overlap:
-            ids[i], maf[i] = flip[i], 1-origmaf[i]
-            outdf = outdf.append(df.iloc[i].apply(lambda x: 2-x))
+            ids[i], maf[i] = flip[i], 1-origmaf[i].astype('float')
+            outdf = outdf.append(df.iloc[i].apply(lambda x: 2-x)).astype('float')
 
     return ids, maf, outdf
 
@@ -109,7 +110,6 @@ print("eQTL weight file: "+args.w_path+ "\n")
 print("Test gene annotation file: "+args.annot_path+ "\n")
 if args.sampleid_path:
     print("Test sampleID file: "+args.sampleid_path+ "\n")
-
 print("Test genotype file: "+args.geno_path+ "\n")
 
 if args.genofile_type=='vcf':
@@ -123,12 +123,12 @@ else:
     raise SystemExit("Please specify input test genotype file as either 'vcf' or 'dosage'."+ "\n")
 
 print("Gene region size: window = "+str(args.window)+ "\n")
-
 print("MAF difference threshold for matching SNPs from eQTL weight file and test genotype file: "+str(args.maf_diff)+ "\n")
-
 print("Number of threads: "+str(args.thread)+ "\n")
-print("Output dir: "+args.out_dir+ "\n")
+print("Output directory: "+args.out_dir+ "\n")
 
+out_pred_path = args.out_dir + '/CHR' + args.chr + '_Pred_GReX.txt'
+print("Prediction results file: " + out_pred_path +"\n")
 #########################
 # Load eQTL weights (ES)
 w_cols = tg.get_header(args.w_path)
@@ -148,7 +148,7 @@ Weight = pd.concat([x[x['CHROM']==args.chr] for x in Weight_chunks]).reset_index
 if Weight.empty:
     raise SystemExit('There are no valid eQTL weights.')
 
-Weight.columns = [w_cols[i] for i in tuple(Weight.columns)]
+# Weight.columns = [w_cols[i] for i in tuple(Weight.columns)]
 Weight = tg.optimize_cols(Weight)
 
 if 'ID' in Weight.columns:
@@ -156,8 +156,6 @@ if 'ID' in Weight.columns:
 
 if not 'snpID' in Weight.columns:
     Weight['snpID'] = tg.get_snpIDs(Weight)
-
-Weight = Weight.drop_duplicates(['snpID'], keep='first')
 
 # Load annotation file
 print("Reading gene annotation file.")
@@ -197,25 +195,27 @@ if not sampleID.size:
 g_cols_ind, g_dtype = tg.genofile_cols_dtype(g_cols, args.genofile_type, sampleID)
 
 ### Define TargetID
-TargetID = Weight.TargetID.values
+TargetID = Gene.TargetID.values
 n_targets = TargetID.size
 
-print("Creating file: "+args.out_dir+'/CHR'+str(args.chr)+'_Pred_GReX.txt')
+print("Creating output file: " + out_pred_path)
 out_cols = np.concatenate((
     ['CHROM','GeneStart','GeneEnd','TargetID','GeneName'], sampleID))
 pd.DataFrame(columns=out_cols).to_csv(
-    args.out_dir+'/CHR'+str(args.chr) + '_Pred_GReX.txt',
+    out_pred_path,
     sep='\t', 
     index=None, 
     header=True, 
     mode='w')
 
+
 #################################################
 ### thread function
 def thread_process(num):
     try:
-        Gene_info = Gene.iloc[[num]]
         target = TargetID[num]
+        print("\nnum="+str(num)+"\nTargetID="+target)
+        Gene_info = Gene.iloc[[num]]
 
         start = str(max(int(Gene_info.GeneStart)-args.window, 0))
         end = str(int(Gene_info.GeneEnd)+args.window)
@@ -259,6 +259,8 @@ def thread_process(num):
             print("No overlapping test SNPs between weight and genotype file for ="+target)
             return None
 
+        print("Number of SNPs overlapped between eQTL weight file and test genotype file : "+str(snp_overlap.size) + "\n")
+
         target_weight = target_weight[target_weight.snpID.isin(snp_overlap)]
         target_geno = target_geno[target_geno.IDorig.isin(snp_overlap_orig) | target_geno.IDflip.isin(snp_overlap_flip)]
 
@@ -283,8 +285,8 @@ def thread_process(num):
 
         else:
             # assume all flipped
-            target_geno['snpID'], target_geno['MAF_test'] = target_geno['IDflip'], 1-target_geno['MAF']
-            target_geno[sampleID] = target_geno[sampleID].apply(lambda x: 2-x)
+            target_geno['snpID'], target_geno['MAF_test'] = target_geno['IDflip'], 1-target_geno['MAF'].astype('float')
+            target_geno[sampleID] = target_geno[sampleID].apply(lambda x: 2-x).astype('float')
 
         target_geno = target_geno.drop(columns=['IDorig','IDflip','MAF'])
 
@@ -295,7 +297,7 @@ def thread_process(num):
             right_on='snpID', 
             how='outer')
 
-        Pred['diff'] = np.abs(Pred['MAF'].values - Pred['MAF_test'].values)
+        Pred['diff'] = np.abs(Pred['MAF'].astype('float') - Pred['MAF_test'].astype('float'))
         
         Pred = Pred[Pred['diff']<=args.maf_diff].drop(columns=['MAF','MAF_test','diff'])
 
@@ -303,14 +305,14 @@ def thread_process(num):
             print("All SNP MAFs for training data and testing data differ by a magnitude greater than "+str(args.maf_diff) + "\n")
             return None
 
-        print("Number of SNPs used for prediction after filtering by maf_diff : "+str(Pred.snpID.size))
+        print("Number of SNPs used for prediction after filtering by maf_diff: "+str(Pred.snpID.size))
 
         # output results
         result = Gene_info.copy()
         result[sampleID] = pd.DataFrame(np.dot(Pred[sampleID].T, Pred['ES'].values)).T
 
         result.to_csv(
-            args.out_dir+'/CHR'+str(args.chr)+'_Pred_GReX.txt',
+            out_pred_path,
             sep='\t',
             index=None,
             header=None,

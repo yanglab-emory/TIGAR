@@ -44,8 +44,8 @@ parser.add_argument('--thread',type=int)
 ### output dir
 parser.add_argument('--out_dir',type=str)
 
-### sampleID path
-parser.add_argument('--sampleID',type=str,dest='sampleid_path')
+# ### sampleID path
+# parser.add_argument('--test_sampleID',type=str,dest='sampleid_path',default=None)
 
 args = parser.parse_args()
 
@@ -100,8 +100,11 @@ print("PED phenotype and covariates information file: "+args.pedinfo_path+ "\n")
 print("Regression model used for association test: "+ args.method + "\n")
 print("Number of threads: "+str(args.thread)+ "\n")
 print("Output directory: "+args.out_dir+ "\n")
-if args.sampleid_path:
-    print("SampleID path: " + args.sampleid_path + "\n")
+
+out_twas_path = args.out_dir + "/indv_" + args.method + "_assoc.txt"
+print("TWAS results file: " + out_twas_path +"\n" )
+# if args.sampleid_path:
+#     print("SampleID path: " + args.sampleid_path + "\n")
 ############################################################
 # Read in PED file
 PED = pd.read_csv(
@@ -148,17 +151,20 @@ if not n_targets:
     raise SystemExit("There is no GREx data in gene expression file provided by --gene_exp ")
 
 
-pedannot_sampleids = np.intersect1d(PED.IND_ID.values, GeneAnnotExp.columns[5:].values)
+sampleID = pedannot_sampleids = np.intersect1d(PED.index.values, GeneAnnotExp.columns[5:].values)
 
-# if user specified path with sampleids, and at least one sampid from that file, get intersection
-if args.sampleid_path:
-    spec_sampleids = pd.read_csv(args.sampleid_path, sep='\t', header=None)
-    spec_sampleids = spec_sampleids[0].drop_duplicates()
+# # if user specified path with sampleids, and at least one sampid from that file, get intersection
+# if args.sampleid_path:
+#     spec_sampleids = pd.read_csv(
+#         args.sampleid_path,
+#         sep='\t',
+#         header=None)
+#     spec_sampleids = spec_sampleids[0].drop_duplicates()
 
-    sampleID = np.intersect1d(pedannot_sampleids, spec_sampleids)
+#     sampleID = np.intersect1d(pedannot_sampleids, spec_sampleids)
 
-else:
-    sampleID = pedannot_sampleids 
+# else:
+#     sampleID = pedannot_sampleids 
 
 if not sampleID.size:
     raise SystemExit("There is no overlapped sample IDs between gene expression file and PED file.")
@@ -191,7 +197,7 @@ def thread_single(num):
         out = regression_single('OLS',X,Y,target_annot,target)
 
         out.to_csv(
-            args.out_dir+"/indv_" + args.method+"_assoc.txt",
+            out_twas_path,
             sep='\t',
             header=None,
             index=None,
@@ -223,7 +229,7 @@ def thread_multi(num):
         out = regression_multi(X,Y,target_annot)
 
         out.to_csv(
-            args.out_dir+"/indv_" + args.method+"_assoc.txt",
+            out_twas_path,
             sep='\t',
             header=None,
             index=None,
@@ -255,7 +261,7 @@ if __name__ == '__main__':
         out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName',
             'R2','BETA','BETA_SE','T_STAT','PVALUE','N'] 
         pd.DataFrame(columns=out_cols).to_csv(
-                args.out_dir+"/indv_"+args.method+"_assoc.txt",
+                out_twas_path,
                 sep='\t',
                 header=True,
                 index=None,
@@ -283,7 +289,7 @@ if __name__ == '__main__':
         out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName',
             'R2','F_STAT','PVALUE','N']   
         pd.DataFrame(columns=out_cols).to_csv(
-                args.out_dir+"/indv_"+args.method+"_assoc.txt",
+                out_twas_path,
                 sep='\t',
                 header=True,
                 index=None,

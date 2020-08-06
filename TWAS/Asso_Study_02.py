@@ -103,7 +103,8 @@ print("SNP weight inclusion threshold : " + str(args.weight_threshold) + "\n")
 print("Test statistic to use: " + args.test_stat + "\n")
 print("Output directory : " + args.out_dir + "\n")
 
-
+out_twas_path = args.out_dir+'/CHR'+args.chr+'_sumstat_assoc.txt'
+print("TWAS results file: " + out_twas_path +"\n")
 ##################################################
 ### Read in gene annotation 
 print("Reading gene annotation file.")
@@ -115,7 +116,7 @@ Gene_chunks = pd.read_csv(
     dtype={'CHROM':object,'GeneStart':np.int64,'GeneEnd':np.int64,'TargetID':object,'GeneName':object}, 
     usecols=['CHROM','GeneStart','GeneEnd','TargetID','GeneName'])
 
-Gene = pd.concat([x[x['CHROM'] == args.chr] for x in Gene_chunks] ).reset_index(drop=True)
+Gene = pd.concat([x[x['CHROM']==args.chr] for x in Gene_chunks] ).reset_index(drop=True)
 
 Gene = tg.optimize_cols(Gene)
 
@@ -130,21 +131,21 @@ z_cols = tg.get_header(args.z_path, zipped=True)
 w_cols_ind, w_dtype = tg.weight_cols_dtype(w_cols)
 z_cols_ind, z_dtype = tg.zscore_cols_dtype(z_cols)
 
-
 print("Creating file: "+'CHR'+args.chr+'_sumstat_assoc.txt')
 out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName','n_snps','Zscore','PVALUE']
 pd.DataFrame(columns=out_cols).to_csv(
-    args.out_dir+'/CHR'+args.chr+'_sumstat_assoc.txt',
+    out_twas_path,
     sep='\t',
     index=None,
     header=True,
     mode='w')
 
-
 ##################################################
+### thread function
 def thread_process(num):
     try: 
-        print("\nnum="+str(num)+"\nTargetID="+TargetID[num])
+        target = TargetID[num]
+        print("\nnum="+str(num)+"\nTargetID="+target)
         Gene_info = Gene.iloc[[num]]
 
         # get start and end positions to tabix
@@ -155,17 +156,17 @@ def thread_process(num):
         w_proc_out = tg.call_tabix(args.w_path, args.chr, start, end)
 
         if not w_proc_out:
-            print("No test SNPs with non-zero cis-eQTL weights in window of gene="+TargetID[num])
+            print("No test SNPs with non-zero cis-eQTL weights in window of gene="+target)
             return None
 
         # tabix Zscore file
         z_proc_out = tg.call_tabix(args.z_path, args.chr, start, end)
 
         if not z_proc_out:
-            print("No test SNPs with GWAS Zscore for gene="+TargetID[num])
+            print("No test SNPs with GWAS Zscore for gene="+target)
             return None
 
-        # parse tabix output for Weight, filtered by TargetID[num], threshold
+        # parse tabix output for Weight, filtered by target, threshold
         Weight_chunks = pd.read_csv(
             StringIO(w_proc_out.decode('utf-8')),
             sep='\t',
@@ -176,10 +177,10 @@ def thread_process(num):
             usecols=w_cols_ind,
             dtype=w_dtype)
 
-        Weight = pd.concat([x[ (x[w_cols_ind[4]]==TargetID[num]) & (abs(x[w_cols_ind[5]]) > args.weight_threshold )] for x in Weight_chunks]).reset_index(drop=True)
+        Weight = pd.concat([x[ (x[w_cols_ind[4]]==target) & (abs(x[w_cols_ind[5]]) > args.weight_threshold )] for x in Weight_chunks]).reset_index(drop=True)
 
         if Weight.empty:
-            print("No test SNPs with cis-eQTL weights with magnitude that exceeds specified threshold for gene="+TargetID[num])
+            print("No test SNPs with cis-eQTL weights with magnitude that exceeds specified threshold for gene="+target)
             return None
 
         Weight.columns = [w_cols[i] for i in tuple(Weight.columns)]
@@ -214,7 +215,7 @@ def thread_process(num):
         snp_overlap = np.concatenate((snp_overlap_orig, snp_overlap_flip))
 
         if not snp_overlap.size:
-            print("No overlapping test SNPs that have magnitude of cis-eQTL weights greater than threshold value and with GWAS Zscore for gene="+TargetID[num])
+            print("No overlapping test SNPs that have magnitude of cis-eQTL weights greater than threshold value and with GWAS Zscore for gene="+target)
             return None
 
         # filter dataframes by overlapping SNPs
@@ -250,7 +251,7 @@ def thread_process(num):
         MCOV = pd.concat([x[x.snpID.isin(snp_search_ids)] for x in MCOV_chunks]).drop_duplicates(['snpID'], keep='first')
 
         if MCOV.empty:
-          print("No reference covariance information for target SNPs for gene="+TargetID[num])
+          print("No reference covariance information for target SNPs for gene="+target)
           return None
         
         MCOV['COV'] = MCOV['COV'].apply(lambda x:np.array(x.split(',')).astype('float'))
@@ -277,7 +278,7 @@ def thread_process(num):
         ZW = ZW[ZW.snpID.isin(MCOV.snpID)]
         n_snps = str(ZW.snpID.size)
 
-        print("TWAS for gene="+TargetID[num])
+        print("TWAS for gene="+target)
         print("N SNPs="+n_snps)
 
         ### Calculate burden Z score
@@ -307,7 +308,7 @@ def thread_process(num):
 
         ### write to file
         result.to_csv(
-            args.out_dir+'/CHR'+args.chr+'_sumstat_assoc.txt',
+            out_twas_path,
             sep='\t',
             index=None,
             header=None,
@@ -322,7 +323,7 @@ def thread_process(num):
 
         e, e_type, e_line_num = [str(x) for x in [e, e_type, e_line_num]]
         
-        print('Caught a type '+ e_type +' exception for TargetID='+TargetID[num]+', num=' + str(num) + ' on line '+e_line_num+':\n' + e )
+        print('Caught a type '+ e_type +' exception for TargetID='+target+', num=' + str(num) + ' on line '+e_line_num+':\n' + e )
 
     finally:
         # print info to log do not wait for buffer to fill up

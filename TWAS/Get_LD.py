@@ -92,7 +92,10 @@ else:
 print("Chromosome number: " + args.chr + "\n")
 print("Number of threads: " + str(args.thread)+ "\n")
 print("Only using variants with MAF > " + str(args.maf) + " to calculate reference LD covariance file."+ "\n")
-print("Output directory : " + args.out_dir + "\n")
+print("Output directory: " + args.out_dir + "\n")
+
+out_ref_cov_path = args.out_dir+'/CHR'+args.chr+'_reference_cov.txt'
+print("Reference covariance results file: " + out_ref_cov_path+"\n")
 
 if args.sampleid_path:
     print("SampleID path: " + args.sampleid_path + "\n")
@@ -134,7 +137,7 @@ g_cols_ind, g_dtype = tg.genofile_cols_dtype(g_cols, args.genofile_type, sampleI
 # write columns out to file
 out_cols = ['#CHROM', 'POS', 'REF', 'ALT', 'snpID','COV']
 pd.DataFrame(columns=out_cols).to_csv(
-    args.out_dir+'/CHR'+args.chr+'_reference_cov.txt',
+    out_ref_cov_path,
     sep='\t',
     index=None,
     header=True,
@@ -183,7 +186,7 @@ def thread_process(num):
             snpcov = ','.join([cov_print_frmt(x) for x in mcovar[i,i:]])
             covar_info = pd.DataFrame(np.append(snpinfo, snpcov)).T
             covar_info.to_csv(
-                args.out_dir+'/CHR'+args.chr+'_reference_cov.txt',
+                out_ref_cov_path,
                 sep='\t',
                 index=None,
                 header=None,

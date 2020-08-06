@@ -154,9 +154,9 @@ def elastic_net(train, test=None, k=args.cv, Alpha=args.alpha):
 
 
 # function to do the ith cross validation step
-def do_cv(i):
-    train_geno_exp = target_geno_exp.loc[CV_trainID[i]].dropna()
-    test_geno_exp = target_geno_exp.loc[CV_testID[i]].dropna()
+def do_cv(i, target_geno_exp_df, cv_trainID, cv_testID):
+    train_geno_exp = target_geno_exp_df.loc[cv_trainID[i]].dropna()
+    test_geno_exp = target_geno_exp_df.loc[cv_testID[i]].dropna()
 
     cv_rsquared = elastic_net(train_geno_exp, test_geno_exp)
     return cv_rsquared
@@ -195,6 +195,13 @@ print("The ratio for L1 & L2 penalty used by Elastic-Net regression: alpha = "+s
 
 print("Number of threads: "+str(args.thread)+ "\n")
 print("Output dir: "+args.out_dir+ "\n")
+
+
+out_train_weight_path = args.out_dir+'/CHR'+args.chr+'_EN_train_eQTLweights.txt'
+print("Training weights output file: " + out_train_weight_path +"\n")
+
+out_train_info_path = args.out_dir+'/CHR'+args.chr+'_EN_train_GeneInfo.txt'
+print("Training info file: " + out_train_info_path +"\n")
 
 print("********************************\n\n")
 ###############################################################
@@ -276,13 +283,13 @@ if args.cvR2:
     CV_trainID, CV_testID = zip(*kf_splits)
 
 else:
-    print("Skip 5-fold cross validation ...")
+    print("Skipping sample split for 5-fold cross validation ...")
 
 
 ### PREP OUTPUT
 weight_out_cols = ['CHROM','POS','ID','REF','ALT','TargetID','MAF','p_HWE','ES']
 pd.DataFrame(columns=weight_out_cols).to_csv(
-    args.out_dir+'/CHR'+args.chr+'_EN_train_eQTLweights.txt',
+    out_train_weight_path,
     header=True,
     index=None,
     sep='\t',
@@ -290,18 +297,19 @@ pd.DataFrame(columns=weight_out_cols).to_csv(
 
 info_out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName','sample_size','n_snp','n_effect_snp','CVR2','TrainPVALUE','TrainR2','k-fold','alpha','Lambda','cvm']
 pd.DataFrame(columns=info_out_cols).to_csv(
-    args.out_dir+'/CHR'+args.chr+'_EN_train_GeneInfo.txt',
+    out_train_info_path,
     header=True,
     index=None,
     sep='\t',
     mode='w')
 
 ###############################################################
-
+### thread function
 def thread_process(num):
     try:
-        target_exp = GeneExp.iloc[[num]]
         target = TargetID[num]
+        print("\nnum="+str(num)+"\nTargetID="+target)
+        target_exp = GeneExp.iloc[[num]]
 
         start = str(max(int(target_exp.GeneStart)-args.window,0))
         end = str(int(target_exp.GeneEnd)+args.window)
@@ -353,8 +361,8 @@ def thread_process(num):
         ### Evaluate whether Elastic Net model valid
         if args.cvR2:
             print("Running 5-fold CV to tune Elastic-Net penalty parameter for Gene: "+target+"\n")
-
-            k_fold_R2 = [do_cv(i) for i in range(5)]
+            do_cv_args = [target_geno_exp, CV_trainID, CV_testID]
+            k_fold_R2 = [do_cv(i, *do_cv_args) for i in range(5)]
 
             avg_r2_cv = sum(k_fold_R2)/5
 
@@ -364,7 +372,7 @@ def thread_process(num):
 
         else:
             avg_r2_cv = 0
-            print("Skip evaluation by 5-fold CV R2 ..." + "\n")
+            print("Skipping evaluation by 5-fold CV R2 ..." + "\n")
 
 
         # FINAL MODEL TRAINING
@@ -384,7 +392,7 @@ def thread_process(num):
         target_weights = target_weights[['CHROM','POS','snpID','REF','ALT','TargetID','MAF','p_HWE','ES']]
 
         target_weights.to_csv(
-            args.out_dir+'/CHR'+args.chr+'_EN_train_eQTLweights.txt',
+            out_train_weight_path,
             header=False,
             index=None,
             sep='\t',
@@ -395,7 +403,7 @@ def thread_process(num):
 
         train_info['sample_size'] = sample_size
         train_info['n_snp'] = n_snp
-        train_info['n_effect_snp'] = n_effect_snp = Beta.ES.size
+        train_info['n_effect_snp'] = n_effect_snp = target_weights.ES.size
         train_info['CVR2'] = avg_r2_cv
         train_info['TrainPVALUE'] = Pvalue if not np.isnan(Pvalue) else 'NaN'
         train_info['TrainR2'] = R2 if n_effect_snp else 0
@@ -405,12 +413,11 @@ def thread_process(num):
         train_info['cvm'] = cvm
 
         train_info.to_csv(
-            args.out_dir+'/CHR'+args.chr+'_EN_train_GeneInfo.txt',
+            out_train_info_path,
             header=None,
             index=None,
             sep='\t',
-            mode='a',
-            float_format='%.4f')
+            mode='a')
 
     except Exception as e:
         e_type, e_obj, e_tracebk = sys.exc_info()
@@ -427,11 +434,12 @@ def thread_process(num):
 ##################################################################
 ### start thread process
 if __name__ == '__main__':
-     print("Starting Elastic-Net training for "+str(n_targets)+" target genes.")
+    print("Starting Elastic-Net training for "+str(n_targets)+" target genes.")
     pool = multiprocessing.Pool(args.thread)
     pool.map(thread_process,[num for num in range(n_targets)])
     pool.close()
     pool.join()
+    print('Done.\n')
 
 #########################################################
 ### time calculation
