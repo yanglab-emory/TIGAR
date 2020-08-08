@@ -123,6 +123,34 @@ def get_header(path, out='tuple', zipped=False, rename={}):
     return header
 
 
+def get_vcf_header(path, out='tuple'):
+    
+    proc = subprocess.Popen(
+        ["zgrep -m1 -E 'CHROM' "+path],
+        shell=True,
+        stdout=subprocess.PIPE,
+        bufsize=1)
+
+    proc_out = bytearray()
+    while proc.poll() is None:
+        line =  proc.stdout.readline()
+        if len(line) == 0:
+            break
+        proc_out += line
+
+    header = pd.read_csv(
+        StringIO(proc_out.decode('utf-8')),
+        sep='\t',
+        error_bad_lines=False).rename(columns={'#CHROM':'CHROM'})   
+
+    if out=='tuple':
+        return tuple(header)
+
+    elif out=='list':
+        return list(header)
+
+    return header
+
 
 # USED TO DETERMINE INDICES OF EXPRESSION FILE COLS TO READ IN, DTYPE OF EACH COL
 def exp_cols_dtype(file_cols, sampleid):
@@ -163,33 +191,64 @@ def genofile_cols_dtype(file_cols, type, sampleid):
     return file_cols_ind, file_dtype
 
 # USED TO DETERMINE INDICES OF WEIGHT FILE COLS TO READ IN, DTYPE OF EACH COL
-def weight_cols_dtype(file_cols, get_id=True, get_maf=False):
-    cols = ['CHROM','POS','REF','ALT','TargetID','ES']
+def weight_cols_dtype(file_cols, add_cols=[], drop_cols=[], get_id=True):
+    cols = ['CHROM','POS','REF','ALT','TargetID','ES'] + add_cols
     dtype_dict = {
         'CHROM': object,
         'POS': np.int64,
         'REF': object,
         'ALT': object,
         'TargetID': object,
-        'ES': np.float64}
-
-    if get_maf:
-        cols.append('MAF')
-        dtype_dict['MAF'] = np.float64
+        'ES': np.float64,
+        'MAF': np.float64,
+        'snpID': object,
+        'ID': object,
+        'beta': np.float64,
+        'b': np.float64}
 
     if get_id:
         if ('snpID' in file_cols):
             cols.append('snpID')
-            dtype_dict['snpID'] = object
 
         elif ('ID' in file_cols):
             cols.append('ID')
-            dtype_dict['ID'] = object
+
+    cols = [x for x in cols if (x not in drop_cols)]
     
     file_cols_ind = tuple([file_cols.index(x) for x in cols])
     file_dtype = {file_cols.index(x):dtype_dict[x] for x in cols}
 
     return file_cols_ind, file_dtype
+# def weight_cols_dtype(file_cols, get_id=True, other_cols=[]):
+#     cols = ['CHROM','POS','REF','ALT','TargetID','ES'] + other_cols
+#     dtype_dict = {
+#         'CHROM': object,
+#         'POS': np.int64,
+#         'REF': object,
+#         'ALT': object,
+#         'TargetID': object,
+#         'ES': np.float64,
+#         'MAF': np.float64,
+#         'snpID': object,
+#         'ID': object}
+
+#     if get_maf:
+#         cols.append('MAF')
+#         dtype_dict['MAF'] = np.float64
+
+#     if get_id:
+#         if ('snpID' in file_cols):
+#             cols.append('snpID')
+#             dtype_dict['snpID'] = object
+
+#         elif ('ID' in file_cols):
+#             cols.append('ID')
+#             dtype_dict['ID'] = object
+    
+#     file_cols_ind = tuple([file_cols.index(x) for x in cols])
+#     file_dtype = {file_cols.index(x):dtype_dict[x] for x in cols}
+
+#     return file_cols_ind, file_dtype
 
 # USED TO DETERMINE INDICES OF ZSCORE FILE COLS TO READ IN, DTYPE OF EACH COL
 def zscore_cols_dtype(file_cols):
