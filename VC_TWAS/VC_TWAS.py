@@ -3,13 +3,12 @@
 ############################################################
 # import packages needed
 import argparse
-import io
-from io import StringIO
 import operator
-import os
 import multiprocessing
 import subprocess
 import sys
+
+from io import StringIO
 from time import time
 
 import pandas as pd
@@ -95,7 +94,7 @@ parser.add_argument('--out_dir',type=str)
 args = parser.parse_args()
 
 sys.path.append(args.TIGAR_dir)
-sys.path.append(args.TIGAR_dir+'/TWAS')
+sys.path.append(args.TIGAR_dir + '/VC_TWAS')
 
 #############################################
 # Import TIGAR functions
@@ -103,52 +102,78 @@ import TIGARutils as tg
 import SKAT
 
 #############################################
-# check input command
-print('********************************\n   Input Arguments\n********************************\n')
-print('Chromosome: '+args.chr+ '\n')
-print('eQTL weight file: '+args.weight+ '\n')
-print('Test gene annotation file: '+args.gene_anno+ '\n')
-print('Test sampleID file: '+args.sampleid_path+ '\n')
-print('Test genotype file: '+args.geno_path+ '\n')
-
-# SPECIFY INDEX WHERE THE SAMPLEIDS START IN THE GENOTYPE FILE
+# check input arguments
 if args.genofile_type == 'vcf':
-    print('VCF genotype file is used for prediction with genotype format: ' + args.format + '\n')
     gcol_sampleids_strt_ind = 9
 
+    if (args.format != 'GT') and (args.format != 'DS'):
+        raise SystemExit('Please specify the genotype data format used by the vcf file (--format ) as either "GT" or "DS".\n')
+
 elif args.genofile_type == 'dosage':
-    print('Using genotype data from the dosage file.'+ '\n')
-    args.format = 'DS'
     gcol_sampleids_strt_ind = 5
+    args.format = 'DS'
+
 else:
-    raise SystemExit("Please specify input test genotype file as either 'vcf' or 'dosage'.\n")
+    raise SystemExit('Please specify the type input genotype file type (--genofile_type) as either "vcf" or "dosage".\n')
 
-print('Gene region size: window = '+str(args.window)+ '\n')
+if (args.phenotype_type != 'C') and (args.phenotype_type != 'D'):
+    raise SystemExit('Please specify phenotype type (--phenotype_type) as either "C" for continous or "D" for dichotomous.\n')
 
-if args.phenotype_type == 'C':
-    print('Continous phenotype used for SKAT.\n')
+out_twas_path = args.out_dir + '/CHR' + args.chr + '_indv_VC_TWAS.txt'
 
-elif args.phenotype_type == 'D':
-    print('Dichotomous phenotype used for SKAT.\n')
-else:
-    raise SystemExit("Please specify phenotype type as either 'C' for continous or 'D' for dichotomous.\n")
+###############################################################
+# Print input arguments
+print(
+'''********************************
+Input Arguments
 
-print('maf threshold: '+str(args.maf)+ '\n')
-print('hwe threshold: '+str(args.hwe)+ '\n')
-print('weight threshold: '+str(args.weight_threshold)+ '\n')
-print('Number of threads: '+str(args.thread)+ '\n')
-print('PED phenotype and covariate data file using: '+args.ped_path+ '\n')
-print('PED phenotype and covariates information file: '+args.pedinfo_path+ '\n')
-print('Output dir: '+args.out_dir+ '\n')
+Gene annotation file specifying genes for TWAS: {annot_path}
+
+PED phenotype/covariate data file: {ped_path}
+
+PED information file: {pedinfo_path}
+
+Test sampleID file: {sampleid_path}
+
+Chromosome: {chr}
+
+cis-eQTL weight file: {w_path}
+
+Test genotype file: {geno_path}
+
+Genotype file used for testing is type: {genofile_type}
+
+Genotype data format: {format}
+
+Gene testing region SNP inclusion window: +-{window}
+
+MAF threshold for SNP inclusion: {maf}
+
+HWE p-value threshold for SNP inclusion: {hwe}
+
+SNP weight inclusion threshold: {weight_threshold}
+
+{pheno_type_str} phenotype used for SKAT.
+
+Number of threads: {thread}
+
+Output directory: {out_dir}
+
+Output TWAS results file: {out_path}
+********************************'''.format(
+    **args.__dict__,
+    pheno_type_str = {'C':'Continuous', 'D':'Dichotomous'}[args.phenotype_type],
+    out_path = out_twas_path))
 
 #############################################
-# READ IN eQTL WEIGHTS (ES) FILE
+# read in eQTL weights (ES) file
 
+print('Reading weight file.')
 # read in headers for Weight file
 w_cols = tg.get_header(args.w_path)
 
 # get the indices and dtypes for reading file into pandas
-w_cols_ind, w_dtype = tg.weight_cols_dtype(w_cols, ['b','beta'], ['ES'])
+w_cols_ind, w_dtype = tg.weight_cols_dtype(w_cols, ['MAF','b','beta'], ['ES'])
 
 # read in file in chunks
 print('Reading eQTL weights file.')
@@ -182,8 +207,7 @@ Weight = Weight[abs(Weight.ES_sum) > args.weight_threshold]
 # drop columns no longer needed
 Weight = Weight.drop(columns=['CHROM','POS','REF','ALT'])
 
-####################################
-# READ IN GENE ANNOTATION FILE
+# read in gene annotation file
 print('Reading gene annotation file.')
 Gene_chunks = pd.read_csv(
     args.annot_path, 
@@ -197,18 +221,18 @@ Gene = pd.concat([x[x['CHROM']==args.chr] for x in Gene_chunks]).reset_index(dro
 
 Gene = tg.optimize_cols(Gene)
 
-# DEFINE TARGET IDS
+# define target ids
 TargetID = Gene.TargetID.values
 n_targets = TargetID.size
 
-####################################
-# READ IN PED FILE
+# read in ped file
+print('Reading PED, PED info files.')
 PED = pd.read_csv(
     args.ped_path,
     sep='\t').rename(columns={'#FAM_ID':'FAM_ID'})
 PED = tg.optimize_cols(PED)
 
-# READ IN ASSOCIATION INFO
+# read in ped info
 # P:phenotype
 # C:covariate
 Asso_Info = pd.read_csv(
@@ -217,48 +241,45 @@ Asso_Info = pd.read_csv(
     header=None,
     names=['Ind','Var'])
 
-# GET PHENOTYPE, COVARIATE FOR SKAT TEST
+# get phenotype, covariate for SKAT test
 phenotype = PED[Asso_Info[Asso_Info.Ind=='P'].Var]
 covariate = PED[Asso_Info[Asso_Info.Ind=='C'].Var]
 
-####################################
-# READ IN GENOTYPE FILE HEADER
+# read genotype file header
+print('Reading genotype file header.\n')
 g_cols = tg.call_tabix_header(args.geno_path)
 gcol_sampleids = g_cols[gcol_sampleids_strt_ind:]
 
-####################################
-# GET SAMPLE IDS TO USE
-
-# INTERSECT PED AND GENOTYPE SAMPLE IDS - intersection for samples in phenotype and genotype_test 
+# get sampleids to use
+# intersect samples in phenotype and genotype file
 gcol_pheno_sampleids = np.intersect1d(PED.IND_ID, gcol_sampleids)
 
 if not gcol_pheno_sampleids.size:
-    raise SystemExit("The phenotype file and genotype file have no sampleIDs in common.")
+    raise SystemExit('The phenotype file and genotype file have no sampleIDs in common.')
 
-# LOAD USER-SPECIFIED  SAMPLEIDS
+# load sampleids
+print('Reading sampleID file.\n')
 spec_sampleids = pd.read_csv(
     args.sampleid_path,
     sep='\t',
-    header=None)
-spec_sampleids = spec_sampleids[0].drop_duplicates()
+    header=None)[0].drop_duplicates()
 
-# INTERSECT SAMPLES FROM ALL FILES - intersection for samples in phenotype, user-specified sampleids, and genotype file
+# intersect samples in phenotype, user-specified sampleids, and genotype file
+print('Matching sampleIDs.\n')
 sampleID = np.intersect1d(spec_sampleids, gcol_pheno_sampleids) 
 
 n_samples = sampleID.size
 
 if not n_samples:
-    raise SystemExit("There is no overlapped sample IDs between phenotype file, genotype file, and sampleID file.")
+    raise SystemExit('The phenotype file, genotype file, and sampleID file have no sampleIDs in common.')
 
-####################################
-# GET COLUMN INDICES, DTYPE OF GENOTYPE COLUMNS TO READ IN
+# get genotype  columns, dtype to read in
 g_cols_ind, g_dtype = tg.genofile_cols_dtype(g_cols, args.genofile_type, sampleID)
 
-####################################
-# CREATE OUTPUT FILE
-print("Creating file: "+args.out_dir+'/indv_VC_TWAS.txt')
+# prep output
+print('Creating file: ' + out_twas_path + '\n')
 
-out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName']
+out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName','n_snps']
 
 if args.phenotype_type == 'D' and n_samples < 2000:
     out_cols = out_cols + ['p_value_resampling', 'p_value_noadj']
@@ -267,18 +288,20 @@ else:
     out_cols = out_cols + ['p_value']
 
 pd.DataFrame(columns=out_cols).to_csv(
-    args.out_dir+'/indv_VC_TWAS.txt',
+    out_twas_path,
     sep='\t',
     header=True,
     index=None,
     mode='w')
+
+print('********************************\n')
 
 ##########################################################
 
 def thread_process(num):
     try:
         target = TargetID[num]
-        print('\nnum='+str(num)+'\nTargetID='+target)
+        print('num=' + str(num) + '\nTargetID=' + target)
         Gene_info = Gene.iloc[[num]].reset_index(drop=True)
 
         # make sure the weight file has SNPs for this target before processing genotype data
@@ -286,17 +309,17 @@ def thread_process(num):
         target_weight = target_weight.drop_duplicates(['snpID'],keep='first') 
 
         if target_weight.empty:
-            print("No test SNPs with cis-eQTL weights for gene="+target)
+            print('No test SNPs with non-zero cis-eQTL weights for TargetID: ' + target + '\n')
             return None        
 
         # READING IN GENOTYPE FILE WITHIN A THREAD_PROCESS
         start = str(max(int(Gene_info.GeneStart)-args.window,0))
-        end = str(int(Gene_info.GeneEnd)+args.window)    
+        end = str(int(Gene_info.GeneEnd) + args.window)    
 
         g_proc_out = tg.call_tabix(args.geno_path, args.chr, start, end)
 
         if not g_proc_out:
-            print('Genotype file has no test SNPs in window of gene='+target)
+            print('No test SNPs with GWAS Zscore for TargetID: ' + target + '\n')
             return None  
 
         target_geno = pd.read_csv(StringIO(g_proc_out.decode('utf-8')),
@@ -332,36 +355,36 @@ def thread_process(num):
         snp_overlap = np.intersect1d(target_weight.snpID,target_geno.snpID)
             
         if not snp_overlap.size:
-            print('No SNPs overlapped between eQTL weight file and test genotype file. Flipping REF and ALT for genotype file.\n')
+            print('No SNPs overlapped between eQTL weight file and test genotype file. Flipping REF and ALT for genotype file.')
             # GET FLIPPED SNP IDS:
-            target_geno = target_geno.drop[columns=['snpID']]
+            target_geno = target_geno.drop(columns=['snpID'])
             target_geno['snpID'] = tg.get_snpIDs(target_geno, flip=True)
             snp_overlap_flip = np.intersect1d(target_weight.snpID,target_geno.snpID)
                 
             if not snp_overlap_flip.size:
-                print('No SNPs overlapped between eQTL weight file and test genotype file after flipping for Gene:'+target)
+                print('No SNPs overlapped between eQTL weight file and test genotype file after flipping for TargetID:' + target + '\n')
                 return None
 
             snp_overlap = snp_overlap_flip
             target_weight['ES_sum'] = -target_weight['ES_sum'].astype('float')
             target_geno['MAF'] = 1-target_geno['MAF'].astype('float')
         
-        # print('Number of SNPs overlapped between eQTL weight file and test genotype file before MAF filter: '+str(snp_overlap.size) + '\n')
+        # print('Number of SNPs overlapped between eQTL weight file and test genotype file before MAF filter: ' + str(snp_overlap.size) + '\n')
 
         target_geno = target_geno[np.append(sampleID,['snpID','MAF'])]
 
         # DO FINAL MAF FILTER - must be after possible flipping
-        target_geno  = target_geno['MAF' > args.maf]
+        target_geno  = target_geno[target_geno['MAF'] > args.maf]
 
         # SNP OVERLAP AFTER FILTER
         snp_overlap = np.intersect1d(target_weight.snpID,target_geno.snpID)
+        n_snps = snp_overlap.size
 
-        if not snp_overlap.size:
-            print('No overlapped SNPs exceed the specified MAF threshold of '+str(args.maf) +' for gene='+target+ '. Choose smaller threshold. \n')
+        if not n_snps:
+            print('No overlapped SNPs exceed the specified MAF threshold of ' + str(args.maf) + ' for TargetID: ' + target + '\n')
             return None           
 
-        print('TWAS for gene='+target)
-        print('N SNPs='+n_snps)
+        print('Running TWAS.\nN SNPs=' + str(n_snps))
 
         # FILTER GENOTYPE AND WEIGHT DF BY SNPOVERLAP
         target_geno = target_geno[target_geno.snpID.isin(snp_overlap)]
@@ -382,13 +405,14 @@ def thread_process(num):
 
         # INITIALIZE OUTPUT DATAFRAME
         result = Gene_info.copy()
+        result['n_snps'] = n_snps
 
         # SKAT TEST
         p_value = SKAT.SKAT(
-            genotype_mat, 
-            phenotype, 
-            covariate, 
-            weight_mat, 
+            genotype_mat,
+            phenotype,
+            covariate,
+            weight_mat,
             args.phenotype_type)
 
         if args.phenotype_type == 'C': 
@@ -406,19 +430,19 @@ def thread_process(num):
                 result['TargetID'] = target
                     
         result.to_csv(
-            args.out_dir+'/indv_VC_TWAS.txt',
+            out_twas_path,
             sep='\t',
             index=None,
             header=None,
             mode='a')
 
+        print('Target TWAS completed.\n')
+
     except Exception as e:
         e_type, e_obj, e_tracebk = sys.exc_info()
         e_line_num = e_tracebk.tb_lineno
-
-        e, e_type, e_line_num = [str(x) for x in [e, e_type, e_line_num]]
         
-        print('Caught a type '+ e_type +' exception for TargetID='+target+', num=' + str(num) + ' on line '+e_line_num+':\n' + e )
+        print('Caught a type {} exception for TargetID={}, num={} on line {}:\n{}'.format(e_type, target, num, e_line_num, e))
 
     finally:
         # print info to log do not wait for buffer to fill up
@@ -426,9 +450,8 @@ def thread_process(num):
 
 ##############################################################
 # thread process
-
 if __name__ == '__main__':
-    print('Starting VC-TWAS for '+str(n_targets)+' target genes.')
+    print('Starting VC-TWAS for ' + str(n_targets) + ' target genes.')
     pool = multiprocessing.Pool(args.thread)
     pool.map(thread_process,[num for num in range(n_targets)])
     pool.close()

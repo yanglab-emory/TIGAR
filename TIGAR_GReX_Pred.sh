@@ -12,7 +12,7 @@
 # --genofile: Path for the training genotype file (bgzipped and tabixed) 
 # --genofile_tye: Genotype file type: "vcf" or "dosage"
 # --format: Genotype format in VCF file that should be used: "GT" (default) for genotype data or "DS" for dosage data, only required if the input genotype file is of VCF file
-# --window: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression prediction model (default 1000000 for +- 1MB region around TSS)
+# --window: Window size around gene region for selecting cis-SNPs for fitting gene expression prediction model (default 1000000 for +- 1MB region around gene)
 # maf_diff: MAF difference threshold for matching SNPs from eQTL weight file and test genotype file. If SNP MAF difference is greater than maf_diff (default 0.2), , the SNP will be excluded
 # --TIGAR_dir : Specify the directory of TIGAR source code
 # --thread: Number of threads for parallel computation (default 1)
@@ -111,7 +111,7 @@ python ${TIGAR_dir}/Model_Train_Pred/Prediction.py \
 --maf_diff ${maf_diff} \
 --TIGAR_dir ${TIGAR_dir} \
 --out_dir ${out_dir}/Pred_CHR${chr} \
-> ${out_dir}/logs/CHR${chr}_pred_log.txt
+> ${out_dir}/logs/CHR${chr}_Pred_log.txt
     
 
 

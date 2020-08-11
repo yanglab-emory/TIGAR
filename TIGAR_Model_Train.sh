@@ -18,7 +18,7 @@
 # --format: Genotype format in VCF file that should be used: "GT" (default) for genotype data or "DS" for dosage data, only required if the input genotype file is of VCF file
 # --maf: Minor Allele Frequency threshold (ranges from 0 to 1; default 0.01) to exclude rare variants
 # --hwe: Hardy Weinberg Equilibrium p-value threshold (default 0.00001) to exclude variants that violated HWE
-# --window: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression prediction model (default 1000000 for +- 1MB region around TSS)
+# --window: Window size around gene region for selecting cis-SNPs for fitting gene expression prediction model (default 1000000 for +- 1MB region around gene)
 # --cvR2: Take value 0 for calculating training R2 from fitted model and 1 for calculating training R2 from 5-fold cross validation
 # --TIGAR_dir : Specify the directory of TIGAR source code
 # --thread: Number of threads for parallel computation (default 1)

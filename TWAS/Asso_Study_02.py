@@ -3,11 +3,11 @@
 ###################################################################
 # Import packages needed
 import argparse
-import io
-from io import StringIO
 import multiprocessing
 import subprocess
 import sys
+
+from io import StringIO
 from time import time
 
 import numpy as np
@@ -15,55 +15,52 @@ import pandas as pd
 
 from scipy.stats import chi2
 
-#########################################################################
-### timecalculation
+###############################################################
+# time calculation
 start_time = time()
 
-############################################################
-### variable needed
+###############################################################
+# parse input arguments
 parser = argparse.ArgumentParser(description='Asso Study 02')
 
-### Specify tool directory
+# Specify tool directory
 parser.add_argument('--TIGAR_dir',type=str)
 
-### Gene annotation file
-parser.add_argument("--gene_anno",type=str,dest='annot_path')
+# Gene annotation file path
+parser.add_argument('--gene_anno',type=str,dest='annot_path')
 
-### GWAS Z score file
-parser.add_argument('--Zscore',type=str,dest='z_path')
-
-### Header of GWAS Z score file
-parser.add_argument('--Zscore_colnames',type=str,dest='zcol_path')
-
-### Weight
-parser.add_argument('--weight',type=str,dest='w_path')
-
-### Reference covariance file
-parser.add_argument('--LD',type=str,dest='ld_path')
-
-### chromosome number
+# chromosome number
 parser.add_argument('--chr',type=str)
 
-### window
+# Weight file path
+parser.add_argument('--weight',type=str,dest='w_path')
+
+# GWAS Z score file path
+parser.add_argument('--Zscore',type=str,dest='z_path')
+
+# Reference covariance file path
+parser.add_argument('--LD',type=str,dest='ld_path')
+
+# window
 parser.add_argument('--window',type=float)
 
-### Number of thread
-parser.add_argument('--thread',type=int)
-
-### Weight threshold to include SNP in TWAS
+# Weight threshold to include SNP in TWAS
 parser.add_argument('--weight_threshold',type=float)
 
-# specify "FUSION" or "S_PrediXcan" Zscore test statistic to use
-parser.add_argument('--test_stat',type=str,default='FUSION')
+# specify 'FUSION', 'SPrediXcan', or 'both': Zscore test statistic to use
+parser.add_argument('--test_stat',type=str)
 
-### Output dir
+# Number of threads
+parser.add_argument('--thread',type=int)
+
+# Output dir
 parser.add_argument('--out_dir',type=str)
 
 args = parser.parse_args()
 
 sys.path.append(args.TIGAR_dir)
 
-##################################################
+###############################################################
 ## Import TIGAR functions, define other functions
 import TIGARutils as tg
 
@@ -90,24 +87,43 @@ def handle_flip(df: pd.DataFrame, origID, flipID, origValCol, orig_overlap, flip
 
     return ids, val
 
-################################################################################################
-### variable checking
-print("Gene annotation file to specify the list of genes for TWAS : " + args.annot_path + "\n")
-print("GWAS summary statistics Z-score file : " + args.z_path+ "\n")
-print("cis-eQTL weight file : " + args.w_path + "\n")
-print("Reference LD genotype covariance file: " + args.ld_path + "\n")
-print("Chromosome number : " + args.chr + "\n")
-print("Test gene region including SNPs within +- window = " + str(args.window) + " base pair of GeneStart/GeneEnd positions \n")
-print("Number of threads : " + str(args.thread) + "\n")
-print("SNP weight inclusion threshold : " + str(args.weight_threshold) + "\n")
-print("Test statistic to use: " + args.test_stat + "\n")
-print("Output directory : " + args.out_dir + "\n")
+#############################################################
+# Print input arguments to log
+out_twas_path = args.out_dir + '/CHR' + args.chr + '_sumstat_assoc.txt'
 
-out_twas_path = args.out_dir+'/CHR'+args.chr+'_sumstat_assoc.txt'
-print("TWAS results file: " + out_twas_path +"\n")
-##################################################
+print(
+'''********************************
+Input Arguments
+
+Gene annotation file specifying genes for TWAS: {annot_path}
+
+Chromosome: {chr}
+
+cis-eQTL weight file: {w_path}
+
+GWAS summary statistics Z-score file: {z_path}
+
+Reference LD genotype covariance file: {ld_path}
+
+Gene training region SNP inclusion window: +-{window}
+
+SNP weight inclusion threshold: {weight_threshold}
+
+Test statistic to use: {test_stat_str}
+
+Number of threads: {thread}
+
+Output directory: {out_dir}
+
+Output TWAS results file: {out_path}
+********************************'''.format(
+    **args.__dict__,
+    test_stat_str = 'FUSION and SPrediXcan' if args.test_stat=='both' else args.test_stat,
+    out_path = out_twas_path))
+
+###############################################################
 ### Read in gene annotation 
-print("Reading gene annotation file.")
+print('Reading gene annotation file.')
 Gene_chunks = pd.read_csv(
     args.annot_path, 
     sep='\t', 
@@ -124,6 +140,7 @@ TargetID = np.array(Gene.TargetID)
 n_targets = TargetID.size
 
 # read in headers for Weight and Zscore files
+print('Reading file headers.\n')
 w_cols = tg.get_header(args.w_path, zipped=True)
 z_cols = tg.get_header(args.z_path, zipped=True)
 
@@ -131,8 +148,14 @@ z_cols = tg.get_header(args.z_path, zipped=True)
 w_cols_ind, w_dtype = tg.weight_cols_dtype(w_cols)
 z_cols_ind, z_dtype = tg.zscore_cols_dtype(z_cols)
 
-print("Creating file: "+'CHR'+args.chr+'_sumstat_assoc.txt')
-out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName','n_snps','Zscore','PVALUE']
+# PREP OUTPUT - print output headers to files
+print('Creating file: ' + out_twas_path + '\n')
+out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName','n_snps']
+if args.test_stat == 'both':
+    out_cols = out_cols + ['FUSION_Z','FUSION_PVAL','SPred_Z','SPred_PVAL']
+else:
+    out_cols = out_cols + ['Zscore','PVALUE']
+
 pd.DataFrame(columns=out_cols).to_csv(
     out_twas_path,
     sep='\t',
@@ -140,30 +163,32 @@ pd.DataFrame(columns=out_cols).to_csv(
     header=True,
     mode='w')
 
-##################################################
-### thread function
+###############################################################
+# thread function
 def thread_process(num):
     try: 
         target = TargetID[num]
-        print("\nnum="+str(num)+"\nTargetID="+target)
-        Gene_info = Gene.iloc[[num]]
+        print('num=' + str(num) + '\nTargetID=' + target)
+        Gene_info = Gene.iloc[[num]].reset_index(drop=True)
 
         # get start and end positions to tabix
         start = str(max(int(Gene_info.GeneStart)-args.window,0))
         end = str(int(Gene_info.GeneEnd)+args.window)
 
         # tabix Weight file
+        # print('Reading weight data.')
         w_proc_out = tg.call_tabix(args.w_path, args.chr, start, end)
 
         if not w_proc_out:
-            print("No test SNPs with non-zero cis-eQTL weights in window of gene="+target)
+            print('No test SNPs with non-zero cis-eQTL weights for TargetID: ' + target + '\n')
             return None
 
         # tabix Zscore file
+        # print('Reading Zscore data.')
         z_proc_out = tg.call_tabix(args.z_path, args.chr, start, end)
 
         if not z_proc_out:
-            print("No test SNPs with GWAS Zscore for gene="+target)
+            print('No test SNPs with GWAS Zscore for TargetID: ' + target + '\n')
             return None
 
         # parse tabix output for Weight, filtered by target, threshold
@@ -180,7 +205,7 @@ def thread_process(num):
         Weight = pd.concat([x[ (x[w_cols_ind[4]]==target) & (abs(x[w_cols_ind[5]]) > args.weight_threshold )] for x in Weight_chunks]).reset_index(drop=True)
 
         if Weight.empty:
-            print("No test SNPs with cis-eQTL weights with magnitude that exceeds specified threshold for gene="+target)
+            print('No test SNPs with cis-eQTL weights with magnitude that exceeds specified weight threshold for TargetID: ' + target + '\n')
             return None
 
         Weight.columns = [w_cols[i] for i in tuple(Weight.columns)]
@@ -215,7 +240,7 @@ def thread_process(num):
         snp_overlap = np.concatenate((snp_overlap_orig, snp_overlap_flip))
 
         if not snp_overlap.size:
-            print("No overlapping test SNPs that have magnitude of cis-eQTL weights greater than threshold value and with GWAS Zscore for gene="+target)
+            print('No overlapping test SNPs that have magnitude of cis-eQTL weights greater than threshold value and with GWAS Zscore for TargetID: ' + target + '\n')
             return None
 
         # filter dataframes by overlapping SNPs
@@ -234,11 +259,12 @@ def thread_process(num):
         # merge Zscore and Weight dataframes on snpIDs
         ZW = Weight.merge(Zscore[['snpID','Zscore']], 
             left_on='snpID', 
-            right_on='snpID').reset_index(drop=True)
+            right_on='snpID').drop_duplicates(['snpID'], keep='first').reset_index(drop=True)
 
         snp_search_ids = ZW.snpID.values
 
-        ### Read in reference covariance matrix file by snpID
+        # Read in reference covariance matrix file by snpID
+        # print('Reading reference covariance data.')
         MCOV_chunks = pd.read_csv(
             args.ld_path, 
             sep='\t', 
@@ -251,7 +277,7 @@ def thread_process(num):
         MCOV = pd.concat([x[x.snpID.isin(snp_search_ids)] for x in MCOV_chunks]).drop_duplicates(['snpID'], keep='first')
 
         if MCOV.empty:
-          print("No reference covariance information for target SNPs for gene="+target)
+          print('No reference covariance information for target SNPs for TargetID: ' + target + '\n')
           return None
         
         MCOV['COV'] = MCOV['COV'].apply(lambda x:np.array(x.split(',')).astype('float'))
@@ -278,74 +304,82 @@ def thread_process(num):
         ZW = ZW[ZW.snpID.isin(MCOV.snpID)]
         n_snps = str(ZW.snpID.size)
 
-        print("TWAS for gene="+target)
-        print("N SNPs="+n_snps)
-
-        ### Calculate burden Z score
-        z_denom = np.sqrt(np.linalg.multi_dot([ZW.ES.values, V, ZW.ES.values]))
-
-        if args.test_stat == 'FUSION':
-            z_numer = np.vdot(ZW.Zscore.values, ZW.ES.values)
-
-        elif args.test_stat == 'S_PrediXcan':
-            snp_SD = np.sqrt(snp_Var)
-            z_numer = snp_SD.dot(ZW.ES.values * ZW.Zscore.values)
-
-        burden_Z = z_numer/z_denom
-        
-        if np.isnan(burden_Z):
-        	print("Could not calculate burden_Z: NaN value.")
-        	return None
-
-        ### p-value for chi-square test
-        pval = 1-chi2.cdf(burden_Z**2,1)
+        print('Running TWAS.\nN SNPs=' + n_snps)
 
         ### create output dataframe
         result = Gene_info.copy()
         result['n_snps'] = n_snps
-        result['TWAS_Zscore'] = burden_Z
-        result['PVALUE'] = pval
 
-        ### write to file
+        ### calculate zscore(s), pvalue(s)
+        z_denom = np.sqrt(np.linalg.multi_dot([ZW.ES.values, V, ZW.ES.values]))
+
+        if args.test_stat == 'both':
+            fusion_z = np.vdot(ZW.Zscore.values, ZW.ES.values) / z_denom
+            fusion_pval = 1-chi2.cdf(fusion_z**2,1)
+            result['FUSION_Z'] = fusion_z
+            result['FUSION_PVAL'] = np.format_float_scientific(fusion_pval)
+
+            snp_sd = np.sqrt(snp_Var)
+            spred_z = snp_sd.dot(ZW.ES.values * ZW.Zscore.values) / z_denom
+            spred_pval = 1-chi2.cdf(spred_z**2,1)
+            result['SPred_Z'] = spred_z
+            result['SPred_PVAL'] = np.format_float_scientific(spred_pval)
+
+        else:
+            if args.test_stat == 'FUSION':
+                z_numer = np.vdot(ZW.Zscore.values, ZW.ES.values)
+
+            elif args.test_stat == 'SPrediXcan':
+                snp_SD = np.sqrt(snp_Var)
+                z_numer = snp_SD.dot(ZW.ES.values * ZW.Zscore.values)
+
+            burden_Z = z_numer/z_denom
+        
+            if np.isnan(burden_Z):
+            	print('Could not calculate burden_Z: NaN value.\n')
+            	return None
+
+            # p-value for chi-square test
+            pval = 1-chi2.cdf(burden_Z**2,1)
+
+            result['TWAS_Zscore'] = burden_Z
+            result['PVALUE'] = np.format_float_scientific(pval)
+
+        # write to file
         result.to_csv(
             out_twas_path,
             sep='\t',
             index=None,
             header=None,
-            mode='a',
-            float_format='%.4f')
+            mode='a')
 
-        print('TWAS complete.')
+        print('Target TWAS completed.\n')
 
     except Exception as e:
         e_type, e_obj, e_tracebk = sys.exc_info()
         e_line_num = e_tracebk.tb_lineno
 
-        e, e_type, e_line_num = [str(x) for x in [e, e_type, e_line_num]]
-        
-        print('Caught a type '+ e_type +' exception for TargetID='+target+', num=' + str(num) + ' on line '+e_line_num+':\n' + e )
+        print('Caught a type {} exception for TargetID={}, num={} on line {}:\n{}'.format(e_type, target, num, e_line_num, e))
 
     finally:
         # print info to log do not wait for buffer to fill up
         sys.stdout.flush()
 
 ###############################################################
-### thread process
-
+# thread process
 if __name__ == '__main__':
-    print("Starting TWAS for "+str(n_targets)+" target genes.")
+    print('Starting TWAS for ' + str(n_targets) + ' target genes.\n')
     pool = multiprocessing.Pool(args.thread)
-    pool.map(thread_process,[num for num in range(n_targets)])
+    pool.imap(thread_process,[num for num in range(n_targets)])
     pool.close()
     pool.join()
-    print("Done.")
+    print('Done.')
 
-
-############################################################
-### time calculation
+###############################################################
+# time calculation
 elapsed_sec = time()-start_time
 elapsed_time = tg.format_elapsed_time(elapsed_sec)
-print("Computation time (DD:HH:MM:SS): " + elapsed_time)
+print('Computation time (DD:HH:MM:SS): ' + elapsed_time)
 
 
 
