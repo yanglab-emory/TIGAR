@@ -125,7 +125,7 @@ def get_header(path, out='tuple', zipped=False, rename={}):
 
     return header
 
-
+# for testing on systems without tabix
 def get_vcf_header(path, out='tuple'):
     
     proc = subprocess.Popen(
