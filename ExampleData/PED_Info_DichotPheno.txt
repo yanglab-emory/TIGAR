@@ -1,0 +1,4 @@
+P	PHENO3
+C	PC1
+C	PC2
+C	AGE

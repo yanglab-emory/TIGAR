@@ -440,12 +440,14 @@ def thread_process(num):
         print('Target TWAS completed.\n')
 
     except Exception as e:
-        e_type, e_obj, e_tracebk = sys.exc_info()
-        e_line_num = e_tracebk.tb_lineno
-        
-        tb = traceback.extract_tb(e_tracebk)
+        e_info = sys.exc_info()
 
-        print('Caught a type {} exception for TargetID={}, num={} on line {}:\n{}\n{}\n'.format(e_type, target, num, e_line_num, e, tb))
+        e_type = e_info[0].__name__
+        e_line = e_info[2].tb_lineno
+        e_tracebk = ''.join(traceback.format_tb(e_info[2]))
+
+        print('Caught a "{}" type exception for TargetID={}, num={} on line {}:\n  {}\nTraceback:\n{}'.format(
+            e_type, target, num, e_line, e, e_tracebk))
 
     finally:
         # print info to log do not wait for buffer to fill up
