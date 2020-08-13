@@ -17,7 +17,7 @@
 ###
 
 VARS=`getopt -o "" -a -l \
-genome_block:,genofile:,genofile_type:,chr:,format:,maf:,TIGAR_dir:,thread:,out_dir: \
+genome_block:,genofile:,genofile_type:,chr:,format:,maf:,TIGAR_dir:,thread:,out_dir:,sampleID: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -40,6 +40,7 @@ do
         --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
         --thread|-thread) thread=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
+        --sampleID|-sampleID) sampleID=$2; shift 2;;
         --) shift;break;;
         *) echo "Please check input arguments!";exit 1;;
         esac
@@ -51,7 +52,8 @@ maf=${maf:-0}
 
 ###
 mkdir -p ${out_dir}
-mkdir -p ${out_dir}/RefLD
+mkdir -p ${out_dir}/logs
+# mkdir -p ${out_dir}/RefLD
 
 # check tabix command
 if [ ! -x "$(command -v tabix)" ]; then
@@ -61,10 +63,10 @@ fi
 
 # Check genotype file 
 if [ ! -f "${genofile}" ] ; then
-    echo Error: Reference genotype file ${genofile} dose not exist or empty. >&2
+    echo Error: Reference genotype file ${genofile} does not exist or is empty. >&2
     exit 1
 fi
-
+echo $genofile
 
 ################################################
 ### 1. Calculate covariance matrix (LD) of genetic variants
@@ -82,7 +84,10 @@ python ${TIGAR_dir}/TWAS/Get_LD.py \
 --format ${format} \
 --maf ${maf} \
 --thread ${thread} \
---out_dir ${out_dir}
+--out_dir ${out_dir} \
+--sampleID ${sampleID} \
+--TIGAR_dir ${TIGAR_dir} \
+> ${out_dir}/logs/CHR${chr}_LD_log.txt
 
 #/RefLD
 
@@ -105,13 +110,4 @@ if [ ! -f ${out_dir}/CHR${chr}_reference_cov.txt.gz.tbi ] ; then
 fi
 
 echo Generate reference LD covariance file successfully ... 
-
-
-
-
-
-
-
-
-
 

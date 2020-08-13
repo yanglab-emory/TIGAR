@@ -18,7 +18,7 @@
 # --format: Genotype format in VCF file that should be used: "GT" (default) for genotype data or "DS" for dosage data, only required if the input genotype file is of VCF file
 # --maf: Minor Allele Frequency threshold (ranges from 0 to 1; default 0.01) to exclude rare variants
 # --hwe: Hardy Weinberg Equilibrium p-value threshold (default 0.00001) to exclude variants that violated HWE
-# --window: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression prediction model (default 1000000 for +- 1MB region around TSS)
+# --window: Window size around gene region for selecting cis-SNPs for fitting gene expression prediction model (default 1000000 for +- 1MB region around gene)
 # --cvR2: Take value 0 for calculating training R2 from fitted model and 1 for calculating training R2 from 5-fold cross validation
 # --TIGAR_dir : Specify the directory of TIGAR source code
 # --thread: Number of threads for parallel computation (default 1)
@@ -81,15 +81,16 @@ thread=${thread:-1}
 maf=${maf:-0.01}
 hwe=${hwe:-0.00001}
 window=${window:-$((10**6))}
-cvR2=${cvR2:-1} 
+cvR2=${cvR2:-1}
 cv=${cv:-5}
 alpha=${alpha:-0.5}
 dpr_num=${dpr_num:-1} # 1 is for VB ; 2 is for MCMC
 ES=${ES:-"fixed"}
-thread=${thread:-1}
+
 
 #### Create output directory if not existed
 mkdir -p ${out_dir}
+mkdir -p ${out_dir}/logs
 
 # check tabix command
 if [ ! -x "$(command -v tabix)" ]; then
@@ -99,19 +100,19 @@ fi
 
 # Check gene expression file
 if [ ! -f "${gene_exp}" ] ; then
-    echo Error: Gene expression file ${gene_exp} dose not exist or empty. >&2
+    echo Error: Gene expression file ${gene_exp} does not exist or is empty. >&2
     exit 1
 fi
 
 # Check training sample ID file
 if [ ! -f "${train_sampleID}" ] ; then
-    echo Error: Training sample ID file ${train_sampleID} dose not exist or empty. >&2
+    echo Error: Training sample ID file ${train_sampleID} does not exist or is empty. >&2
     exit 1
 fi
 
 # Check genotype file 
 if [ ! -f "${genofile}" ] ; then
-    echo Error: Training genotype file ${genofile} dose not exist or empty. >&2
+    echo Error: Training genotype file ${genofile} does not exist or is empty. >&2
     exit 1
 fi
 
@@ -129,7 +130,6 @@ if [[ "$model"x == "elastic_net"x ]];then
     fi
 
     mkdir -p ${out_dir}/EN_CHR${chr}
-    zcat ${genofile} | grep 'CHROM' > ${out_dir}/EN_CHR${chr}/geno_colnames.txt
 
     python ${TIGAR_dir}/Model_Train_Pred/Elastic_Net_Train.py \
     --gene_exp ${gene_exp} \
@@ -137,7 +137,6 @@ if [[ "$model"x == "elastic_net"x ]];then
     --chr ${chr} \
     --genofile ${genofile} \
     --genofile_type ${genofile_type} \
-    --geno_colnames ${out_dir}/EN_CHR${chr}/geno_colnames.txt \
     --format ${format} \
     --maf ${maf} \
     --hwe ${hwe} \
@@ -146,11 +145,10 @@ if [[ "$model"x == "elastic_net"x ]];then
     --cv ${cv} \
     --thread ${thread} \
     --alpha ${alpha} \
+    --TIGAR_dir ${TIGAR_dir} \
     --out_dir ${out_dir}/EN_CHR${chr} \
-    > ${out_dir}/EN_CHR${chr}/CHR${chr}_EN_train_Log.txt
+    > ${out_dir}/logs/CHR${chr}_EN_train_log.txt
 
-    ### Remove file
-    rm -f ${out_dir}/EN_CHR${chr}/geno_colnames.txt
 
 elif [[ "$model"x == "DPR"x ]]; then
     echo "Train gene expression imputation models by Nonparametric Bayesian DPR method..."
@@ -160,14 +158,6 @@ elif [[ "$model"x == "DPR"x ]]; then
 
     ### Store files for DPR under DPR_Files
     mkdir -p ${out_dir}/DPR_CHR${chr}/DPR_Files
-
-    ### Extract column names from training genotype file
-    if [ -f ${genofile} ] ; then
-        zcat ${genofile} | grep 'CHROM' > ${out_dir}/DPR_CHR${chr}/geno_colnames.txt
-    else
-        echo Error: ${genofile} dose not exist or empty. >&2
-        exit 1
-    fi
 
     ### Store Cross Validation DPR input files and outputs
     if [ ${cvR2} == "1" ] ; then
@@ -191,8 +181,7 @@ elif [[ "$model"x == "DPR"x ]]; then
     --gene_exp ${gene_exp} \
     --train_sampleID ${train_sampleID} \
     --chr ${chr} \
-    --train_geno_file ${genofile} \
-    --geno_colnames ${out_dir}/DPR_CHR${chr}/geno_colnames.txt \
+    --genofile ${genofile} \
     --genofile_type ${genofile_type} \
     --format ${format} \
     --hwe ${hwe} \
@@ -204,11 +193,10 @@ elif [[ "$model"x == "DPR"x ]]; then
     --TIGAR_dir ${TIGAR_dir} \
     --thread ${thread} \
     --out_dir ${out_dir}/DPR_CHR${chr} \
-    > ${out_dir}/DPR_CHR${chr}/CHR${chr}_DPR_train_Log.txt
+    > ${out_dir}/logs/CHR${chr}_DPR_train_log.txt
 
     ### 4. Remove DPR input files
     echo Remove DPR input files 
-    rm -f ${out_dir}/CHR${chr}_geno_colnames.txt
     rm -fr ${out_dir}/DPR_CHR${chr}/DPR_Files
 
     if [ ${cvR2} == "1" ] ; then
@@ -221,5 +209,7 @@ else
 fi
 
 echo "Training ${model} model job completed for CHR ${chr}."
-
+# MAYBE TRY SORTING FILE AT THIS POINT????      
+#   head -n1 ${weight} > ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
+# tail -n+2 ${weight} | sort -nk1 -nk2  >> ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
 exit

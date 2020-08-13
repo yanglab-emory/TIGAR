@@ -1,27 +1,34 @@
 #!/usr/bin/bash
 
 #######################################################################
-### Input Arguments for GReX Prediction
+### Input Arguments for VC-TWAS
 #######################################################################
 
 # --chr: Chromosome number need to be specified with respect to the genotype input data
 # --weight: Path for SNP weight (eQTL effect size) file 
 # --gene_anno : Path for gene annotation file to specify a list of gene for GReX prediction
-# `--gene_anno`: Gene annotation file to specify the list of genes, which is of the same format as the first five columsn of gene expression file
+# `--gene_anno`: Gene annotation file to specify the list of genes, which is of the same format as the first five columns of gene expression file
 # --test_sampleID: Path for a file with sampleIDs that should be contained in the genotype file
 # --genofile: Path for the training genotype file (bgzipped and tabixed) 
-# --genofile_tye: Genotype file type: "vcf" or "dosage"
+# --genofile_type: Genotype file type: "vcf" or "dosage"
 # --format: Genotype format in VCF file that should be used: "GT" (default) for genotype data or "DS" for dosage data, only required if the input genotype file is of VCF file
 # --window: Window size around gene region for selecting cis-SNPs for fitting gene expression prediction model (default 1000000 for +- 1MB region around gene)
-# maf_diff: MAF difference threshold for matching SNPs from eQTL weight file and test genotype file. If SNP MAF difference is greater than maf_diff (default 0.2), , the SNP will be excluded
+# --phenotype_type: phenotype type, continous phenotype is "C" and binomial phenotype is "D"
+# --maf: Threshold for Minor Allele Frequency (range from 0-1),default 0.01
+# --hwe: Hardy Weinberg Equilibrium p-value threshold (default 0.00001) to exclude variants that violated HWE
+# --weight_threshold: Threshold for estimated cis-eQTL effect sizes, filter SNPs with absolute cis-eQTL effect sizes smaller than threshold
 # --TIGAR_dir : Specify the directory of TIGAR source code
 # --thread: Number of threads for parallel computation (default 1)
+# --PED : Path for PED file that contains phenotype and covariate data
+# --PED_info : Specify culumn names for phenotypes and covariates that will be used in TWAS.
+#             1) P : phenotype column names
+#             2) C : covariate column names
 # --out_dir: Output directory (will be created if not exist)
 
 
 #######################################################################
 VARS=`getopt -o "" -a -l \
-chr:,weight:,gene_anno:,genofile_type:,genofile:,test_sampleID:,format:,window:,maf_diff:,TIGAR_dir:,thread:,out_dir: \
+chr:,weight:,test_sampleID:,gene_anno:,genofile:,genofile_type:,format:,window:,phenotype_type:,maf:,hwe:,weight_threshold:,PED:,PED_info:,TIGAR_dir:,thread:,out_dir: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -37,13 +44,18 @@ do
     case "$1" in
         --chr|-chr) chr=$2; shift 2;;
         --weight|-weight) weight_file=$2; shift 2;;
-        --gene_anno|-gene_anno) gene_anno=$2; shift 2;;
-        --genofile_type|-genofile_type) genofile_type=$2; shift 2;;
-        --genofile|-genofile) genofile=$2; shift 2;;
         --test_sampleID|-test_sampleID) test_sampleID_file=$2; shift 2;;
+        --gene_anno|-gene_anno) gene_anno=$2; shift 2;;
+        --genofile|-genofile) genofile=$2; shift 2;;
+        --genofile_type|-genofile_type) genofile_type=$2; shift 2;;
         --format|-format) format=$2; shift 2;;
         --window|-window) window=$2; shift 2;;
-        --maf_diff|-maf_diff) maf_diff=$2; shift 2;;
+        --phenotype_type|-phenotype_type) phenotype_type=$2; shift 2;;
+        --maf|-maf) maf=$2; shift 2;;
+        --hwe|-hwe) hwe=$2; shift 2;;
+        --weight_threshold|-weight_threshold) weight_threshold=$2; shift 2;;
+        --PED|-PED) PED=$2; shift 2;;
+        --PED_info|-PED_info) PED_info=$2; shift 2;;
         --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
         --thread|-thread) thread=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
@@ -53,14 +65,14 @@ do
 done
 
 #### default value
-window=${window:-$((10**6))}
-maf_diff=${maf_diff:-0.2}
 thread=${thread:-1}
+window=${window:-$((10**6))}
+maf=${maf:-0.01}
+hwe=${hwe:-0.00001}
 
 #### Create output directory if not existed
-mkdir -p ${out_dir}
 mkdir -p ${out_dir}/logs
-mkdir -p ${out_dir}/Pred_CHR${chr}
+mkdir -p ${out_dir}/VC_TWAS_CHR${chr}
 
 ####################################################
 # check tabix command
@@ -71,52 +83,50 @@ fi
 
 # Check genotype file 
 if [ ! -f "${genofile}" ] ; then
-    echo Error: Training genotype file ${genofile} does not exist or is empty. >&2
+    echo Error: Training genotype file ${genofile} does not exist or empty. >&2
     exit 1
 fi
 
 # Check training sample ID file
 if [ ! -f "${test_sampleID_file}" ] ; then
-    echo Error: Test sample ID file ${test_sampleID_file} does not exist or is empty. >&2
+    echo Error: Test sample ID file ${test_sampleID_file} does not exist or empty. >&2
     exit 1
 fi
 
 # Check eQTL weight file
 if [ ! -f "${weight_file}" ] ; then
-    echo Error: eQTL weight file ${weight_file} does not exist or is empty. >&2
+    echo Error: eQTL weight file ${weight_file} does not exist or empty. >&2
     exit 1
 fi
 
 # Check gene annotation file
 if [ ! -f "${gene_anno}" ] ; then
-    echo Error: eQTL weight file ${gene_anno} does not exist or is empty. >&2
+    echo Error: eQTL weight file ${gene_anno} does not exist or empty. >&2
     exit 1
 fi
 
 # Make python script executible
-if [[ ! -x  ${TIGAR_dir}/Model_Train_Pred/Prediction.py ]] ; then
-    chmod 755  ${TIGAR_dir}/Model_Train_Pred/Prediction.py
+if [[ ! -x  ${TIGAR_dir}/VC_TWAS/VC_TWAS_ver1.py ]] ; then
+    chmod 755  ${TIGAR_dir}/VC_TWAS/VC_TWAS.py
 fi
 
-python ${TIGAR_dir}/Model_Train_Pred/Prediction.py \
+python ${TIGAR_dir}/VC_TWAS/VC_TWAS.py \
 --chr ${chr} \
 --weight ${weight_file} \
---genofile ${genofile} \
 --test_sampleID ${test_sampleID_file} \
---format ${format} \
---genofile_type ${genofile_type} \
 --gene_anno ${gene_anno} \
+--genofile ${genofile} \
+--genofile_type ${genofile_type} \
+--format ${format} \
 --window ${window} \
+--phenotype_type ${phenotype_type} \
+--maf ${maf} \
+--hwe ${hwe} \
+--weight_threshold ${weight_threshold} \
 --thread ${thread} \
---maf_diff ${maf_diff} \
+--PED ${PED} \
+--PED_info ${PED_info} \
 --TIGAR_dir ${TIGAR_dir} \
---out_dir ${out_dir}/Pred_CHR${chr} \
-> ${out_dir}/logs/CHR${chr}_Pred_log.txt
-    
-
-
-
-
-
-
+--out_dir ${out_dir}/VC_TWAS_CHR${chr} \
+> ${out_dir}/logs/CHR${chr}_VC_TWAS_log.txt
 

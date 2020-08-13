@@ -1,241 +1,236 @@
 #!/usr/bin/env python
 
-##############################################################################################
+###############################################################
 # Import packages needed
 import argparse
-import time
+import multiprocessing
+import operator
 import subprocess
-from subprocess import *
+import sys
+
+from io import StringIO
+from time import time
+
 import pandas as pd
 import numpy as np
-from numpy import *
-from dfply import *
-import io
-from io import StringIO
-from io import *
 
+###############################################################
+# time calculation
+start_time = time()
 
-import multiprocessing
-##############################################################################################
-### time calculation
-start_time=time.clock()
+###############################################################
+# parse input arguments
+parser = argparse.ArgumentParser(description='Get LD')
 
-# Reform vcf file
-### input each sample genotype
-### For GT Format:
-###  code '0|0' or '0/0' as 0
-###  code ('0|1' or '1|0')  or ('0/1' or '1/0') as 1
-###  code '1|1' or '1/1' as 2
-###  code '.|.' or './.' as nan(missing)
+# Specify tool directory
+parser.add_argument('--TIGAR_dir',type=str)
 
-### For DS Format:
-### code '.' as nan(missing)
-def geno_reform(data,Format):
-    if Format=='GT':
-        data[(data=='0|0')|(data=='0/0')]=0
-        data[(data=='1|0')|(data=='1/0')|(data=='0|1')|(data=='0/1')]=1
-        data[(data=='1|1')|(data=='1/1')]=2
-        data[(data=='.|.')|(data=='./.')]=nan
-    elif Format=='DS':
-        data[(data==".")]=nan
-    return data
+# chromosome block information path
+parser.add_argument('--genome_block',type=str,dest='block_path')
 
-### For vcf input
-### Split input dataframe by Format. ex, '0|0:0.128'
-### Input:
-### 1. data:The first nine columns fixed
-### 2. Format: GT or DS
+# sampleID path
+parser.add_argument('--sampleID',type=str,dest='sampleid_path')
 
-### Output:
-###  The First six columns of output dataframe should be:
-###    1) CHROM
-###    2) POS
-###    3) ID (i.e. rsID)
-###    4) REF
-###    5) ALT
-###    6) snpID (CHROM:POS:REF:ALT)
-###    7) p_HWE:p-value for Hardy Weinberg Equilibrium exact test
-###    8) MAF: Minor Allele Frequency (range from 0~1)
-###    9) Samples gene variance splited by Format (GT or DS)
+# chromosome number
+parser.add_argument('--chr',type=str)
 
-def CHR_Reform_vcf(data,Format,maf):
-    sampleID = data.columns[9:]
+# genotype file path
+parser.add_argument('--genofile',type=str,dest='geno_path')
 
-    data['snpID']=(data['CHROM'].astype('str')+":"+data['POS'].astype('str')
-                   +":"+data.REF+":"+data.ALT)
-        
-    CHR = data >> select(data[['CHROM','POS','ID','REF','ALT','snpID']],data[sampleID])
+# specified input file type (vcf or doasges)
+parser.add_argument('--genofile_type',type=str)
 
-    CHR=CHR.drop_duplicates(['snpID'],keep='first')
-        
-    indicate=data.FORMAT[0].split(":").index(Format)
-    CHR[sampleID]=CHR[sampleID].applymap(lambda x:x.split(":")[indicate])
-    
-    CHR[sampleID]=CHR[sampleID].apply(lambda x:geno_reform(x,Format),axis=0)
+# 'DS' or 'GT'
+parser.add_argument('--format',type=str)
 
-    ### calculate MAF by SNPs(range from 0-1)
-    temp=pd.DataFrame((CHR >> select(CHR[sampleID])),dtype=np.float)
-    CHR['MAF']=temp.apply(lambda x:sum(x)/(2*len(x.dropna())),axis=1)
+# maf threshold for seleting genotype data to calculate covariance matrix
+parser.add_argument('--maf',type=float)
 
-    ### Dealing with NaN
-    CHR[np.hstack(([sampleID,'MAF']))] = CHR[np.hstack(([sampleID,'MAF']))].apply(lambda x:x.fillna(2*x.MAF),axis=1)
-    
-    return (CHR>>mask(CHR.MAF>maf)),sampleID
+# number of threads
+parser.add_argument('--thread',type=int)
 
-### For dosages input
-### Input:
-### 1. data:The first five columns fixed
-###    1) CHROM
-###    2) POS
-###    3) ID (i.e. rsID)
-###    4) REF
-###    5) ALT
-### 2. Format: DS
-
-def CHR_Reform_DS(data,maf):
-    sampleID=data.columns[5:]
-    
-    data['snpID']=(data['CHROM'].astype('str')+':'+data['POS'].astype('str')
-                   +':'+data.REF+':'+data.ALT)
-    data=data.drop_duplicates(['snpID'],keep='first')
-
-    data[data[sampleID].astype('str')=='.']=nan
-    
-    data[sampleID]=data[sampleID].astype('float')
-
-    data['MAF']=data[sampleID].apply(lambda x:sum(x)/(2*len(x.dropna())),axis=1)
-    
-    data[np.hstack(([sampleID,'MAF']))] = data[np.hstack(([sampleID,'MAF']))].apply(lambda x:x.fillna(2*x.MAF),axis=1)
-    
-    return (data>>mask(data.MAF>maf)),sampleID
-
-######################################################################################
-### variable needed
-parser = argparse.ArgumentParser(description='manual to this script')
-
-### chromosome block information
-parser.add_argument('--genome_block',type=str,default = None)
-
-### genotype file dir
-parser.add_argument('--genofile',type=str,default = None)
-
-### specified input file type(vcf or doasges)
-parser.add_argument('--genofile_type',type=str,default = None)
-
-### chromosome number
-parser.add_argument('--chr',type=int,default = None)
-
-### 'DS' or 'GT'
-parser.add_argument('--format',type=str,default = None)
-
-### maf threshold for seleting genotype data to calculate covariance matrix
-parser.add_argument('--maf',type=float,default = None)
-
-### number of thread
-parser.add_argument('--thread',type=int,default = None)
-
-### output dir
-parser.add_argument('--out_dir',type=str,default = None)
+# output dir
+parser.add_argument('--out_dir',type=str)
 
 args = parser.parse_args()
 
-######################################################################################
-### variable checking
-print("\n \nGenome block annotation based on LD structure : " + args.genome_block + "\n")
-print("Reference genotype file: " + args.genofile + "\n")
+sys.path.append(args.TIGAR_dir)
 
-if args.genofile_type=='vcf':
-	print("Using genotype data of format " + args.format + " in the VCF file.\n")
-elif args.geno=='dosage':
-	print("Using genotype data from the dosage file."+ "\n")
+###############################################################
+# DEFINE, IMPORT FUNCTIONS
+import TIGARutils as tg
+
+# limit to 4 decimal places max, strip trailing 0s
+def cov_print_frmt(x): return ('%.4f' % x).rstrip('0').rstrip('.')
+
+###############################################################
+# check input arguments
+if args.genofile_type == 'vcf':
+    gcol_sampleids_strt_ind = 9
+
+    if (args.format != 'GT') and (args.format != 'DS'):
+        raise SystemExit('Please specify the genotype data format used by the vcf file (--format ) as either "GT" or "DS".\n')
+        
+elif args.genofile_type == 'dosage':
+    gcol_sampleids_strt_ind = 5
+    args.format = 'DS'
+
 else:
-	raise SystemExit("Genotype file type should be specified as either vcf or dosage."+ "\n")
+    raise SystemExit('Please specify the type input genotype file type (--genofile_type) as either "vcf" or "dosage".\n')
+    
+out_ref_cov_path = args.out_dir+'/CHR'+args.chr+'_reference_cov.txt'
 
-print("Chromosome number: "+str(args.chr)+ "\n")
-print("Number of threads: "+str(args.thread)+ "\n")
-print("Only using variants with MAF > "+str(args.maf) + " to calculate reference LD covariance file."+ "\n")
-print("Output directory : "+args.out_dir + "\n")
+###############################################################
+# Print input arguments
+print(
+'''********************************
+Input Arguments
 
-#######################################################################################
-### Read in block information
-Block = pd.read_csv(args.genome_block,sep='\t')
+Genome block annotation (based on LD structure) file: {block_path}
 
-Block = Block >> mask(Block.CHROM==args.chr)
-Block = Block.reset_index(drop=True)
+SampleID file: {sampleid_path}
 
-file_path=args.genofile
+Chromosome: {chr}
 
-header_process = subprocess.Popen(["zcat"+" "+file_path+"|"+"grep"+" "+"'CHROM'"],
-                                  shell=True,
-                                  stdout=subprocess.PIPE,
-                                  stderr=subprocess.PIPE)
-header=header_process.communicate()[0]
+Reference genotype file: {geno_path}
 
-pd.DataFrame(columns=['#CHROM', 'POS', 'ID', 'REF', 'ALT','COV']).to_csv(args.out_dir+'/CHR'+str(args.chr)+'_reference_cov.txt',
-                                                                        sep='\t', index=None, header=True, mode='w')
+Genotype file used is type: {genofile_type}
 
+Genotype data format: {format}
+
+MAF threshold for SNP inclusion: {maf}
+
+Number of threads: {thread}
+
+Output directory: {out_dir}
+
+Output reference covariance results file: {out_rc}
+********************************'''.format(
+    **args.__dict__,
+    out_rc = out_ref_cov_path))
+
+###############################################################
+# Read in block information
+print('Reading block annotation file.')
+chr_blocks = pd.read_csv(
+    args.block_path,
+    sep='\t',
+    usecols=['CHROM','Start','End'],
+    dtype={'CHROM':object,'Start':object,'End':object})
+chr_blocks = chr_blocks[chr_blocks['CHROM']==args.chr].reset_index(drop=True)
+chr_blocks = tg.optimize_cols(chr_blocks)
+
+n_blocks = len(chr_blocks)
+
+print('Reading genotype file header.\n')
+g_cols = tg.call_tabix_header(args.geno_path)
+gcol_sampleids = g_cols[gcol_sampleids_strt_ind:]
+
+# get sampleIDs
+print('Reading sampleID file.\n')
+spec_sampleids = pd.read_csv(
+    args.sampleid_path,
+    sep='\t',
+    header=None)[0].drop_duplicates()
+
+print('Matching sampleIDs.\n')
+sampleID = np.intersect1d(gcol_sampleids, spec_sampleids)
+
+if not sampleID.size:
+    raise SystemExit('There are no sampleID in both the genotype data and the specified sampleID file.')
+
+# get the indices and dtypes for reading files into pandas
+g_cols_ind, g_dtype = tg.genofile_cols_dtype(g_cols, args.genofile_type, sampleID)
+
+# write columns out to file
+print('Creating file: ' + out_ref_cov_path + '\n')
+out_cols = ['#CHROM', 'POS', 'REF', 'ALT', 'snpID','COV']
+pd.DataFrame(columns=out_cols).to_csv(
+    out_ref_cov_path,
+    sep='\t',
+    index=None,
+    header=True,
+    mode='w')
+
+print('********************************\n')
+
+###############################################################
 def thread_process(num):
-    block_temp = Block.loc[num]
-    
-    ### select corresponding genotype file by tabix
-    chr_process=subprocess.Popen(["tabix"+" "+file_path+" "+str(block_temp.CHROM)+":"+str(block_temp.Start)+"-"+str(block_temp.End)],
-                                 shell=True,
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE)
-    out=chr_process.communicate()[0]
+    try:
+        block = chr_blocks.loc[num]
+        print('num=' + str(num))
+        
+        print('Reading genotype data.')
+        g_proc_out = tg.call_tabix(args.geno_path, args.chr, block.Start, block.End)
 
-    if len(out)==0:
-        print("There is no genotype data in this block.")
-    else:
-        CHR = pd.read_csv(StringIO(out.decode('utf-8')),sep='\t',low_memory=False)
-        CHR.columns = (pd.read_csv(StringIO(header.decode('utf-8')),sep='\t',low_memory=False)).columns
-        CHR = CHR.rename(columns={'#CHROM':'CHROM'})
-        CHR = CHR.reset_index(drop=True)
+        if not g_proc_out:
+            print('There is no genotype data in this block.\n')
+            return None
 
-    if args.genofile_type=='vcf':
-        if args.format not in unique(CHR.FORMAT)[0].split(':'):
-            print("Specified genotype format does not exist in the FORMAT column of input VCF file.")
-        else:
-            Chrom,sampleID = CHR_Reform_vcf(CHR,args.format,args.maf)
-    elif args.genofile_type=='dosage':
-        Chrom,sampleID = CHR_Reform_DS(CHR,args.maf)
-    
-    Chrom = Chrom.sort_values(by='POS')
-    Chrom = Chrom.reset_index(drop=True)
+        block_geno = pd.read_csv(StringIO(g_proc_out.decode('utf-8')),
+            sep='\t',
+            low_memory=False,
+            header=None,
+            usecols=g_cols_ind,
+            dtype=g_dtype)
 
-    mcovar = cov(pd.DataFrame(Chrom[sampleID],dtype='float'))
+        block_geno.columns = [g_cols[i] for i in block_geno.columns]
+        block_geno = tg.optimize_cols(block_geno)
 
-    for i in range(len(Chrom)):
-        covar_info=np.append([Chrom.loc[i][0:5].ravel()],','.join(mcovar[i,i:].astype('str')))
+        # get snpIDs
+        block_geno['snpID'] = tg.get_snpIDs(block_geno)
+        block_geno = block_geno.drop_duplicates(['snpID'],keep='first').reset_index(drop=True)
 
-        pd.DataFrame(covar_info).T.to_csv(args.out_dir+'/CHR'+str(args.chr)+'_reference_cov.txt',
-                                          sep='\t',index=None,header=None,mode='a')
+        # prep vcf file
+        if args.genofile_type=='vcf':
+            block_geno = tg.check_prep_vcf(block_geno, args.format, sampleID)
+
+        # reformat sample values
+        block_geno[sampleID]=block_geno[sampleID].apply(lambda x:tg.reformat_sample_vals(x,args.format), axis=0)
+
+        # calculate, filter maf
+        block_geno = tg.calc_maf(block_geno, sampleID, args.maf)
+
+        # get covariance matrix
+        mcovar = np.cov(block_geno[sampleID])
+
+        for i in range(len(block_geno)):
+            snpinfo = block_geno.iloc[i][['CHROM','POS','REF','ALT','snpID']]
+            snpcov = ','.join([cov_print_frmt(x) for x in mcovar[i,i:]])
+            covar_info = pd.DataFrame(np.append(snpinfo, snpcov)).T
+            covar_info.to_csv(
+                out_ref_cov_path,
+                sep='\t',
+                index=None,
+                header=None,
+                mode='a')
+
+        print('Block LD calculation completed for block.\n')
+
+    except Exception as e:
+        e_type, e_obj, e_tracebk = sys.exc_info()
+        e_line_num = e_tracebk.tb_lineno
+
+        print('Caught a type {} exception for block num={} on line {}:\n{}'.format(e_type, num, e_line_num, e))
+
+    finally:
+        # print info to log do not wait for buffer to fill up
+        sys.stdout.flush()
 
 ##################################################################
-### thread process
-pool = multiprocessing.Pool(args.thread)
+# thread process
 
-pool.map(thread_process,[num for num in range(len(Block))])
-
-pool.close()
-pool.join()
+if __name__ == '__main__':
+    print('Starting LD calculation for ' + str(n_blocks) + ' blocks.\n')
+    pool = multiprocessing.Pool(args.thread)
+    pool.imap(thread_process,[num for num in range(n_blocks)])
+    pool.close()
+    pool.join()
+    print('Done.')
 
 ################################################################
-### time calculation
-# time=round((time.clock()-start_time)/60,2)
-
-# print(str(time)+' minutes')
-
-
-
-
-
-
-
-
-
-
-
-
-
+# time calculation
+elapsed_sec = time()-start_time
+elapsed_time = tg.format_elapsed_time(elapsed_sec)
+print('Computation time (DD:HH:MM:SS): ' + elapsed_time)
 
