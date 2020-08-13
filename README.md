@@ -582,4 +582,34 @@ ${TIGAR_dir}/VC_TWAS.sh \
 --gene_anno ${gene_anno_file} \
 --PED ${PED} \
 --PED_info ${PED_info} \
---test_sampleID ${tes
+--test_sampleID ${test_sample_ID_file} \
+--chr 1 \
+--weight ${eQTL_ES_file} \
+--genofile ${genofile} \
+--genofile_type vcf \
+--format GT \
+--weight_threshold 0.0001 \
+--phenotype_type C \
+--thread 2 \
+--out_dir ${out_dir} \
+--TIGAR_dir ${TIGAR_dir}
+```
+
+## Updates
+- Removed 'dfply' Python package dependency
+- Added VC-TWAS method
+- Added `SPrediXcan` test statistic calculation to TWAS with summary-level GWAS data (in addition to existing `FUSION` test statistic); added option (`--test_stat`) to select which test statistic to use (default: `both`)
+- Added `--weight-threshold` option (for excluding SNPs with small effect-sizes) to summary-level TWAS (default: `0`)
+- Added `--sampleID` argument to `TIGAR_LD.sh`
+- Reduced size of output LD files
+- Improved memory usage of Python scripts (especially for model-training and TWAS with summary-level GWAS data)
+- Improved speed (especially for model-training)
+- Improved error handling for parallelized functions
+- Added/improved log output in all Python scripts
+- Added time elapsed calculation for logging
+- Removed intermediate `call_DPR.sh` script
+
+
+## Reference
+- [PrediXcan](https://github.com/hakyimlab/PrediXcan)  
+- [DPR](https://github.com/biostatpzeng/DPR)
