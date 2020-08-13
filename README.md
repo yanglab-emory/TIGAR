@@ -13,16 +13,18 @@
 
 - [Software Setup](#software-setup)
 - [Input Files](#input-files)
-	- [1. Gene Expression File](#1-gene-expression-file)
-	- [2. Genotype File](#2-genotype-file)
-	- [3. PED](#3-ped)
-	- [4. PED info](#4-ped-info)
-	- [5. Zscore File](#5-zscore-file)
-	- [6. Weight (eQTL effect size) File](#6-weight-eqtl-effect-size-file)
-	- [7. Gene Annotation File](#7-gene-annotation-file)
-	- [8. LD File](#8-ld-file)
-	- [9. Genome Block Annotation File](#9-genome-block-annotation-file)
-	- [10. SampleID File](#10-sampleid-file)
+	- [1. Genotype File](#1-genotype-file)
+		- [VCF](#vcf-variant-call-format)
+		- [Dosage](#dosage-file)
+	- [2. SampleID File](#2-sampleid-file)
+	- [3. Gene Expression File](#3-gene-expression-file)
+	- [4. Gene Annotation File](#4-gene-annotation-file)
+	- [5. Weight (eQTL effect size) File](#5-weight-eqtl-effect-size-file)	
+	- [6. PED](#6-ped)
+	- [7. PED info](#7-ped-info)
+	- [8. Genome Block Annotation File](#8-genome-block-annotation-file)
+	- [9. LD File](#9-ld-file)
+	- [10. Zscore File](#10-zscore-file)
 <!-- - [Commands](#commands) -->
 - [Example Usage](#example-usage)
 	- [1. Train Gene Expression Imputation Models](#1-train-gene-expression-imputation-models-per-chromosome)
@@ -36,6 +38,8 @@
 	- [5. VC-TWAS](#5-vc-twas)
 - [Updates](#updates)
 - [Reference](#reference)
+
+---
 
 ## Software Setup
 
@@ -61,18 +65,13 @@ chmod 755 ${TIGAR_dir}/*.sh
 Example input files provided under `./ExampleData/` are generated artificially. All input files are *Tab Delimited Text Files*.
 
 
-### 1. Gene Expression File
-| CHROM | GeneStart | GeneEnd |   TargetID      | GeneName | Sample1 | Sample...|
-|:-----:|:---------:|:-------:|:---------------:|:--------:|:-------:|:--------:|
-|   1   |    100    |   200   |     ENSG0000    |     X    |   0.2   |     ...  |
+### 1. Genotype File
 
-- First 5 columns are *Chromosome number, Gene start position, Gene end position, Target gene ID, Gene name* (optional, could be the same as Target gene ID).
-- Gene expression data start from the 6th column. Each column denotes the corresponding gene expression value per sample. 
-- Example: `./ExampleData/gene_exp.txt`
-
-
-### 2. Genotype File
 #### VCF ([Variant Call Format](http://www.internationalgenome.org/wiki/Analysis/Variant%20Call%20Format/vcf-variant-call-format-version-40/))
+
+- `--genofile_type vcf`
+	- `--format GT`
+	- `--format DS`
 
 | CHROM | POS |  ID | REF | ALT | QUAL | FILTER | INFO | FORMAT |  Sample1 | Sample...|
 |:-----:|:---:|:---:|:---:|:---:|:----:|:------:|:----:|:------:|:--------:|:--------:|
@@ -84,7 +83,11 @@ Example input files provided under `./ExampleData/` are generated artificially. 
 - Genotype data starts from the 10th column. Each column denotes the genotype data per sample.
 - Example: `./ExampleData/example.vcf.gz`
 
+
+
 #### Dosage file
+
+- `--genofile_type dosage`
 
 | CHROM | POS |  ID | REF | ALT | Sample1 | Sample...|
 |:-----:|:---:|:---:|:---:|:---:|:-------:|:--------:|
@@ -94,48 +97,76 @@ Example input files provided under `./ExampleData/` are generated artificially. 
 - Dosage genotype data start from the 6th column that are values ranging from 0 to 2, denoting the number of minor alleles. Each column denotes the genotype data per sample.
 
 
-### 3. PED
+#### Usage
+```
+--genofile
+--genofile_type
+--format
+```
 
-| FAM_ID | IND_ID | FAT_ID | MOT_ID | SEX | PHENO | COV1 | COV...|
-|:------:|:------:|:------:|:------:|:---:|:-----:|:---:|:---:|
-|   11A  |   11A  |    X   |    X   |  1  |  0.2  | 0.3 |...|
-
-- Phenotype [PED](http://zzz.bwh.harvard.edu/plink/data.shtml#ped) File
-- First five columns are *Family ID, Individual ID, Paternal ID, Maternal ID, Sex* (1=male; 2=female; other=unknown). The combination of family and individual ID should uniquely identify a person.
-- Phenotype is the *6th* column. A PED file must have 1 and only 1 phenotype in the *6th* column.  
-- Other covariates start from the *7th* column
-- Example: `./ExampleData/example_PED.ped`
-
-
-### 4. PED Info
-|     |     |
-|:---:|:---:|
-| P | PHENO |
-| C | COV1  |
-| C | COV2  |
-| C | SEX   |
-
-- Phenotype and Covariate Information File
-- Used to specify phenotype columns and covariate columns in the `PED` file to use for the TWAS.
-- Headerless, two-column, tab-delimited file. Specify one column per row. The first column of each row is the type (`P` for phenotype, `C` for covariate) and the second column in each row is the name of the column in the `PED` file.
-- Example: `./ExampleData/PED_Info_*.txt`
+- Train Gene Expression Imputation Models
+- Predict GReX
+- Generate Reference LD Genotype Covariance Files
+- VC-TWAS
 
 
-### 5. Zscore File
+### 2. SampleID File
+- Headerless, single-column file containing sampleIDs to use.
+- Examples:
+	- `./ExampleData/sampleID.txt`
+	- `./ExampleData/test_sampleID.txt`
 
-| CHROM | POS | REF | ALT | Zscore |
-|:-----:|:---:|:---:|:---:|:------:|
-|   1   | 100 |  C  |  T  |  0.01  |
+#### Usage
+`--train_sampleID`
 
-- Contains GWAS summary statistics (*Zscore*) for TWAS
-- First 4 columns have the same format as the first 4 columns of a VCF file.
-- The name of the column containing the Zscore statistic values to use must be `Zscore`.
-- The file must be sorted by chromosome and base pair position, bgzipped by `bgzip`, and tabixed by `tabix`. Example tabix command: `tabix -f -p vcf *_Zscore.txt.gz`.
-- Example: `./ExampleData/CHR1_GWAS_Zscore.txt.gz`
+- Train Gene Expression Imputation Models
+
+`--test_sampleID`
+
+- Predict GReX
+- VC-TWAS
+
+`--sampleID`
+
+- Generate Reference LD Genotype Covariance Files
 
 
+### 3. Gene Expression File
 
-### 6. Weight (eQTL effect size) File
+| CHROM | GeneStart | GeneEnd |   TargetID      | GeneName | Sample1 | Sample...|
+|:-----:|:---------:|:-------:|:---------------:|:--------:|:-------:|:--------:|
+|   1   |    100    |   200   |     ENSG0000    |     X    |   0.2   |     ...  |
+
+- First 5 columns are *Chromosome number, Gene start position, Gene end position, Target gene ID, Gene name* (optional, could be the same as Target gene ID).
+- Gene expression data start from the 6th column. Each column denotes the corresponding gene expression value per sample. 
+- Example: `./ExampleData/gene_exp.txt`
+
+#### Usage
+`--gene_exp`
+
+- Train Gene Expression Imputation Models
+- TWAS (with individual-level GWAS data)
+
+
+### 4. Gene Annotation File
+
+| CHROM | GeneStart | GeneEnd |     TargetID    | GeneName | 
+|:-----:|:---------:|:-------:|:---------------:|:--------:|
+|   1   |    100    |   200   |     ENSG0000    |     X    |
+
+- Provides a list of genes for TWAS 
+- Same format as the first five columns of the Gene Expression File.
+- Example: `./ExampleData/gene_anno.txt`
+
+#### Usage
+`--gene_anno`
+
+- Predict GReX
+- TWAS (with summary-level GWAS data)
+- VC-TWAS
+
+
+### 5. Weight (eQTL effect size) File
 
 | CHROM | POS | REF | ALT |     TargetID    |  ES  |
 |:-----:|:---:|:---:|:---:|:---------------:|:----:|
@@ -148,24 +179,54 @@ Example input files provided under `./ExampleData/` are generated artificially. 
 - Variants will be matched with those from the Zscore file by their unique `CHROM:POS:REF:ALT` snpID
 - Example: `./ExampleData/eQTLweights.txt`
 
+#### Usage
+`--weight`
 
-### 7. Gene Annotation File
-
-| CHROM | GeneStart | GeneEnd |     TargetID    | GeneName | 
-|:-----:|:---------:|:-------:|:---------------:|:--------:|
-|   1   |    100    |   200   |     ENSG0000    |     X    |
-
-- Provides a list of genes for TWAS 
-- Same format as the first five columns of the Gene Expression File.
-- Example: `./ExampleData/gene_anno.txt`
+- Predict GReX
+- TWAS (with summary-level GWAS data)
+- VC-TWAS
 
 
-### 8. LD File
-- Contains LD covariance coefficients generated from reference data.
-- Used for TWAS with GWAS summary statistics
-<!-- - Example: `./ExampleData/` -->
+### 6. PED
 
-### 9. Genome Block Annotation File
+| FAM_ID | IND_ID | FAT_ID | MOT_ID | SEX | PHENO | COV1 | COV...|
+|:------:|:------:|:------:|:------:|:---:|:-----:|:---:|:---:|
+|   11A  |   11A  |    X   |    X   |  1  |  0.2  | 0.3 |...|
+
+- Phenotype [PED](http://zzz.bwh.harvard.edu/plink/data.shtml#ped) File
+- First five columns are *Family ID, Individual ID, Paternal ID, Maternal ID, Sex* (1=male; 2=female; other=unknown). The combination of family and individual ID should uniquely identify a person.
+- Phenotype is the *6th* column. A PED file must have 1 and only 1 phenotype in the *6th* column.  
+- Other covariates start from the *7th* column
+- Example: `./ExampleData/example_PED.ped`
+
+#### Usage
+`--PED`
+
+- TWAS (with individual-level GWAS data)
+- VC-TWAS
+
+
+### 7. PED Info
+|     |     |
+|:---:|:---:|
+| P | PHENO |
+| C | COV1  |
+| C | COV2  |
+| C | SEX   |
+
+- Phenotype and Covariate Information File
+- Used to specify phenotype columns and covariate columns in the `PED` file to use for the TWAS.
+- Headerless, two-column, tab-delimited file. Specify one column per row. The first column of each row is the type (`P` for phenotype, `C` for covariate) and the second column in each row is the name of the column in the `PED` file.
+- Example: `./ExampleData/PED_Info_*.txt`
+
+#### Usage
+`--PED_info`
+
+- TWAS (with individual-level GWAS data)
+- VC-TWAS
+
+
+### 8. Genome Block Annotation File
 
 | CHROM |   Start   |    End  |
 |:-----:|:---------:|:-------:|
@@ -176,8 +237,40 @@ Example input files provided under `./ExampleData/` are generated artificially. 
 - Block annotation files can be created from genome segmentation files generated by [LDetect](https://bitbucket.org/nygcresearch/ldetect-data/src/master/)
 - Example: `./ExampleData/example_genome_block_CHR1.txt`
 
-### 10. SampleID File
-- Headerless, single-column file containing sampleIDs to use. 
+#### Usage
+`--genom_block`
+
+- Generate Reference LD Genotype Covariance Files
+
+
+### 9. LD File
+- Contains LD covariance coefficients generated from reference data.
+- Used for TWAS with GWAS summary statistics
+
+#### Usage
+`--LD`
+
+- TWAS (with summary-level GWAS data)
+
+
+### 10. Zscore File
+
+| CHROM | POS | REF | ALT | Zscore |
+|:-----:|:---:|:---:|:---:|:------:|
+|   1   | 100 |  C  |  T  |  0.01  |
+
+- Contains GWAS summary statistics (*Zscore*) for TWAS
+- First 4 columns have the same format as the first 4 columns of a VCF file.
+- The name of the column containing the Zscore statistic values to use must be `Zscore`.
+- The file must be sorted by chromosome and base pair position, bgzipped by `bgzip`, and tabixed by `tabix`. Example tabix command: `tabix -f -p vcf *_Zscore.txt.gz`.
+- Example: `./ExampleData/CHR1_GWAS_Zscore.txt.gz`
+
+#### Usage
+`--Zscore`
+
+- TWAS (with summary-level GWAS data)
+
+
 <!-- - Example: -->
 
 <!-- 
@@ -218,6 +311,7 @@ Example input files provided under `./ExampleData/` are generated artificially. 
 - `--ES`: Output effect size type: `fixed` or `additive` (default: `fixed`)
 	- `fixed`: use fixed effects only
 	- `additive`: use the sum of fixed and random effects
+
 ##### Example Command
 ```bash
 # Setup input file paths
@@ -488,34 +582,4 @@ ${TIGAR_dir}/VC_TWAS.sh \
 --gene_anno ${gene_anno_file} \
 --PED ${PED} \
 --PED_info ${PED_info} \
---test_sampleID ${test_sample_ID_file} \
---chr 1 \
---weight ${eQTL_ES_file} \
---genofile ${genofile} \
---genofile_type vcf \
---format GT \
---weight_threshold 0.0001 \
---phenotype_type C \
---thread 2 \
---out_dir ${out_dir} \
---TIGAR_dir ${TIGAR_dir}
-```
-
-## Updates
-- Removed 'dfply' Python package dependency
-- Added VC-TWAS method
-- Added `SPrediXcan` test statistic calculation to TWAS with summary-level GWAS data (in addition to existing `FUSION` test statistic); added option (`--test_stat`) to select which test statistic to use (default: `both`)
-- Added `--weight-threshold` option (for excluding SNPs with small effect-sizes) to summary-level TWAS (default: `0`)
-- Added `--sampleID` argument to `TIGAR_LD.sh`
-- Reduced size of output LD files
-- Improved memory usage of Python scripts (especially for model-training and TWAS with summary-level GWAS data)
-- Improved speed (especially for model-training)
-- Improved error handling for parallelized functions
-- Added/improved log output in all Python scripts
-- Added time elapsed calculation for logging
-- Removed intermediate `call_DPR.sh` script
-
-
-## Reference
-- [PrediXcan](https://github.com/hakyimlab/PrediXcan)  
-- [DPR](https://github.com/biostatpzeng/DPR)
+--test_sampleID ${tes
