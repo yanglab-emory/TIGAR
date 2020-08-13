@@ -31,6 +31,8 @@ VARS=`getopt -o "" -a -l \
 chr:,weight:,test_sampleID:,gene_anno:,genofile:,genofile_type:,format:,window:,phenotype_type:,maf:,hwe:,weight_threshold:,PED:,PED_info:,TIGAR_dir:,thread:,out_dir: \
 -- "$@"`
 
+echo "Conducting VC-TWAS using individual-level GReX and phenotype data ... "
+
 if [ $? != 0 ]
 then
     echo "Terminating....." >&2
@@ -130,3 +132,4 @@ python ${TIGAR_dir}/VC_TWAS/VC_TWAS.py \
 --out_dir ${out_dir}/VC_TWAS_CHR${chr} \
 > ${out_dir}/logs/CHR${chr}_VC_TWAS_log.txt
 
+echo "Completed TWAS."

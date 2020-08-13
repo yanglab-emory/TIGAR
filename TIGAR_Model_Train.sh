@@ -122,7 +122,7 @@ fi
 ####################################
 
 if [[ "$model"x == "elastic_net"x ]];then
-    echo "Train gene expression imputation models by Elastic-Net method..."
+    echo "Training gene expression imputation models using Elastic-Net method..."
 
     # Make python script executible
     if [[ ! -x ${TIGAR_dir}/Model_Train_Pred/Elastic_Net_Train.py ]] ; then
@@ -151,7 +151,7 @@ if [[ "$model"x == "elastic_net"x ]];then
 
 
 elif [[ "$model"x == "DPR"x ]]; then
-    echo "Train gene expression imputation models by Nonparametric Bayesian DPR method..."
+    echo "Training gene expression imputation models using Nonparametric Bayesian DPR method..."
 
     ### Store DPR Results
     mkdir -p ${out_dir}/DPR_CHR${chr}
@@ -162,9 +162,9 @@ elif [[ "$model"x == "DPR"x ]]; then
     ### Store Cross Validation DPR input files and outputs
     if [ ${cvR2} == "1" ] ; then
         mkdir -p ${out_dir}/DPR_CHR${chr}/CV_Files
-        echo "Run 5-fold cross validation to evaluate DPR model."
+        echo "Running 5-fold cross validation to evaluate DPR model."
     else
-        echo "Skip 5-fold CV."
+        echo "Skipping 5-fold CV."
     fi
 
     # Make DPR file executible
@@ -196,16 +196,16 @@ elif [[ "$model"x == "DPR"x ]]; then
     > ${out_dir}/logs/CHR${chr}_DPR_train_log.txt
 
     ### 4. Remove DPR input files
-    echo Remove DPR input files 
+    echo Removing DPR input files used for training.
     rm -fr ${out_dir}/DPR_CHR${chr}/DPR_Files
 
     if [ ${cvR2} == "1" ] ; then
-        echo Remove files for CV
+        echo Removing DPR input files used for CV.
         rm -fr ${out_dir}/DPR_CHR${chr}/CV_Files
     fi
 
 else
-    echo "Error: Please specify --model to be either elastic_net or DPR "
+    echo "Error: Please specify --model as either elastic_net or DPR "
 fi
 
 echo "Training ${model} model job completed for CHR ${chr}."

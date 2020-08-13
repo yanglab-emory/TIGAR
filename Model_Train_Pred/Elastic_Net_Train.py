@@ -439,8 +439,9 @@ def thread_process(num):
     except Exception as e:
         e_type, e_obj, e_tracebk = sys.exc_info()
         e_line_num = e_tracebk.tb_lineno
+        tb = traceback.extract_tb(e_tracebk)[-1]
 
-        print('Caught a type {} exception for TargetID={}, num={} on line {}:\n{}'.format(e_type, target, num, e_line_num, e))
+        print('Caught a type {} exception for TargetID={}, num={} on line {}:\n{}\n{}\n{}\n'.format(e_type, target, num, e_line_num, e), tb[2], tb[1])
 
     finally:
         # print info to log do not wait for buffer to fill up
