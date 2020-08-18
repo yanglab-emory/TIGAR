@@ -21,7 +21,7 @@ from sklearn.model_selection import KFold
 
 ### For Elastic Net Regression
 from sklearn.linear_model import ElasticNet
-from sklearn.metrics import r2_score
+# from sklearn.metrics import r2_score
 
 ### For OLS regression in cross validation
 from scipy import stats
@@ -138,11 +138,14 @@ def elastic_net(train, test=None, k=args.cv, Alpha=args.alpha):
 
     lm = sm.OLS(testY, sm.add_constant(predY)).fit()
 
+    Rsquared = lm.rsquared
+
     if test is not None:
-        return lm.rsquared
+        return Rsquared
 
     beta = reg.coef_
-    Rsquared = r2_score(trainY,predY)
+    ### r2_score IMPLEMENTED BY SKLEARN IS NOT CORRECT R2
+    # Rsquared = r2_score(trainY,predY)
     Pvalue = lm.f_pvalue
     cvm = clf.best_score_
 
@@ -439,8 +442,9 @@ def thread_process(num):
     except Exception as e:
         e_type, e_obj, e_tracebk = sys.exc_info()
         e_line_num = e_tracebk.tb_lineno
+        tb = traceback.extract_tb(e_tracebk)[-1]
 
-        print('Caught a type {} exception for TargetID={}, num={} on line {}:\n{}'.format(e_type, target, num, e_line_num, e))
+        print('Caught a type {} exception for TargetID={}, num={} on line {}:\n{}\n{}\n{}\n'.format(e_type, target, num, e_line_num, e), tb[2], tb[1])
 
     finally:
         # print info to log do not wait for buffer to fill up

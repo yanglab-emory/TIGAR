@@ -572,12 +572,13 @@ VC-TWAS with cis-eQTL effect sizes estimated from nonparametric Bayesian DPR met
 #### Example Command
 ```bash
 gene_anno_file="${TIGAR_dir}/ExampleData/gene_anno.txt"
-PED="${TIGAR_dir}/ExampleData/example_PED.ped"
 PED_info="${TIGAR_dir}/ExampleData/PED_Info_SinglePheno.txt"
 test_sample_ID_file="${TIGAR_dir}/ExampleData/test_sampleID.txt"
 eQTL_ES_file="${TIGAR_dir}/ExampleData/eQTLweights.txt"
 genofile="${TIGAR_dir}/ExampleData/example.vcf.gz"
 
+# continuous phenotype
+PED="${TIGAR_dir}/ExampleData/example_PED.ped"
 ${TIGAR_dir}/VC_TWAS.sh \
 --gene_anno ${gene_anno_file} \
 --PED ${PED} \
@@ -590,6 +591,24 @@ ${TIGAR_dir}/VC_TWAS.sh \
 --format GT \
 --weight_threshold 0.0001 \
 --phenotype_type C \
+--thread 2 \
+--out_dir ${out_dir} \
+--TIGAR_dir ${TIGAR_dir}
+
+# dichotomous phenotype
+PED="${TIGAR_dir}/ExampleData/PED_Info_SinglePheno_binary.PED"
+${TIGAR_dir}/VC_TWAS.sh \
+--gene_anno ${gene_anno_file} \
+--PED ${PED} \
+--PED_info ${PED_info} \
+--test_sampleID ${test_sample_ID_file} \
+--chr 1 \
+--weight ${eQTL_ES_file} \
+--genofile ${genofile} \
+--genofile_type vcf \
+--format GT \
+--weight_threshold 0.0001 \
+--phenotype_type D \
 --thread 2 \
 --out_dir ${out_dir} \
 --TIGAR_dir ${TIGAR_dir}

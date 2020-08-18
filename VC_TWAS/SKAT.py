@@ -40,9 +40,9 @@ def get_logistic_residual(pheno, cov, n_resampling):
     betas = lm.params
     mu = lm.predict()
     pi_1 = mu*(1-mu)
-    res = pheno.to_numpy().flatten() - mu 
+    res = pheno.values.flatten() - mu 
     n1 = len(res)
-    n_case = sum(pheno)
+    n_case = np.sum(pheno)
     res_out = 0
     ####resampling####
     if n_resampling > 0:
@@ -113,7 +113,7 @@ def SKAT_With_NullModel_ADJ(re, weight, geno):
     Z1 = weight * geno
     Q1 = (res).dot(Z1)
     Q = Q1.dot(Q1.T) / 2
-    Z2 = (sqrt(pi_1) * Z1.T).T - ((sqrt(pi_1) * X1.T).T).dot(np.linalg.inv((X1.T).dot((pi_1 * X1.T).T))).to_numpy().dot((X1.T).dot((pi_1 * Z1.T).T).to_numpy())
+    Z2 = (sqrt(pi_1) * Z1.T).T - ((sqrt(pi_1) * X1.T).T).dot(np.linalg.inv((X1.T).dot((pi_1 * X1.T).T))).values.dot((X1.T).dot((pi_1 * Z1.T).T).values)
     Q_Temp_res1 = (res_moment.T).dot(Z1)
     Q_sim = pow(Q_Temp_res1, 2).sum(axis = 1) / 2
     p_value = SKAT_PValue_Logistic_VarMatching(Q, Z2 /sqrt(2), mu, Q_sim)
@@ -275,7 +275,7 @@ def SKAT_Logistic_Model(geno, weights, re):
     Z1 = weights * geno
     Q1 = (res.T).dot(Z1)
     Q = Q1.dot(Q1.T) / 2
-    W = (Z1.T).dot((pi_1 * Z1.T).T.to_numpy()) - (pi_1 * Z1.T).dot(X).dot(np.linalg.inv((X.T).dot((pi_1 * X.T).T.to_numpy()))).dot((X.T).to_numpy().dot((pi_1 * Z1.T).T.to_numpy())) 
+    W = (Z1.T).dot((pi_1 * Z1.T).T.values) - (pi_1 * Z1.T).dot(X).dot(np.linalg.inv((X.T).dot((pi_1 * X.T).T.values))).dot((X.T).values.dot((pi_1 * Z1.T).T.values)) 
     return Q,W 
 
 ##########################
@@ -372,12 +372,11 @@ def Get_pvalue(W, Q):
 ##########################
 # SKAT method Davies way for continous phenotype
 def SKAT(geno, pheno, cov, weights, outtype):
+    re, n_resampling = SKAT_Null_Model(pheno, cov, outtype)
     if outtype == "C":
-        re, n_resampling = SKAT_Null_Model(pheno, cov, outtype)
         Q,W = SKAT_Linear_Model(geno, weights, re)
         p_val = Get_pvalue(W, Q)
     if outtype =="D":
-        re, n_resampling = SKAT_Null_Model(pheno, cov, outtype)
         if n_resampling > 0:
             p_val = SKAT_With_NullModel_ADJ(re, weights, geno)
         else:

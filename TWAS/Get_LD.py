@@ -211,7 +211,7 @@ def thread_process(num):
         e_type, e_obj, e_tracebk = sys.exc_info()
         e_line_num = e_tracebk.tb_lineno
 
-        print('Caught a type {} exception for block num={} on line {}:\n{}'.format(e_type, num, e_line_num, e))
+        print('Caught a type {} exception for block num={} on line {}:\n{}\n'.format(e_type, num, e_line_num, e))
 
     finally:
         # print info to log do not wait for buffer to fill up

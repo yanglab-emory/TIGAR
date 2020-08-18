@@ -98,6 +98,8 @@ if [[ ! -x  ${TIGAR_dir}/Model_Train_Pred/Prediction.py ]] ; then
     chmod 755  ${TIGAR_dir}/Model_Train_Pred/Prediction.py
 fi
 
+echo Predicting gene expression.
+
 python ${TIGAR_dir}/Model_Train_Pred/Prediction.py \
 --chr ${chr} \
 --weight ${weight_file} \
@@ -114,7 +116,7 @@ python ${TIGAR_dir}/Model_Train_Pred/Prediction.py \
 > ${out_dir}/logs/CHR${chr}_Pred_log.txt
     
 
-
+echo Completed prediction.
 
 
 

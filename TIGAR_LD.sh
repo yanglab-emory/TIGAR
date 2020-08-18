@@ -109,5 +109,5 @@ if [ ! -f ${out_dir}/CHR${chr}_reference_cov.txt.gz.tbi ] ; then
     exit 1
 fi
 
-echo Generate reference LD covariance file successfully ... 
+echo Successfully generated reference LD covariance file ${out_dir}/CHR${chr}_reference_cov.txt... 
 

@@ -7,6 +7,7 @@ import operator
 import multiprocessing
 import subprocess
 import sys
+import traceback
 
 from io import StringIO
 from time import time
@@ -439,10 +440,14 @@ def thread_process(num):
         print('Target TWAS completed.\n')
 
     except Exception as e:
-        e_type, e_obj, e_tracebk = sys.exc_info()
-        e_line_num = e_tracebk.tb_lineno
-        
-        print('Caught a type {} exception for TargetID={}, num={} on line {}:\n{}'.format(e_type, target, num, e_line_num, e))
+        e_info = sys.exc_info()
+
+        e_type = e_info[0].__name__
+        e_line = e_info[2].tb_lineno
+        e_tracebk = ''.join(traceback.format_tb(e_info[2]))
+
+        print('Caught a "{}" type exception for TargetID={}, num={} on line {}:\n  {}\nTraceback:\n{}'.format(
+            e_type, target, num, e_line, e, e_tracebk))
 
     finally:
         # print info to log do not wait for buffer to fill up
@@ -451,7 +456,7 @@ def thread_process(num):
 ##############################################################
 # thread process
 if __name__ == '__main__':
-    print('Starting VC-TWAS for ' + str(n_targets) + ' target genes.')
+    print('Starting VC-TWAS for ' + str(n_targets) + ' target genes.\n')
     pool = multiprocessing.Pool(args.thread)
     pool.map(thread_process,[num for num in range(n_targets)])
     pool.close()
