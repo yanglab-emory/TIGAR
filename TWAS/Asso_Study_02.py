@@ -317,13 +317,13 @@ def thread_process(num):
             fusion_z = np.vdot(ZW.Zscore.values, ZW.ES.values) / z_denom
             fusion_pval = 1-chi2.cdf(fusion_z**2,1)
             result['FUSION_Z'] = fusion_z
-            result['FUSION_PVAL'] = np.format_float_scientific(fusion_pval)
+            result['FUSION_PVAL'] = np.format_float_scientific(fusion_pval, precision=15, exp_digits=4)
 
             snp_sd = np.sqrt(snp_Var)
             spred_z = snp_sd.dot(ZW.ES.values * ZW.Zscore.values) / z_denom
             spred_pval = 1-chi2.cdf(spred_z**2,1)
             result['SPred_Z'] = spred_z
-            result['SPred_PVAL'] = np.format_float_scientific(spred_pval)
+            result['SPred_PVAL'] = np.format_float_scientific(spred_pval, precision=15, exp_digits=4)
 
         else:
             if args.test_stat == 'FUSION':
@@ -343,7 +343,7 @@ def thread_process(num):
             pval = 1-chi2.cdf(burden_Z**2,1)
 
             result['TWAS_Zscore'] = burden_Z
-            result['PVALUE'] = np.format_float_scientific(pval)
+            result['PVALUE'] = np.format_float_scientific(pval, precision=15, exp_digits=4)
 
         # write to file
         result.to_csv(

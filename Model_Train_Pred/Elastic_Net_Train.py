@@ -21,7 +21,7 @@ from sklearn.model_selection import KFold
 
 ### For Elastic Net Regression
 from sklearn.linear_model import ElasticNet
-from sklearn.metrics import r2_score
+# from sklearn.metrics import r2_score
 
 ### For OLS regression in cross validation
 from scipy import stats
@@ -138,11 +138,14 @@ def elastic_net(train, test=None, k=args.cv, Alpha=args.alpha):
 
     lm = sm.OLS(testY, sm.add_constant(predY)).fit()
 
+    Rsquared = lm.rsquared
+
     if test is not None:
-        return lm.rsquared
+        return Rsquared
 
     beta = reg.coef_
-    Rsquared = r2_score(trainY,predY)
+    ### r2_score IMPLEMENTED BY SKLEARN IS NOT CORRECT R2
+    # Rsquared = r2_score(trainY,predY)
     Pvalue = lm.f_pvalue
     cvm = clf.best_score_
 
