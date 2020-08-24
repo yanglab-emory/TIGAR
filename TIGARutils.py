@@ -1,14 +1,16 @@
 #!/usr/bin/env python
 
 #########################################################
-import subprocess
-import pandas as pd
-import numpy as np
+import functools
 import operator
+import subprocess
+import sys
+import traceback
 
-import io
 from io import StringIO
 
+import pandas as pd
+import numpy as np
 #########################################################
 ## FUNCTIONS:
 
@@ -31,6 +33,28 @@ from io import StringIO
 # substr_in_strarray
 
 #########################################################
+
+def error_handler(func):
+    @functools.wraps(func)
+    def wrapper(num, *args, **kwargs):     
+        try:
+            return func(num, *args, **kwargs)
+
+        except Exception as e:
+            e_info = sys.exc_info()
+            e_type = e_info[0].__name__
+            
+            # don't print traceback info for wrapper
+            e_tracebk = ''.join(traceback.format_tb(e_info[2])[1:])
+
+            print('Caught an exception for num={}:\n  {}: {}\nTraceback:\n{}'.format(num, e_type, e, e_tracebk))
+
+        finally:
+            sys.stdout.flush()
+
+    return wrapper
+
+
 
 # Call tabix, read in lines into byt array
 def call_tabix(path, chr, start, end):
