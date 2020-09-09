@@ -67,10 +67,15 @@ def call_tabix(path, chr, start, end):
 
     proc_out = bytearray()
 
+    # process while subprocesses running
     while proc.poll() is None:
         line =  proc.stdout.readline()
         if len(line) == 0:
             break
+        proc_out += line
+
+    # get any remaining lines
+    for line in proc.stdout:
         proc_out += line
 
     return proc_out
