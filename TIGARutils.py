@@ -1,14 +1,16 @@
 #!/usr/bin/env python
 
 #########################################################
-import subprocess
-import pandas as pd
-import numpy as np
+import functools
 import operator
+import subprocess
+import sys
+import traceback
 
-import io
 from io import StringIO
 
+import pandas as pd
+import numpy as np
 #########################################################
 ## FUNCTIONS:
 
@@ -32,6 +34,28 @@ from io import StringIO
 
 #########################################################
 
+def error_handler(func):
+    @functools.wraps(func)
+    def wrapper(num, *args, **kwargs):     
+        try:
+            return func(num, *args, **kwargs)
+
+        except Exception as e:
+            e_info = sys.exc_info()
+            e_type = e_info[0].__name__
+            
+            # don't print traceback info for wrapper
+            e_tracebk = ''.join(traceback.format_tb(e_info[2])[1:])
+
+            print('Caught an exception for num={}:\n  {}: {}\nTraceback:\n{}'.format(num, e_type, e, e_tracebk))
+
+        finally:
+            sys.stdout.flush()
+
+    return wrapper
+
+
+
 # Call tabix, read in lines into byt array
 def call_tabix(path, chr, start, end):
 
@@ -43,10 +67,15 @@ def call_tabix(path, chr, start, end):
 
     proc_out = bytearray()
 
+    # process while subprocesses running
     while proc.poll() is None:
         line =  proc.stdout.readline()
         if len(line) == 0:
             break
+        proc_out += line
+
+    # get any remaining lines
+    for line in proc.stdout:
         proc_out += line
 
     return proc_out
@@ -268,6 +297,46 @@ def zscore_cols_dtype(file_cols):
 
     return file_cols_ind, file_dtype
 
+# USED TO DETERMINE INDICES OF gwas FILE COLS TO READ IN, DTYPE OF EACH COL
+def gwas_cols_dtype(file_cols):
+    cols = ['CHROM','POS','REF','ALT','BETA','SE']
+    dtype_dict = {
+        'CHROM': object,
+        'POS': np.int64,
+        'REF': object,
+        'ALT': object,
+        'BETA': np.float64,
+        'SE': np.float64}
+
+    file_cols_ind = tuple([file_cols.index(x) for x in cols])
+    file_dtype = {file_cols.index(x):dtype_dict[x] for x in cols}
+
+    return file_cols_ind, file_dtype
+
+# USED TO DETERMINE INDICES OF MCOV FILE COLS TO READ IN, DTYPE OF EACH COL
+def MCOV_cols_dtype(file_cols, add_cols=[], drop_cols=[], get_id=True):
+    cols = ['CHROM','POS','REF','ALT','COV'] + add_cols
+    dtype_dict = {
+        'CHROM': object,
+        'POS': np.int64,
+        'REF': object,
+        'ALT': object,
+        'COV': object,
+        'snpID': object,
+        'ID': object}
+
+    if get_id:
+        if ('snpID' in file_cols):
+            cols.append('snpID')
+
+        elif ('ID' in file_cols):
+            cols.append('ID')
+
+    cols = [x for x in cols if (x not in drop_cols)]
+    
+    file_cols_ind = tuple([file_cols.index(x) for x in cols])
+    file_dtype = {file_cols.index(x):dtype_dict[x] for x in cols}
+    return file_cols_ind, file_dtype
 
 # RETURN SNP IDS
 def get_snpIDs(df: pd.DataFrame, flip=False):
