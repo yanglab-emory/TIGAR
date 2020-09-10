@@ -8,18 +8,18 @@ import numpy as np
 from numpy import exp, floor, log, sin, sqrt
 
 ####################################################
+# %%
 pi = 3.14159265358979
 log28 = 0.0866 
 
-
-##########################
-# exp
+# %%
+############# exp #############
 def exp1(x):
     x1 = 0 if x <- 50 else exp(x)
     return x1
 
-##########################
-# log
+# %%
+############# log #############
 def log1(x, first):
     if abs(x) > 0.1:
         s = log(1 + x) if first == True else (log(1 + x) - x)
@@ -37,9 +37,9 @@ def log1(x, first):
             s1 = s + term / k
     return s
 
-##########################
-# errbd
-## stop when count>lim
+# %%
+#############errbd#############
+#############stop when count>lim#############
 def errbd(u, sigsq, lb, nc, n, r):
     #counter count>lim break
     xconst = u * sigsq
@@ -56,7 +56,7 @@ def errbd(u, sigsq, lb, nc, n, r):
     return_sum = exp1(-0.5*sum1)
     return cx, return_sum
 
-##########################
+# %%
 def ctff(accx, upn, sigsq, lb, nc, n, r, lmin, lmax, mean):
     u2 = upn; u1 = 0; c1 = mean;
     rb = 2* lmax if u2 > 0 else 2*lmin
@@ -83,10 +83,8 @@ def ctff(accx, upn, sigsq, lb, nc, n, r, lmin, lmax, mean):
     upn = u2; 
     return upn, c2
 
-
-##########################
-# truncation
-#checked
+# %%
+#############truncation#############checked
 def truncation(u, tausq, sigsq, r, lb, nc, n):
     #counter count>lim break
     sum1 = 0
@@ -113,7 +111,7 @@ def truncation(u, tausq, sigsq, r, lb, nc, n):
     prod2 = prod1 + prod2
     prod3 = prod1 + prod3
     x = exp1(-sum1 - 0.25 * prod2) / pi
-    y = exp1(-sum1-0.25 * prod3) / pi
+    y = exp1(-sum1-0.25*prod3) / pi
     err1 = 1 if s == 0 else x * 2 / s
     err2 = 2.5 * y if prod3 > 1 else 1
     if err2 < err1:
@@ -122,10 +120,8 @@ def truncation(u, tausq, sigsq, r, lb, nc, n):
     err = err1 if err1 < err2 else err2
     return err        
 
-
-##########################
-# findu
-#checked
+# %%
+#############findu#############checked
 def findu(utx, accx, sigsq, r, lb, nc, n):
     divis = [2, 1.4, 1.2, 1.1]
     ut = utx #why point in c++????
@@ -156,8 +152,8 @@ def findu(utx, accx, sigsq, r, lb, nc, n):
     utx = ut
     return utx  
 
-##########################
-# integrate
+# %%
+#############integrate#############
 def integrate(nterm, interv, tausq, mainx, sigsq, c, r, n, lb, nc, intl, ersm):
     inpi = interv / pi
     #first statement
@@ -192,16 +188,14 @@ def integrate(nterm, interv, tausq, mainx, sigsq, c, r, n, lb, nc, intl, ersm):
         k = k - 1
     return intl, ersm
 
-
-##########################
-# order num absolute value of lb, increasing order
+# %%
+#############order num absolute value of lb, increasing order#############
 def order(lb):
     sortnum = np.argsort(-np.abs(lb))
     return sortnum
 
-
-##########################
-# cfe
+# %%
+#############cfe#############
 def cfe(x, fail,n, lb, nc, r):
     #counter count>lim break
     sortnum= order(lb)
@@ -240,13 +234,13 @@ def cfe(x, fail,n, lb, nc, r):
         return_value = pow(2.0, (sum1 / 4)) / (pi * pow(axl, 2))
     return return_value, fail                 
 
-##########################
+# %%
 def qfc(lb, nc, n, r, sigma, c, lim, acc, trace, ifault, res):
     acc1 = acc
     qfval = -1.0
     rats = [1,2,4,8]
     ifault = 0; count = 0; intl = 0; ersm = 0
-    ndsrt = True; fail = False
+    fail = False
     sigsq = pow(sigma, 2)
     sd = sigsq
     xlim = lim
@@ -291,9 +285,9 @@ def qfc(lb, nc, n, r, sigma, c, lim, acc, trace, ifault, res):
         err = truncation(utx, tausq, sigsq, r, lb, nc, n)
         if err < 0.2 * acc1:
             sigsq = sigsq + tausq
-            utx = findu(utx, 0.25 * acc1, sigsq, r, lb, nc, n)
+            utx=findu(utx, 0.25 * acc1, sigsq, r, lb, nc, n)
             trace[5] = sqrt(tausq)
-    trace[4] = utx; acc1 = 0.5 * acc1
+    trace[4] = utx;  acc1 = 0.5 * acc1
     #######################
     flag = True
     while flag == True:
@@ -321,24 +315,24 @@ def qfc(lb, nc, n, r, sigma, c, lim, acc, trace, ifault, res):
                 trace[6] = count
                 res = qfval
                 return trace, res, ifault
-            ntm = floor(xtm + 0.5)
+            ntm = floor(xntm + 0.5)
             intv1= utx / ntm; x = 2.0 * pi / intv1
             if x <= abs(c):
                 flag=False
             else:
-                x1, ndtsrt, fail = cfe(c-x, ndtsrt, fail, th, n, lb, nc, r)
-                x2, ndtsrt, fail = cfe(c+x, ndtsrt, fail, th, n, lb, nc, r)
-                tausq = 0.33 * acc1 / (1.1 * (x1 + x2))
+                x1, fail = cfe(c-x, fail, n, lb, nc, r)
+                x2, fail = cfe(c+x, fail, n, lb, nc, r)
+                tausq = 0.33 *acc1 / (1.1 * (x1 + x2))
             if fail:
-                flag = False
+                flag=False
             else:
                 acc1 = 0.67 * acc1
-                intl, ersm = integrate(ntm, inv1, tausq, False, c, r, n, lb, nc, intl, ersm)
+                intl, ersm = integrate(ntm, intv1, tausq, False, sigsq, c, r, n, lb, nc, intl, ersm)
                 xlim = xlim - xntm; sigsq = sigsq + tausq
                 trace[2] = trace[2] + 1; trace[1] = trace[1] + ntm + 1
                 utx = findu(utx, 0.25 * acc1, sigsq, r, lb, nc, n)
                 acc1 = 0.75*acc1
-                Flag = True
+                flag = True
         else:
             flag = False      
     #######################
