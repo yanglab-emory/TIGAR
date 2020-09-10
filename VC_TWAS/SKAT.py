@@ -1,22 +1,18 @@
+# %%
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
-####################################################
+##########################################################################################
 # import packages needed
 import pandas as pd
 import numpy as np
-from numpy import mean, sqrt, std, where
-
+from numpy import mean, sqrt, std, where, diag,sum
 import statsmodels.api as sm
-from scipy.stats import chi2
-
+import scipy.stats 
 import qfc_checked
+#######################################################################################
 
-####################################################
-# Functions
-
-##########################
-# get s^2,residual,and cov matrix for continous phenotype 
+# %%
+############# get s^2,residual,and cov matrix for continuous phenotype #############
 def get_linear_residual(pheno, cov, outtype):       
     if len(cov) != 0:
         cov_x = sm.add_constant(cov)
@@ -27,9 +23,8 @@ def get_linear_residual(pheno, cov, outtype):
     res = lm.resid
     return s2, res, cov_x       
 
-#########################
-# get cov matrix , mu, pi_1, res, res_out(resampling if sample size <2000) dichotomous phenotype 
-
+# %%
+############# get cov matrix , mu, pi_1, res, res_out(resampling if sample size <2000) dichotomous phenotype #############
 def get_logistic_residual(pheno, cov, n_resampling):       
     if len(cov) != 0:
         cov_x = sm.add_constant(cov)
@@ -37,12 +32,11 @@ def get_logistic_residual(pheno, cov, n_resampling):
         cov_x = np.ones(len(pheno))
     ####from logistic regression#####
     lm = sm.Logit(pheno,cov_x).fit()
-    betas = lm.params
     mu = lm.predict()
     pi_1 = mu*(1-mu)
     res = pheno.values.flatten() - mu 
     n1 = len(res)
-    n_case = np.sum(pheno)
+    n_case = sum(pheno)
     res_out = 0
     ####resampling####
     if n_resampling > 0:
@@ -75,15 +69,15 @@ def get_logistic_residual(pheno, cov, n_resampling):
             res_out [:,i] = res_out [:,i] - mu                 
     return cov_x, mu, pi_1, res, res_out
 
-##########################
-# get residual (resampling & without resampling)
+# %%
+############# get residual (resampling & without resampling) #############
 def SKAT_Null_Model_MomentAdjust(pheno, cov, n_resampling):
     re1 = get_logistic_residual(pheno, cov, 0)
     re2 = get_logistic_residual(pheno, cov, n_resampling)
     return (re1, re2)
 
-##########################
-# SKAT Null Model
+# %%
+############# SKAT Null Model #############
 def SKAT_Null_Model(pheno, cov, outtype):
     regdata = pd.concat([pheno, cov], axis=1)
     samplesize = len(regdata.dropna())
@@ -98,8 +92,8 @@ def SKAT_Null_Model(pheno, cov, outtype):
         re = get_linear_residual(pheno, cov, outtype)
     return re, n_resampling
 
-##########################
-# logistic model with adjustment (sample size < 2000)
+# %%
+############# logistic model with adjustment (sample size < 2000) #############
 def SKAT_With_NullModel_ADJ(re, weight, geno):
     obj_res = re[0]
     res = obj_res[3]
@@ -108,8 +102,6 @@ def SKAT_With_NullModel_ADJ(re, weight, geno):
     pi_1 = obj_res[2]
     mu = obj_res[1]
     res_moment = res2
-    n = len(pi_1)
-    D = np.diag(pi_1)
     Z1 = weight * geno
     Q1 = (res).dot(Z1)
     Q = Q1.dot(Q1.T) / 2
@@ -119,8 +111,8 @@ def SKAT_With_NullModel_ADJ(re, weight, geno):
     p_value = SKAT_PValue_Logistic_VarMatching(Q, Z2 /sqrt(2), mu, Q_sim)
     return p_value    
 
-##########################
-# Get_Lambda_U_From_Z
+# %%
+############# Get_Lambda_U_From_Z #############
 def Get_Lambda_U_From_Z(Z):
     out_svd = np.linalg.svd(Z)
     lambda_org = pow(out_svd[1],2)
@@ -131,8 +123,8 @@ def Get_Lambda_U_From_Z(Z):
     U = u[:,IDX[0]]
     return Lambda, U
 
-##########################
-# SKAT_Get_Cov_Param
+# %%
+############# SKAT_Get_Cov_Param #############
 def SKAT_Get_Cov_Param(Lambda,p_all,U):
     p_m = len(Lambda)
     m4 = p_all * (1 - p_all) * (3 * pow(p_all, 2) - 3 * p_all + 1) / pow(p_all * (1 - p_all), 2)
@@ -160,8 +152,8 @@ def SKAT_Get_Cov_Param(Lambda,p_all,U):
     Lambda_new = Lambda * sqrt(var_i) / sqrt(2)
     return zeta, var_i, varQ, muQ, Lambda_new, p_m
 
-##########################
-# SKAT_GET_kurtosis
+# %%
+############# SKAT_GET_kurtosis #############
 def SKAT_GET_kurtosis(x):
     if std(x) == 0:
         return -100
@@ -169,15 +161,15 @@ def SKAT_GET_kurtosis(x):
     kurt = m4 / pow(std(x), 4) - 3
     return kurt
 
-##########################
-# SKAT_GET_skewness
+# %%
+############# SKAT_GET_skewness #############
 def SKAT_GET_skewness(x):
     m3 = mean(pow(x - mean(x), 3))
     skew = m3 / pow(std(x), 3)
     return skew
 
-##########################
-# SKAT_Get_DF_Sim
+# %%
+############# SKAT_Get_DF_Sim #############
 def SKAT_Get_DF_Sim(Q_sim):
     s2_sim = SKAT_GET_kurtosis(Q_sim)
     df_sim = 12 / s2_sim
@@ -188,22 +180,18 @@ def SKAT_Get_DF_Sim(Q_sim):
         df_sim = 8 / pow(s1_sim, 2)
     return df_sim
 
-##########################
-# Get_Liu_Params_Mod
+# %%
+############# Get_Liu_Params_Mod #############
 def Get_Liu_Params_Mod(c1):
     muQ = c1[0]
     sigmaQ = sqrt(2 * c1[1])
     s1 = c1[2] / pow(c1[1], 3/2)
     s2 = c1[3] / pow(c1[1], 2)
-    beta1 = sqrt(8) * s1
-    beta2 = 12 * s2
-    type1 = 0
     if pow(s1, 2) > s2:
         a = 1 / (s1 - sqrt(pow(s1, 2) - s2))
         d = s1 *a^3 - a^2
         l = a^2 - 2*d
     else: 
-        type1<-1
         l = 1/s2
         a = sqrt(l)
         d = 0
@@ -211,14 +199,13 @@ def Get_Liu_Params_Mod(c1):
     sigmaX = sqrt(2) * a
     return l, d, muQ, muX, sigmaQ, sigmaX
 
-##########################
-# SKAT_Logistic_VarMatching_GetParam
+# %%
+############# SKAT_Logistic_VarMatching_GetParam #############
 def SKAT_Logistic_VarMatching_GetParam(Lambda, U, p_all, Q_sim):
     re = SKAT_Get_Cov_Param(Lambda, p_all, U)
     Lambda_new = re[4]
     muQ = re[3]
     varQ = re[2]
-    s2 = sum(pow(Lambda_new, 4)) / pow(sum(pow(Lambda_new, 2)), 2)
     df = SKAT_Get_DF_Sim(Q_sim)
     c1 = np.zeros(4)
     for i in range(4):
@@ -227,8 +214,8 @@ def SKAT_Logistic_VarMatching_GetParam(Lambda, U, p_all, Q_sim):
     n_Lambda = len(Lambda_new)
     return muQ, varQ, df, Lambda_new, para, n_Lambda
 
-##########################
-# SKAT_Logistic_VarMatching_GetParam1
+# %%
+############# SKAT_Logistic_VarMatching_GetParam1 #############
 def SKAT_Logistic_VarMatching_GetParam1(Z, p_all, Q_sim):
     out_svd = Get_Lambda_U_From_Z(Z)
     Lambda = out_svd[0]
@@ -236,18 +223,18 @@ def SKAT_Logistic_VarMatching_GetParam1(Z, p_all, Q_sim):
     para = SKAT_Logistic_VarMatching_GetParam(Lambda, U, p_all, Q_sim)
     return para
 
-##########################
-# SKAT_Get_Var_Elements
+# %%
+############# SKAT_Get_Var_Elements #############
 def SKAT_Get_Var_Elements(m4,p_all,u1,u2):
     temp1 = pow(u1, 2) * pow(u2, 2)
     a1 = sum(m4 * temp1)
-    a2 = sum(pow(u1, 2)) * sum(pow(u2, 2)) - sum(temp1)
+    a2 = sum(pow(u1, 2))*sum(pow(u2, 2)) - sum(temp1)
     a3 = pow(sum(u1 * u2), 2) - sum(temp1)
     a3 = a3 * 2
     return (a1 + a2 + a3)
 
-##########################
-# SKAT_PValue_Logistic_VarMatching (get p_value and p_value without adjustment) logistic
+# %%
+############# SKAT_PValue_Logistic_VarMatching (get p_value and p_value without adjustment) logistic #############
 def SKAT_PValue_Logistic_VarMatching(Q, Z, p_all, Q_sim):
     para = SKAT_Logistic_VarMatching_GetParam1(Z, p_all, Q_sim)
     if para[1] == 0:
@@ -255,18 +242,18 @@ def SKAT_PValue_Logistic_VarMatching(Q, Z, p_all, Q_sim):
     param = para[4]
     Q_norm = (Q - para[0]) / sqrt(para[1])
     Q_norm1 = Q_norm * sqrt(2 * para[2]) + para[2]
-    p_value =  1 - chi2.cdf(x = Q_norm1, df = para[2])
+    p_value =  scipy.stats.distributions.chi2.sf(x = Q_norm1, df = para[2])
     if len(param) > 1:
         if param[4] == 0:
             p_value_noadj = np.ones(1, len(Q))
         else:
             Q_norm = (Q - param[2]) / param[4]
             Q_norm1 = Q_norm * param[5] + param[3]
-            p_value_noadj =  1 - chi2.cdf(x = Q_norm1, df = param[0])                
+            p_value_noadj =  scipy.stats.distributions.chi2.sf(x = Q_norm1, df = param[0])                
     return p_value, p_value_noadj
 
-##########################
-# SKAT logistic Model(get Q,W)
+# %%
+############# SKAT logistic Model(get Q,W) ################
 def SKAT_Logistic_Model(geno, weights, re):
     X = re[0]
     mu = re[1]
@@ -278,8 +265,8 @@ def SKAT_Logistic_Model(geno, weights, re):
     W = (Z1.T).dot((pi_1 * Z1.T).T.values) - (pi_1 * Z1.T).dot(X).dot(np.linalg.inv((X.T).dot((pi_1 * X.T).T.values))).dot((X.T).values.dot((pi_1 * Z1.T).T.values)) 
     return Q,W 
 
-##########################
-# SKAT Linear Model(get Q,W)
+# %%
+############# SKAT Linear Model(get Q,W) ################
 def SKAT_Linear_Model(geno, weights, re):
     s2 = re[0]
     res = re[1]
@@ -290,8 +277,8 @@ def SKAT_Linear_Model(geno, weights, re):
     W = (Z1.T).dot(Z1)  - ((Z1.T).dot(X)).dot(np.linalg.inv((X.T).dot(X))).dot(((X.T).dot(Z1)))     
     return Q,W 
 
-##########################
-# Get_Lambda
+# %%
+############# Get_Lambda #############
 def Get_Lambda(K):
     lambda1 = np.linalg.eigvalsh(K, UPLO = 'L')
     a = mean(lambda1[lambda1 >= 0] / 100000)
@@ -299,25 +286,21 @@ def Get_Lambda(K):
     #len(lambda2)==0, stop?
     return lambda2
 
-##########################
-# Get_Liu_Params_Mod_Lambda (function from Get_Liu_PVal_MOD_Lambda)
+# %%
+############# Get_Liu_Params_Mod_Lambda (function from Get_Liu_PVal_MOD_Lambda) #############
 def Get_Liu_Params_Mod_Lambda(Lambda):
     c1 = np.zeros(shape = (4))
-    for i in range(0,4):
+    for i in range (0,4):
         c1[i] = sum(pow(Lambda, i + 1))
     muQ = c1[0]
     sigmaQ = sqrt(2 * c1[1])
     s1 = c1[2] / (pow(c1[1], 3 / 2))
     s2 = c1[3] / (pow(c1[1], 2))
-    beta1 = sqrt(8) * s1
-    beta2 = 12 * s2
-    type1 = 0
     if pow(s1, 2) > s2:
         a = 1 / (s1 - sqrt(s1^2 - s2))
         d = s1 * pow(a, 3) - pow(a, 2)
         l = pow(a, 2) - 2 * d
     else:
-        type1 = 1
         l = 1 / s2
         a = sqrt(l)
         d = 0
@@ -325,17 +308,17 @@ def Get_Liu_Params_Mod_Lambda(Lambda):
     sigmaX = sqrt(2) * a 
     return l, d, muQ, muX, sigmaQ, sigmaX
 
-##########################
-# Get_Liu_PVal_MOD_Lambda (get_pvalue)
+# %%
+############# Get_Liu_PVal_MOD_Lambda (get_pvalue) #############
 def Get_Liu_PVal_MOD_Lambda(Q,Lambda):
     l, d, muQ, muX, sigmaQ, sigmaX = Get_Liu_Params_Mod_Lambda(Lambda)
     Q_Norm = (Q - muQ) / sigmaQ
     Q_Norm1 = Q_Norm * sigmaX + muX
-    p_value = 1 - chi2.cdf(x = Q_Norm1, df = l)
+    p_value = scipy.stats.distributions.chi2.sf(x = Q_Norm1, df = l)
     return p_value    
 
-##########################
-# SKAT_davies method to get p_value
+# %%
+############# SKAT_davies method to get p_value #############
 def SKAT_davies(Q, Lambda):
     nc = np.zeros(len(Lambda))
     n = np.ones(len(Lambda))
@@ -349,8 +332,8 @@ def SKAT_davies(Q, Lambda):
     trace, res, ifault = qfc_checked.qfc(Lambda, nc, n, r, sigma, Q, lim, acc, trace, ifault, res)
     return trace, res, ifault
 
-##########################
-# caculate p_value
+# %%
+############# caculate p_value #############
 def Get_PValue_Lambda(Lambda,Q):
     p_val_liu = Get_Liu_PVal_MOD_Lambda(Q, Lambda)
     trace, res, ifault = SKAT_davies(Q, Lambda)
@@ -361,25 +344,111 @@ def Get_PValue_Lambda(Lambda,Q):
         p_val = p_val_liu 
     return p_val
 
-##########################
-# combine to get p_value
+# %%
+############# combine to get p_value #############
 def Get_pvalue(W, Q):
     K = W / 2
     Lambda = Get_Lambda(K)
     p_val = Get_PValue_Lambda(Lambda,Q)
     return p_val
 
-##########################
-# SKAT method Davies way for continous phenotype
+# %%
+#############  phenotype, cov, genotype with samples without missing  #############
+def missingcheck(geno, pheno, cov):
+    regdata = pd.concat([pheno, cov], axis=1)
+    regdata["id"] = range(len(regdata))
+    regdata_nona = regdata.dropna()
+    if len(regdata) != len(regdata_nona):
+        keep_col = regdata_nona["id"]
+        geno_mat_nona = geno[keep_col,:]
+        pheno_nona = regdata_nona[pheno.columns]
+        cov_nona = regdata_nona[cov.columns]
+        return geno_mat_nona, pheno_nona, cov_nona
+    else:
+        return geno, pheno, cov
+
+# %%
+############# SKAT method main function #############
 def SKAT(geno, pheno, cov, weights, outtype):
-    re, n_resampling = SKAT_Null_Model(pheno, cov, outtype)
+    geno, pheno, cov = missingcheck(geno, pheno, cov)
     if outtype == "C":
+        re, n_resampling = SKAT_Null_Model(pheno, cov, outtype)
         Q,W = SKAT_Linear_Model(geno, weights, re)
         p_val = Get_pvalue(W, Q)
     if outtype =="D":
+        re, n_resampling = SKAT_Null_Model(pheno, cov, outtype)
         if n_resampling > 0:
             p_val = SKAT_With_NullModel_ADJ(re, weights, geno)
         else:
             Q,W = SKAT_Logistic_Model(geno, weights, re)
             p_val = Get_pvalue(W, Q)
+    return p_val
+
+# %%
+############# SKAT method for summary statistics #############
+def SKAT_summary(beta_var, beta_estimate, weight, sample_size, COV, D):
+    weight_square = pow(weight,2)
+    y_estimate = np.zeros(len(weight))
+###estimate y'y 
+    for i in range(len(weight)):
+        y_estimate[i] = (sample_size-1) *D[i]*beta_var[i]*(sample_size-1)+ D[i]*pow(beta_estimate[i],2)*(sample_size-1)
+###get median as y'y and variance of y
+    y_square_estimate =np.median(y_estimate)
+    y_estimate_var =y_square_estimate/(sample_size-1)
+###get W
+    W = (1/y_estimate_var)*(sample_size-1)*diag(weight).dot(COV).dot(diag(weight))
+###get G'y
+    res_geno_temp = diag(D*sample_size).dot(beta_estimate)
+    res_geno = res_geno_temp/y_estimate_var
+    square_res_geno = pow(res_geno,2)
+    Q = square_res_geno.dot(weight_square)
+    p_val = Get_pvalue(2 * W, Q)
+    return p_val
+
+# %%
+############# SKAT method for summary statistics #############
+def SKAT_summary(beta_var, beta_estimate, weight, sample_size, COV, D):
+    weight_square = pow(weight,2)
+    y_estimate = np.zeros(len(weight))
+###estimate y'y 
+    for i in range(len(weight)):
+        y_estimate[i] = (sample_size-1) *D[i]*beta_var[i]*(sample_size-1)+ D[i]*pow(beta_estimate[i],2)*(sample_size-1)
+###get median as y'y and variance of y
+    y_square_estimate =np.median(y_estimate)
+    y_estimate_var =y_square_estimate/(sample_size-1)
+###get W
+    W = (1/y_estimate_var)*(sample_size-1)*diag(weight).dot(COV).dot(diag(weight))
+###get G'y
+    res_geno_temp = diag(D*sample_size).dot(beta_estimate)
+    res_geno = res_geno_temp/y_estimate_var
+    square_res_geno = pow(res_geno,2)
+    Q = square_res_geno.dot(weight_square)
+    p_val = Get_pvalue(2 * W, Q)
+    return p_val
+# %%
+############# SKAT method for summary statistics #############
+def SKAT_summary_gety(beta_var,beta_estimate, sample_size, COV, D):
+    y_estimate = np.zeros(len(beta_var))
+###estimate y'y 
+    for i in range(len(beta_var)):
+        y_estimate[i] = (sample_size-1) *D[i]*beta_var[i]*(sample_size-1)+ D[i]*pow(beta_estimate[i],2)*(sample_size-1)
+###get median as y'y and variance of y
+    y_square_estimate =np.median(y_estimate)
+    return y_square_estimate
+
+
+# %%
+############# SKAT method for summary statistics #############
+def SKAT_summary_withy(y_est,beta_estimate, weight, sample_size, COV, D):
+    weight_square = pow(weight,2)
+###get median as y'y and variance of y
+    y_estimate_var =y_est/(sample_size-1)
+###get W
+    W = (1/y_estimate_var)*(sample_size-1)*diag(weight).dot(COV).dot(diag(weight))
+###get G'y
+    res_geno_temp = diag(D*sample_size).dot(beta_estimate)
+    res_geno = res_geno_temp/y_estimate_var
+    square_res_geno = pow(res_geno,2)
+    Q = square_res_geno.dot(weight_square)
+    p_val = Get_pvalue(2 * W, Q)
     return p_val
