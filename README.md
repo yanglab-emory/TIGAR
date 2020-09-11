@@ -4,7 +4,7 @@
 1. **TIGAR** can train gene expression imputation models by both **nonparametric Bayesian DPR** and **Elastic-Net (PrediXcan)** methods with reference dataset that contain transcriptomic and genetic data of the same samples.
 2. Impute **Genetically Regulated gene eXpression (GReX)** from *Individual-level* genetic data
 3. Conduct **TWAS** using both *Individual-level* and *Summary-level* GWAS data for studying *Univariate* and *Multivariate* phenotypes.
-4. Conduct **VC-TWAS** using *Individual-level* GWAS data using cis-eQTL effect sizes estimated from **nonparametric Bayesian DPR** methods for *Univariate* phenotypes.
+4. Conduct **VC-TWAS** using *Individual-level* GWAS data and *Summary-level* GWAS data using cis-eQTL effect sizes estimated from **nonparametric Bayesian DPR** methods for *Univariate* phenotypes.
 5. **Note:** please use our most recently updated scripts to conduct TWAS.
 6. Please cite our TIGAR paper:
 >[*TIGAR: An Improved Bayesian Tool for Transcriptomic Data Imputation Enhances Gene Mapping of Complex Traits.* 2019 AJHG.](https://www.cell.com/ajhg/fulltext/S0002-9297(19)30205-8)
@@ -35,7 +35,8 @@
 		- [TWAS with individual-level GWAS data](#twas-using-individual-level-gwas-data)
 		- [TWAS with summary-level GWAS data](#twas-using-summary-level-gwas-data)
 	- [4. Generate Reference LD Genotype Covariance Files](#4-generate-reference-ld-genotype-covariance-files)
-	- [5. VC-TWAS](#5-vc-twas)
+	- [5. VC-TWAS with individual-level GWAS data](#5-vc-twas-using-individual-level-gwas-data)
+	- [6. VC-TWAS with summary-level GWAS data](#5-vc-twas-using-summary-level-gwas-data)
 - [Updates](#updates)
 - [Reference](#reference)
 
@@ -269,6 +270,26 @@ Example input files provided under `./ExampleData/` are generated artificially. 
 `--Zscore`
 
 - TWAS (with summary-level GWAS data)
+
+### 11. GWAS result File
+
+| CHROM | POS | REF | ALT | BETA | SE | 
+|:-----:|:---:|:---:|:---:|:------:|
+|   1   | 100 |  C  |  T  |  0.01  |  0.52  |
+
+- Contains GWAS summary statistics (*BETA*) and (*SE*) for TWAS
+- First 4 columns have the same format as the first 4 columns of a VCF file.
+- The name of the column containing the BETA and SE to use must be `BETA` and `SE`.
+- The file must be sorted by chromosome and base pair position, bgzipped by `bgzip`, and tabixed by `tabix`. Example tabix command: `tabix -f -p vcf *_GWAS.txt.gz`.
+- Example: `./ExampleData/sample_GWAS_Result.txt.gz`
+
+#### Usage
+`--GWAS_result`
+
+- VC-TWAS (with summary-level GWAS data)
+
+
+
 
 
 <!-- - Example: -->
@@ -543,27 +564,31 @@ ${TIGAR_dir}/TIGAR_LD.sh \
 ### 5. VC-TWAS 
 VC-TWAS with cis-eQTL effect sizes estimated from nonparametric Bayesian DPR method for Univariate phenotypes.
 
-#### Arguments
+#### Arguments for both VC-TWAS types
 - `--gene_anno`: Gene annotation file to specify the list of genes, which is of the same format as the first five columns of gene expression file 
+- `--weight`: Path to SNP weight (eQTL effect size) file. The weight file must be generated using the DPR model.
+- `--weight_threshold`: Threshold for estimated cis-eQTL effect sizes, filter SNPs with absolute cis-eQTL effect sizes smaller than threshold
+- `--chr`: Chromosome number need to be specified with respect to the genotype input data
+- `--window`: Window size around gene region from which to include SNPs (default `1000000` for `+- 1MB` region around gene region)
+- `--thread`: Number of simultaneous *processes* to use for parallel computation (default: `1`)
+- `--out_dir`: Output directory (will be created if it does not exist)
+- `--TIGAR_dir`: Specify the directory of **TIGAR** source code
+
+#### VC-TWAS using *individual-level* GWAS data
+
+##### Additional arguments
 - `--PED`: Path to PED file that contains phenotype and covariate data
 - `--PED_info`: A two-column, tab-delimited file specifying phenotype columns and covariate columns in the `PED` file to use for the TWAS. Specify one column per row. Each row should start with the type of column (`P` for phenotype, `C` for covariate) and the column name.
 - `--test_sampleID`: Path to a file with sampleIDs that should be contained in the genotype file
-- `--chr`: Chromosome number need to be specified with respect to the genotype input data
-- `--weight`: Path to SNP weight (eQTL effect size) file. The weight file must be generated using the DPR model.
 - `--genofile`: Path to the training genotype file (bgzipped and tabixed) 	
 - `--genofile_type`: Genotype file type: `vcf` or `dosage`
 - `--format`: (Required if `genofile_type` is `vcf`) Genotype data format that should be used: `GT` or `DS`
 	- `GT`: genotype data
 	- `DS`: dosage data
-- `--window`: Window size around gene region from which to include SNPs (default `1000000` for `+- 1MB` region around gene region)
 - `--maf`: Minor Allele Frequency threshold (ranges from 0 to 1) to exclude rare variants (default: `0.01`))
-- `--weight_threshold`: Threshold for estimated cis-eQTL effect sizes, filter SNPs with absolute cis-eQTL effect sizes smaller than threshold
 - `--phenotype_type`: phenotype type: `C` or `D`
 	- `C`: continous phenotype
 	- `D`: binomial (dichotomous) phenotype
-- `--thread`: Number of simultaneous *processes* (cores) to use for parallel computation (default: `1`)
-- `--out_dir`: Output directory (will be created if it does not exist)
-- `--TIGAR_dir`: Specify the directory of **TIGAR** source code
 
 #### Output
 - `CHR${chr}_indv_VC_TWAS.txt`: File containing VC_TWAS results with TargetID gene information
@@ -596,7 +621,7 @@ ${TIGAR_dir}/VC_TWAS.sh \
 --TIGAR_dir ${TIGAR_dir}
 
 # dichotomous phenotype
-PED="${TIGAR_dir}/ExampleData/PED_Info_SinglePheno_binary.PED"
+PED="${TIGAR_dir}/ExampleData/example_PED_binary.ped"
 ${TIGAR_dir}/VC_TWAS.sh \
 --gene_anno ${gene_anno_file} \
 --PED ${PED} \
@@ -613,6 +638,37 @@ ${TIGAR_dir}/VC_TWAS.sh \
 --out_dir ${out_dir} \
 --TIGAR_dir ${TIGAR_dir}
 ```
+
+#### VC-TWAS using *summary-level* GWAS data
+
+##### Additional arguments
+- `--GWAS_result`: Path to GWAS result file 
+- `--sample_size`: Sample size of summary-level GWAS data
+- `--LD`: Path to Reference LD genotype covariance file
+
+#### Output
+- `CHR${chr}_sum_VC_TWAS.txt`: File containing VC_TWAS results with TargetID gene information
+- `CHR${chr}_sum_VC_TWAS_log.txt`: File containing log messages	
+
+#### Example Command
+```bash
+gene_anno_file="${TIGAR_dir}/ExampleData/gene_anno.txt"
+eQTL_ES_file="${TIGAR_dir}/ExampleData/eQTLweights.txt.gz"
+ld_file="${TIGAR_dir}/ExampleData/eQTLweights.txt.gz"
+gwas_file="${TIGAR_dir}/ExampleData/sample_GWAS_Result.txt.gz"
+${TIGAR_dir}/VC_TWAS_summary.sh \
+--gene_anno ${gene_anno_file} \
+--GWAS_result ${gwas_file} \
+--Weight ${eQTL_ES_file} \
+--sample_size ${sample_size} \
+--weight_threshold 0.0001 \
+--LD ${ld_file} \
+--chr 1 \
+--window 1000000 \
+--thread 1 \
+--out_dir ${out_dir}
+```
+
 
 ## Updates
 - Removed 'dfply' Python package dependency
