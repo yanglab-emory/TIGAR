@@ -8,6 +8,7 @@ import subprocess
 import sys
 
 from io import StringIO
+from itertools import groupby
 from time import time
 
 import numpy as np
