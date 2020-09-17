@@ -87,6 +87,103 @@ def handle_flip(df: pd.DataFrame, origID, flipID, origValCol, orig_overlap, flip
 
     return ids, val
 
+# get header of ld file, get indices of columns to read in
+def ld_cols(path):
+    # get header
+    file_cols = tuple(pd.read_csv(
+        path,
+        sep='\t',
+        header=0,
+        compression='gzip',
+        low_memory=False,
+        nrows=0).rename(columns={'#snpID':'snpID', '#0':'row', '#row':'row', '0':'row'}))
+    # ld files have gone through a lot of format revisions hence the possible need to rename
+
+    cols = ['row', 'snpID', 'COV']
+
+    file_cols_ind = tuple([file_cols.index(x) for x in cols])
+
+    return file_cols, file_cols_ind
+
+# yields formatted tabix regions strings
+def get_regions_list(snp_ids):
+    # 'chrm:' prefix for region string 
+    chrm = snp_ids[0].split(':')[0] + ':'
+    # snp pos values as integers
+    pos_vals = [int(snp.split(':')[1]) for snp in snp_ids]
+    # get intervals of start,end positions; convert to tabix string
+    for x, y in groupby(enumerate(pos_vals), lambda p: p[1]-p[0]):
+        y = list(y)
+        # chr:start-end
+        yield chrm + str(y[0][1]) + '-' + str(y[-1][1])
+
+# call tabix using regions string
+def call_tabix_regions(path, regs_str):
+    proc = subprocess.Popen(
+        ['tabix '+path+' '+regs_str],
+        shell=True,
+        stdout=subprocess.PIPE,
+        bufsize=1)
+    proc_out = bytearray()
+    # process while subprocesses running
+    while proc.poll() is None:
+        line =  proc.stdout.readline()
+        if len(line) == 0:
+            break
+        proc_out += line
+    # leftover lines
+    for line in proc.stdout:
+        proc_out += line
+    return proc_out
+
+# get proc_out from function and parse data for regions
+def get_regions_data(regs_str, path, snp_ids, ld_cols, ld_cols_ind):
+
+    proc_out = call_tabix_regions(path, regs_str)
+
+    regs_data = pd.read_csv(
+        StringIO(proc_out.decode('utf-8')),
+        sep='\t',
+        low_memory=False,
+        header=None,
+        names=ld_cols,
+        usecols=ld_cols_ind, 
+        dtype={
+            'snpID': object,
+            'row': np.int32,
+            'COV': object}
+        ).drop_duplicates(['snpID'], keep='first')
+
+    regs_data = regs_data[regs_data.snpID.isin(snp_ids)]
+
+    return regs_data
+
+# read in covariance data for snps
+def get_ld_data(path, snp_ids, ld_cols, ld_cols_ind):
+    # format tabix regions from snp_ids; 'chr:start-end'
+    regs_lst = list(get_regions_list(snp_ids))
+    N = len(regs_lst)
+    # arguments to pass
+    regs_args = [path, snp_ids, ld_cols, ld_cols_ind]
+    try:
+        regs_str = ' '.join(regs_lst)
+        cov_data = get_regions_data(regs_str, *regs_args)
+    except OSError:
+        # argument may be too long for OS; if so try subset instead of getting all regions at once
+        # print('Subseting regions to tabix.')
+        n = 2500
+        while n:
+            try: 
+                regs_str_lst = [' '.join(regs_lst[i:i+n]) for i in range(0, N, n)]
+                cov_data = pd.concat([get_regions_data(regs_str, *regs_args) for regs_str in regs_str_lst])
+            except OSError:
+                n -= 500
+                pass
+            else:
+                n = 0
+
+    return cov_data.set_index('row')
+
 #############################################################
 # Print input arguments to log
 out_twas_path = args.out_dir + '/CHR' + args.chr + '_sumstat_assoc.txt'
@@ -148,6 +245,9 @@ z_cols = tg.get_header(args.z_path, zipped=True)
 w_cols_ind, w_dtype = tg.weight_cols_dtype(w_cols)
 z_cols_ind, z_dtype = tg.zscore_cols_dtype(z_cols)
 
+# get columns names, indices for ld file
+ld_cols, ld_cols_ind = ld_cols(args.ld_path)
+
 # PREP OUTPUT - print output headers to files
 print('Creating file: ' + out_twas_path + '\n')
 out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName','n_snps']
@@ -165,205 +265,185 @@ pd.DataFrame(columns=out_cols).to_csv(
 
 ###############################################################
 # thread function
+@tg.error_handler
 def thread_process(num):
-    try: 
-        target = TargetID[num]
-        print('num=' + str(num) + '\nTargetID=' + target)
-        Gene_info = Gene.iloc[[num]].reset_index(drop=True)
+    target = TargetID[num]
+    print('num=' + str(num) + '\nTargetID=' + target)
+    Gene_info = Gene.iloc[[num]].reset_index(drop=True)
 
-        # get start and end positions to tabix
-        start = str(max(int(Gene_info.GeneStart)-args.window,0))
-        end = str(int(Gene_info.GeneEnd)+args.window)
+    # get start and end positions to tabix
+    start = str(max(int(Gene_info.GeneStart)-args.window,0))
+    end = str(int(Gene_info.GeneEnd)+args.window)
 
-        # tabix Weight file
-        # print('Reading weight data.')
-        w_proc_out = tg.call_tabix(args.w_path, args.chr, start, end)
+    # tabix Weight file
+    # print('Reading weight data.')
+    w_proc_out = tg.call_tabix(args.w_path, args.chr, start, end)
 
-        if not w_proc_out:
-            print('No test SNPs with non-zero cis-eQTL weights for TargetID: ' + target + '\n')
-            return None
+    if not w_proc_out:
+        print('No test SNPs with non-zero cis-eQTL weights for TargetID: ' + target + '\n')
+        return None
 
-        # tabix Zscore file
-        # print('Reading Zscore data.')
-        z_proc_out = tg.call_tabix(args.z_path, args.chr, start, end)
+    # tabix Zscore file
+    # print('Reading Zscore data.')
+    z_proc_out = tg.call_tabix(args.z_path, args.chr, start, end)
 
-        if not z_proc_out:
-            print('No test SNPs with GWAS Zscore for TargetID: ' + target + '\n')
-            return None
+    if not z_proc_out:
+        print('No test SNPs with GWAS Zscore for TargetID: ' + target + '\n')
+        return None
 
-        # parse tabix output for Weight, filtered by target, threshold
-        Weight_chunks = pd.read_csv(
-            StringIO(w_proc_out.decode('utf-8')),
-            sep='\t',
-            header=None,
-            low_memory=False,
-            iterator=True, 
-            chunksize=10000,
-            usecols=w_cols_ind,
-            dtype=w_dtype)
+    # parse tabix output for Weight, filtered by target, threshold
+    Weight_chunks = pd.read_csv(
+        StringIO(w_proc_out.decode('utf-8')),
+        sep='\t',
+        header=None,
+        low_memory=False,
+        iterator=True, 
+        chunksize=10000,
+        usecols=w_cols_ind,
+        dtype=w_dtype)
 
-        Weight = pd.concat([x[ (x[w_cols_ind[4]]==target) & (abs(x[w_cols_ind[5]]) > args.weight_threshold )] for x in Weight_chunks]).reset_index(drop=True)
+    Weight = pd.concat([x[ (x[w_cols_ind[4]]==target) & (abs(x[w_cols_ind[5]]) > args.weight_threshold )] for x in Weight_chunks]).reset_index(drop=True)
 
-        if Weight.empty:
-            print('No test SNPs with cis-eQTL weights with magnitude that exceeds specified weight threshold for TargetID: ' + target + '\n')
-            return None
+    if Weight.empty:
+        print('No test SNPs with cis-eQTL weights with magnitude that exceeds specified weight threshold for TargetID: ' + target + '\n')
+        return None
 
-        Weight.columns = [w_cols[i] for i in tuple(Weight.columns)]
-        Weight = tg.optimize_cols(Weight)
+    Weight.columns = [w_cols[i] for i in tuple(Weight.columns)]
+    Weight = tg.optimize_cols(Weight)
 
-        # 'ID' snpID column does not exist in TIGAR training output from previous versions
-        # check to see if it is in the file, if not will need to generate snpIDs later
-        if 'ID' in Weight.columns:
-            Weight = Weight.rename(columns={'ID':'snpID'})
+    # 'ID' snpID column does not exist in TIGAR training output from previous versions
+    # check to see if it is in the file, if not will need to generate snpIDs later
+    if 'ID' in Weight.columns:
+        Weight = Weight.rename(columns={'ID':'snpID'})
 
-        if not 'snpID' in Weight.columns:
-            Weight['snpID'] = tg.get_snpIDs(Weight)
+    if not 'snpID' in Weight.columns:
+        Weight['snpID'] = tg.get_snpIDs(Weight)
 
-        # parse tabix output for Zscore
-        Zscore = pd.read_csv(
-            StringIO(z_proc_out.decode('utf-8')),
-            sep='\t',
-            header=None,
-            low_memory=False,
-            usecols=z_cols_ind,
-            dtype=z_dtype)
+    # parse tabix output for Zscore
+    Zscore = pd.read_csv(
+        StringIO(z_proc_out.decode('utf-8')),
+        sep='\t',
+        header=None,
+        low_memory=False,
+        usecols=z_cols_ind,
+        dtype=z_dtype)
 
-        Zscore.columns = [z_cols[i] for i in tuple(Zscore.columns)]
-        Zscore = tg.optimize_cols(Zscore)
+    Zscore.columns = [z_cols[i] for i in tuple(Zscore.columns)]
+    Zscore = tg.optimize_cols(Zscore)
 
-        Zscore['IDorig'] = tg.get_snpIDs(Zscore)
-        Zscore['IDflip'] = tg.get_snpIDs(Zscore, flip=True)
+    Zscore['IDorig'] = tg.get_snpIDs(Zscore)
+    Zscore['IDflip'] = tg.get_snpIDs(Zscore, flip=True)
 
-        # check for overlapping SNPs in Weight, Zscore data
-        snp_overlap_orig = np.intersect1d(Weight.snpID, Zscore.IDorig)
-        snp_overlap_flip = np.intersect1d(Weight.snpID, Zscore.IDflip)
-        snp_overlap = np.concatenate((snp_overlap_orig, snp_overlap_flip))
+    # check for overlapping SNPs in Weight, Zscore data
+    snp_overlap_orig = np.intersect1d(Weight.snpID, Zscore.IDorig)
+    snp_overlap_flip = np.intersect1d(Weight.snpID, Zscore.IDflip)
+    snp_overlap = np.concatenate((snp_overlap_orig, snp_overlap_flip))
 
-        if not snp_overlap.size:
-            print('No overlapping test SNPs that have magnitude of cis-eQTL weights greater than threshold value and with GWAS Zscore for TargetID: ' + target + '\n')
-            return None
+    if not snp_overlap.size:
+        print('No overlapping test SNPs that have magnitude of cis-eQTL weights greater than threshold value and with GWAS Zscore for TargetID: ' + target + '\n')
+        return None
 
-        # filter dataframes by overlapping SNPs
-        Weight = Weight[Weight.snpID.isin(snp_overlap)]
-        Zscore = Zscore[Zscore.IDorig.isin(snp_overlap_orig) | Zscore.IDflip.isin(snp_overlap_flip)]
-        Zscore = Zscore.drop(columns=['CHROM','POS','REF','ALT'])
+    # filter dataframes by overlapping SNPs
+    Weight = Weight[Weight.snpID.isin(snp_overlap)]
+    Zscore = Zscore[Zscore.IDorig.isin(snp_overlap_orig) | Zscore.IDflip.isin(snp_overlap_flip)]
+    Zscore = Zscore.drop(columns=['CHROM','POS','REF','ALT'])
 
-        # if handle any flipped matches in Zscore using Weight snpIDs as reference
-        if (snp_overlap_orig.size > 0) and (snp_overlap_flip.size > 0):
-            Zscore['snpID'], Zscore['Zscore'] = handle_flip(Zscore,'IDorig','IDflip','Zscore',snp_overlap_orig, snp_overlap_flip)
-        elif snp_overlap_orig.size == snp_overlap.size:   
-            Zscore['snpID'], Zscore['Zscore'] = Zscore['IDorig'], Zscore['Zscore']
-        else:
-            Zscore['snpID'], Zscore['Zscore'] = Zscore['IDflip'], -Zscore['Zscore']
+    # if handle any flipped matches in Zscore using Weight snpIDs as reference
+    if (snp_overlap_orig.size > 0) and (snp_overlap_flip.size > 0):
+        Zscore['snpID'], Zscore['Zscore'] = handle_flip(Zscore,'IDorig','IDflip','Zscore',snp_overlap_orig, snp_overlap_flip)
+    elif snp_overlap_orig.size == snp_overlap.size:   
+        Zscore['snpID'], Zscore['Zscore'] = Zscore['IDorig'], Zscore['Zscore']
+    else:
+        Zscore['snpID'], Zscore['Zscore'] = Zscore['IDflip'], -Zscore['Zscore']
 
-        # merge Zscore and Weight dataframes on snpIDs
-        ZW = Weight.merge(Zscore[['snpID','Zscore']], 
-            left_on='snpID', 
-            right_on='snpID').drop_duplicates(['snpID'], keep='first').reset_index(drop=True)
+    # merge Zscore and Weight dataframes on snpIDs
+    ZW = Weight.merge(Zscore[['snpID','Zscore']], 
+        left_on='snpID', 
+        right_on='snpID').drop_duplicates(['snpID'], keep='first').reset_index(drop=True)
 
-        snp_search_ids = ZW.snpID.values
+    snp_search_ids = ZW.snpID.values
 
-        # Read in reference covariance matrix file by snpID
-        # print('Reading reference covariance data.')
-        MCOV_chunks = pd.read_csv(
-            args.ld_path, 
-            sep='\t', 
-            compression='gzip', 
-            iterator=True, 
-            chunksize=10000,
-            usecols=['snpID','COV'], 
-            dtype={'snpID': object, 'COV': object})
+    # Read in reference covariance matrix file by snpID
+    MCOV = get_ld_data(args.ld_path, snp_search_ids, ld_cols, ld_cols_ind)
 
-        MCOV = pd.concat([x[x.snpID.isin(snp_search_ids)] for x in MCOV_chunks]).drop_duplicates(['snpID'], keep='first')
+    if MCOV.empty:
+      print('No reference covariance information for target SNPs for TargetID: ' + target + '\n')
+      return None
+    
+    MCOV['COV'] = MCOV['COV'].apply(lambda x:np.array(x.split(',')).astype(np.float32))
 
-        if MCOV.empty:
-          print('No reference covariance information for target SNPs for TargetID: ' + target + '\n')
-          return None
+    # construct covariance matrix
+    inds = MCOV.index
+    n_inds = inds.size
+    V_upper = np.zeros((n_inds,n_inds))
+    
+    for i in range(n_inds):
+        cov_i = MCOV.COV.loc[inds[i]]
+        N = cov_i.size
         
-        MCOV['COV'] = MCOV['COV'].apply(lambda x:np.array(x.split(',')).astype('float'))
+        for j in range(i,n_inds):
+            if inds[j] - inds[i] < N:
+                V_upper[i,j] = cov_i[inds[j]-inds[i]]
+            else:
+                V_upper[i,j] = 0
 
-        # construct covariance matrix
-        inds = MCOV.index
-        n_inds = inds.size
-        V_upper = np.zeros((n_inds,n_inds))
-        
-        for i in range(n_inds):
-            cov_i = MCOV.COV.loc[inds[i]]
-            N = cov_i.size
-            
-            for j in range(i,n_inds):
-                if inds[j] - inds[i] < N:
-                    V_upper[i,j] = cov_i[inds[j]-inds[i]]
-                else:
-                    V_upper[i,j] = 0
+    snp_Var = V_upper.diagonal()              
+    V = V_upper + V_upper.T - np.diag(snp_Var)   
+    
+    # filter ZW to include only snpIDs also in MCOV
+    ZW = ZW[ZW.snpID.isin(MCOV.snpID)]
+    n_snps = str(ZW.snpID.size)
 
-        snp_Var = V_upper.diagonal()              
-        V = V_upper + V_upper.T - np.diag(snp_Var)   
-        
-        # filter ZW to include only snpIDs also in MCOV
-        ZW = ZW[ZW.snpID.isin(MCOV.snpID)]
-        n_snps = str(ZW.snpID.size)
+    print('Running TWAS.\nN SNPs=' + n_snps)
 
-        print('Running TWAS.\nN SNPs=' + n_snps)
+    ### create output dataframe
+    result = Gene_info.copy()
+    result['n_snps'] = n_snps
 
-        ### create output dataframe
-        result = Gene_info.copy()
-        result['n_snps'] = n_snps
+    ### calculate zscore(s), pvalue(s)
+    z_denom = np.sqrt(np.linalg.multi_dot([ZW.ES.values, V, ZW.ES.values]))
 
-        ### calculate zscore(s), pvalue(s)
-        z_denom = np.sqrt(np.linalg.multi_dot([ZW.ES.values, V, ZW.ES.values]))
+    if args.test_stat == 'both':
+        fusion_z = np.vdot(ZW.Zscore.values, ZW.ES.values) / z_denom
+        fusion_pval = 1-chi2.cdf(fusion_z**2,1)
+        result['FUSION_Z'] = fusion_z
+        result['FUSION_PVAL'] = np.format_float_scientific(fusion_pval, precision=15, exp_digits=4)
 
-        if args.test_stat == 'both':
-            fusion_z = np.vdot(ZW.Zscore.values, ZW.ES.values) / z_denom
-            fusion_pval = 1-chi2.cdf(fusion_z**2,1)
-            result['FUSION_Z'] = fusion_z
-            result['FUSION_PVAL'] = np.format_float_scientific(fusion_pval, precision=15, exp_digits=4)
+        snp_sd = np.sqrt(snp_Var)
+        spred_z = snp_sd.dot(ZW.ES.values * ZW.Zscore.values) / z_denom
+        spred_pval = 1-chi2.cdf(spred_z**2,1)
+        result['SPred_Z'] = spred_z
+        result['SPred_PVAL'] = np.format_float_scientific(spred_pval, precision=15, exp_digits=4)
 
-            snp_sd = np.sqrt(snp_Var)
-            spred_z = snp_sd.dot(ZW.ES.values * ZW.Zscore.values) / z_denom
-            spred_pval = 1-chi2.cdf(spred_z**2,1)
-            result['SPred_Z'] = spred_z
-            result['SPred_PVAL'] = np.format_float_scientific(spred_pval, precision=15, exp_digits=4)
+    else:
+        if args.test_stat == 'FUSION':
+            z_numer = np.vdot(ZW.Zscore.values, ZW.ES.values)
 
-        else:
-            if args.test_stat == 'FUSION':
-                z_numer = np.vdot(ZW.Zscore.values, ZW.ES.values)
+        elif args.test_stat == 'SPrediXcan':
+            snp_SD = np.sqrt(snp_Var)
+            z_numer = snp_SD.dot(ZW.ES.values * ZW.Zscore.values)
 
-            elif args.test_stat == 'SPrediXcan':
-                snp_SD = np.sqrt(snp_Var)
-                z_numer = snp_SD.dot(ZW.ES.values * ZW.Zscore.values)
+        burden_Z = z_numer/z_denom
+    
+        if np.isnan(burden_Z):
+        	print('Could not calculate burden_Z: NaN value.\n')
+        	return None
 
-            burden_Z = z_numer/z_denom
-        
-            if np.isnan(burden_Z):
-            	print('Could not calculate burden_Z: NaN value.\n')
-            	return None
+        # p-value for chi-square test
+        pval = 1-chi2.cdf(burden_Z**2,1)
 
-            # p-value for chi-square test
-            pval = 1-chi2.cdf(burden_Z**2,1)
+        result['TWAS_Zscore'] = burden_Z
+        result['PVALUE'] = np.format_float_scientific(pval, precision=15, exp_digits=4)
 
-            result['TWAS_Zscore'] = burden_Z
-            result['PVALUE'] = np.format_float_scientific(pval, precision=15, exp_digits=4)
+    # write to file
+    result.to_csv(
+        out_twas_path,
+        sep='\t',
+        index=None,
+        header=None,
+        mode='a')
 
-        # write to file
-        result.to_csv(
-            out_twas_path,
-            sep='\t',
-            index=None,
-            header=None,
-            mode='a')
-
-        print('Target TWAS completed.\n')
-
-    except Exception as e:
-        e_type, e_obj, e_tracebk = sys.exc_info()
-        e_line_num = e_tracebk.tb_lineno
-
-        print('Caught a type {} exception for TargetID={}, num={} on line {}:\n{}\n'.format(e_type, target, num, e_line_num, e))
-
-    finally:
-        # print info to log do not wait for buffer to fill up
-        sys.stdout.flush()
+    print('Target TWAS completed.\n')
 
 ###############################################################
 # thread process
