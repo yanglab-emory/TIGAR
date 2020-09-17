@@ -101,6 +101,10 @@ def call_tabix_header(path, out='tuple', rename={}):
         if not line.startswith(b"##"):
             proc_out += line
 
+    for line in proc.stdout:
+        if not line.startswith(b"##"):
+            proc_out += line
+
     header = pd.read_csv(
         StringIO(proc_out.decode('utf-8')),
         sep='\t',
@@ -168,6 +172,9 @@ def get_vcf_header(path, out='tuple'):
         line =  proc.stdout.readline()
         if len(line) == 0:
             break
+        proc_out += line
+
+    for line in proc.stdout:
         proc_out += line
 
     header = pd.read_csv(
