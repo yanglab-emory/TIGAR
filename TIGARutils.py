@@ -304,6 +304,46 @@ def zscore_cols_dtype(file_cols):
 
     return file_cols_ind, file_dtype
 
+# USED TO DETERMINE INDICES OF gwas FILE COLS TO READ IN, DTYPE OF EACH COL
+def gwas_cols_dtype(file_cols):
+    cols = ['CHROM','POS','REF','ALT','BETA','SE']
+    dtype_dict = {
+        'CHROM': object,
+        'POS': np.int64,
+        'REF': object,
+        'ALT': object,
+        'BETA': np.float64,
+        'SE': np.float64}
+
+    file_cols_ind = tuple([file_cols.index(x) for x in cols])
+    file_dtype = {file_cols.index(x):dtype_dict[x] for x in cols}
+
+    return file_cols_ind, file_dtype
+
+# USED TO DETERMINE INDICES OF MCOV FILE COLS TO READ IN, DTYPE OF EACH COL
+def MCOV_cols_dtype(file_cols, add_cols=[], drop_cols=[], get_id=True):
+    cols = ['CHROM','POS','REF','ALT','COV'] + add_cols
+    dtype_dict = {
+        'CHROM': object,
+        'POS': np.int64,
+        'REF': object,
+        'ALT': object,
+        'COV': object,
+        'snpID': object,
+        'ID': object}
+
+    if get_id:
+        if ('snpID' in file_cols):
+            cols.append('snpID')
+
+        elif ('ID' in file_cols):
+            cols.append('ID')
+
+    cols = [x for x in cols if (x not in drop_cols)]
+    
+    file_cols_ind = tuple([file_cols.index(x) for x in cols])
+    file_dtype = {file_cols.index(x):dtype_dict[x] for x in cols}
+    return file_cols_ind, file_dtype
 
 # RETURN SNP IDS
 def get_snpIDs(df: pd.DataFrame, flip=False):
