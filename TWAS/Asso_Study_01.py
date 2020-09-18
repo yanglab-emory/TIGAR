@@ -184,65 +184,46 @@ GeneAnnot = GeneAnnotExp[GeneAnnotExp.columns[0:5]]
 # Thread Process
 
 # Single Phenotype
+@tg.error_handler
 def thread_single(num):
-    try:
-        target = TargetID[num]
-        target_cols = np.concatenate((pheno, cov, [target]))
-        target_data = PEDExp[target_cols].dropna(axis=0, how='any')
-        target_annot = GeneAnnot.iloc[[num]]
+    target = TargetID[num]
+    target_cols = np.concatenate((pheno, cov, [target]))
+    target_data = PEDExp[target_cols].dropna(axis=0, how='any')
+    target_annot = GeneAnnot.iloc[[num]]
 
-        X_cols = np.append(cov, target)
-        X = target_data[X_cols]
-        Y = target_data[pheno]
+    X_cols = np.append(cov, target)
+    X = target_data[X_cols]
+    Y = target_data[pheno]
 
-        out = regression_single('OLS',X,Y,target_annot,target)
+    out = regression_single('OLS',X,Y,target_annot,target)
 
-        out.to_csv(
-            out_twas_path,
-            sep='\t',
-            header=None,
-            index=None,
-            mode='a')
+    out.to_csv(
+        out_twas_path,
+        sep='\t',
+        header=None,
+        index=None,
+        mode='a')
 
-    except Exception as e:
-        e_type, e_obj, e_tracebk = sys.exc_info()
-        e_line_num = e_tracebk.tb_lineno
-
-        print('Caught a type {} exception for TargetID={}, num={} on line {}:\n{}\n'.format(e_type, target, num, e_line_num, e))
-
-    finally:
-        # print info to log do not wait for buffer to fill up
-        sys.stdout.flush()
 
 # Multiple Phenotype
+@tg.error_handler
 def thread_multi(num):
-    try:
-        target = TargetID[num]
-        target_cols = np.insert(pheno,0,target)
-        target_data = resid_exp[target_cols].dropna(axis=0, how='any')
-        target_annot = GeneAnnot.iloc[[num]]
+    target = TargetID[num]
+    target_cols = np.insert(pheno,0,target)
+    target_data = resid_exp[target_cols].dropna(axis=0, how='any')
+    target_annot = GeneAnnot.iloc[[num]]
 
-        X = target_data[pheno]
-        Y = target_data[target]
+    X = target_data[pheno]
+    Y = target_data[target]
 
-        out = regression_multi(X,Y,target_annot)
+    out = regression_multi(X,Y,target_annot)
 
-        out.to_csv(
-            out_twas_path,
-            sep='\t',
-            header=None,
-            index=None,
-            mode='a')
-
-    except Exception as e:
-        e_type, e_obj, e_tracebk = sys.exc_info()
-        e_line_num = e_tracebk.tb_lineno
-        
-        print('Caught a type {} exception for TargetID={}, num={} on line {}:\n{}\n'.format(e_type, target, num, e_line_num, e))
-
-    finally:
-        # print info to log do not wait for buffer to fill up
-        sys.stdout.flush()
+    out.to_csv(
+        out_twas_path,
+        sep='\t',
+        header=None,
+        index=None,
+        mode='a')
 
 ###################################################
 # Association Study
