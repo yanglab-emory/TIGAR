@@ -87,6 +87,23 @@ def handle_flip(df: pd.DataFrame, origID, flipID, origValCol, orig_overlap, flip
 
     return ids, val
 
+def get_pval(z): return np.format_float_scientific(1-chi2.cdf(z**2, 1), precision=15, exp_digits=4)
+
+def get_spred_zscore(z_denom, ZW, snp_sd):
+    ZW = ZW.copy()
+    zscore = snp_sd.dot(ZW.ES.values * ZW.Zscore.values) / z_denom
+    return zscore, get_pval(zscore)
+    
+def get_fusion_zscore(z_denom, ZW, snp_sd=None):
+    ZW = ZW.copy()
+    zscore = np.vdot(ZW.Zscore.values, ZW.ES.values) / z_denom
+    return zscore, get_pval(zscore)
+
+def get_burden_zscore(test_stat, get_zscore_args):
+    if test_stat =='FUSION':
+        return get_fusion_zscore(*get_zscore_args)
+    if test_stat == 'SPrediXcan':
+        return get_spred_zscore(*get_zscore_args)
 
 #############################################################
 # Print input arguments to log
@@ -274,29 +291,9 @@ def thread_process(num):
       print('No reference covariance information for target SNPs for TargetID: ' + target + '\n')
       return None
 
-    snp_Var, V = tg.get_ld_matrix(MCOV)
-    
-    # MCOV['COV'] = MCOV['COV'].apply(lambda x:np.array(x.split(',')).astype(np.float32))
+    # get the snp variance and covariance matrix
+    snp_sd, V = tg.get_ld_matrix(MCOV)
 
-    # # construct covariance matrix
-    # inds = MCOV.index
-    # n_inds = inds.size
-    # V_upper = np.zeros((n_inds,n_inds))
-    
-    # for i in range(n_inds):
-    #     cov_i = MCOV.COV.loc[inds[i]]
-    #     N = cov_i.size
-        
-    #     for j in range(i,n_inds):
-    #         if inds[j] - inds[i] < N:
-    #             V_upper[i,j] = cov_i[inds[j]-inds[i]]
-    #         else:
-    #             V_upper[i,j] = 0
-
-    # snp_Var = V_upper.diagonal()              
-    # V = V_upper + V_upper.T - np.diag(snp_Var)   
-    
-    # filter ZW to include only snpIDs also in MCOV
     ZW = ZW[ZW.snpID.isin(MCOV.snpID)]
     n_snps = str(ZW.snpID.size)
 
@@ -309,37 +306,15 @@ def thread_process(num):
     ### calculate zscore(s), pvalue(s)
     z_denom = np.sqrt(np.linalg.multi_dot([ZW.ES.values, V, ZW.ES.values]))
 
-    if args.test_stat == 'both':
-        fusion_z = np.vdot(ZW.Zscore.values, ZW.ES.values) / z_denom
-        fusion_pval = 1-chi2.cdf(fusion_z**2,1)
-        result['FUSION_Z'] = fusion_z
-        result['FUSION_PVAL'] = np.format_float_scientific(fusion_pval, precision=15, exp_digits=4)
+    get_zscore_args = [z_denom, ZW, snp_sd]
 
-        snp_sd = np.sqrt(snp_Var)
-        spred_z = snp_sd.dot(ZW.ES.values * ZW.Zscore.values) / z_denom
-        spred_pval = 1-chi2.cdf(spred_z**2,1)
-        result['SPred_Z'] = spred_z
-        result['SPred_PVAL'] = np.format_float_scientific(spred_pval, precision=15, exp_digits=4)
+    if args.test_stat == 'both':
+        result['FUSION_Z'], result['FUSION_PVAL'] = get_fusion_zscore(*get_zscore_args)
+
+        result['SPred_Z'], result['SPred_PVAL'] = get_spred_zscore(*get_zscore_args)
 
     else:
-        if args.test_stat == 'FUSION':
-            z_numer = np.vdot(ZW.Zscore.values, ZW.ES.values)
-
-        elif args.test_stat == 'SPrediXcan':
-            snp_SD = np.sqrt(snp_Var)
-            z_numer = snp_SD.dot(ZW.ES.values * ZW.Zscore.values)
-
-        burden_Z = z_numer/z_denom
-    
-        if np.isnan(burden_Z):
-        	print('Could not calculate burden_Z: NaN value.\n')
-        	return None
-
-        # p-value for chi-square test
-        pval = 1-chi2.cdf(burden_Z**2,1)
-
-        result['TWAS_Zscore'] = burden_Z
-        result['PVALUE'] = np.format_float_scientific(pval, precision=15, exp_digits=4)
+        result['TWAS_Zscore'], result['PVALUE'] = get_burden_zscore(args.test_stat, get_zscore_args)
 
     # write to file
     result.to_csv(

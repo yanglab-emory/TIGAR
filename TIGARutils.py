@@ -28,12 +28,13 @@ import numpy as np
 # gwas_cols_dtype
 # MCOV_cols_dtype
 
-## Handling covariance files
+## Handling covariance files:
 # ld_cols
 # get_regions_list
 # call_tabix_regions
 # get_regions_data
 # get_ld_data
+# get_ld_matrix
 
 # get_snpIDs
 # optimize_cols
@@ -222,13 +223,14 @@ def exp_cols_dtype(file_cols, sampleid):
 # USED TO DETERMINE INDICES OF GENOFILE COLS TO READ IN, DTYPE OF EACH COL
 def genofile_cols_dtype(file_cols, type, sampleid):
     cols = ['CHROM','POS','REF','ALT'] + sampleid.tolist()
-
+    # 'dosage' files should only have 'DS' format for each sample
+    sampleid_dtype = np.float64 if type == 'dosage' else object
     dtype_dict = {
         'CHROM': object,
         'POS': np.int64,
         'REF': object,
         'ALT': object,
-         **{x:object for x in sampleid}}
+         **{x:sampleid_dtype for x in sampleid}}
 
     if type == 'vcf':
         cols.append('FORMAT')
@@ -238,6 +240,7 @@ def genofile_cols_dtype(file_cols, type, sampleid):
     file_dtype = {file_cols.index(x):dtype_dict[x] for x in cols}
     
     return file_cols_ind, file_dtype
+
 
 # USED TO DETERMINE INDICES OF WEIGHT FILE COLS TO READ IN, DTYPE OF EACH COL
 def weight_cols_dtype(file_cols, add_cols=[], drop_cols=[], get_id=True):
@@ -427,7 +430,10 @@ def get_ld_data(path, snp_ids, ld_cols, ld_cols_ind):
 
 
 def get_ld_matrix(MCOV):
-    MCOV['COV'] = MCOV['COV'].apply(lambda x:np.array(x.split(',')).astype(np.float32))
+    MCOV = MCOV.copy()
+    
+    MCOV['COV'] =  MCOV['COV'].apply(lambda x:np.fromstring(x, dtype=np.float32, sep=','))
+
     inds = MCOV.index
     n_inds = inds.size
     V_upper = np.zeros((n_inds, n_inds))
@@ -444,8 +450,9 @@ def get_ld_matrix(MCOV):
 
     snp_Var = V_upper.diagonal()              
     V = V_upper + V_upper.T - np.diag(snp_Var)
+    snp_sd = np.sqrt(snp_Var)
 
-    return snp_Var, V
+    return snp_sd, V
 
 
 # RETURN SNP IDS
@@ -463,8 +470,12 @@ def get_snpIDs(df: pd.DataFrame, flip=False):
 # Decrease memory by downcasting 'CHROM' column to integer, integer and float columns to minimum size that will not lose info
 def optimize_cols(df: pd.DataFrame):
 
+    # if 'CHROM' not convertable to integer, assume it's 'X', 'Y', 'MT', etc.
     if 'CHROM' in df.columns:
-        df['CHROM'] = df['CHROM'].astype(str).astype(int)
+        try: 
+            df['CHROM'] = df['CHROM'].astype(str).astype(np.int8)
+        except ValueError:
+            pass
 
     ints = df.select_dtypes(include=['int64']).columns.tolist()
     df[ints] = df[ints].apply(pd.to_numeric, downcast='integer')
@@ -473,6 +484,8 @@ def optimize_cols(df: pd.DataFrame):
     df[floats] = df[floats].apply(pd.to_numeric, downcast='float')
 
     return df
+
+
 
 
 # Reform vcf file
