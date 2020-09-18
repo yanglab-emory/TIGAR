@@ -8,7 +8,6 @@ import subprocess
 import sys
 
 from io import StringIO
-from itertools import groupby
 from time import time
 
 import numpy as np
@@ -88,102 +87,6 @@ def handle_flip(df: pd.DataFrame, origID, flipID, origValCol, orig_overlap, flip
 
     return ids, val
 
-# get header of ld file, get indices of columns to read in
-def ld_cols(path):
-    # get header
-    file_cols = tuple(pd.read_csv(
-        path,
-        sep='\t',
-        header=0,
-        compression='gzip',
-        low_memory=False,
-        nrows=0).rename(columns={'#snpID':'snpID', '#0':'row', '#row':'row', '0':'row'}))
-    # ld files have gone through a lot of format revisions hence the possible need to rename
-
-    cols = ['row', 'snpID', 'COV']
-
-    file_cols_ind = tuple([file_cols.index(x) for x in cols])
-
-    return file_cols, file_cols_ind
-
-# yields formatted tabix regions strings
-def get_regions_list(snp_ids):
-    # 'chrm:' prefix for region string 
-    chrm = snp_ids[0].split(':')[0] + ':'
-    # snp pos values as integers
-    pos_vals = [int(snp.split(':')[1]) for snp in snp_ids]
-    # get intervals of start,end positions; convert to tabix string
-    for x, y in groupby(enumerate(pos_vals), lambda p: p[1]-p[0]):
-        y = list(y)
-        # chr:start-end
-        yield chrm + str(y[0][1]) + '-' + str(y[-1][1])
-
-# call tabix using regions string
-def call_tabix_regions(path, regs_str):
-    proc = subprocess.Popen(
-        ['tabix '+path+' '+regs_str],
-        shell=True,
-        stdout=subprocess.PIPE,
-        bufsize=1)
-    proc_out = bytearray()
-    # process while subprocesses running
-    while proc.poll() is None:
-        line =  proc.stdout.readline()
-        if len(line) == 0:
-            break
-        proc_out += line
-    # leftover lines
-    for line in proc.stdout:
-        proc_out += line
-    return proc_out
-
-# get proc_out from function and parse data for regions
-def get_regions_data(regs_str, path, snp_ids, ld_cols, ld_cols_ind):
-
-    proc_out = call_tabix_regions(path, regs_str)
-
-    regs_data = pd.read_csv(
-        StringIO(proc_out.decode('utf-8')),
-        sep='\t',
-        low_memory=False,
-        header=None,
-        names=ld_cols,
-        usecols=ld_cols_ind, 
-        dtype={
-            'snpID': object,
-            'row': np.int32,
-            'COV': object}
-        ).drop_duplicates(['snpID'], keep='first')
-
-    regs_data = regs_data[regs_data.snpID.isin(snp_ids)]
-
-    return regs_data
-
-# read in covariance data for snps
-def get_ld_data(path, snp_ids, ld_cols, ld_cols_ind):
-    # format tabix regions from snp_ids; 'chr:start-end'
-    regs_lst = list(get_regions_list(snp_ids))
-    N = len(regs_lst)
-    # arguments to pass
-    regs_args = [path, snp_ids, ld_cols, ld_cols_ind]
-    try:
-        regs_str = ' '.join(regs_lst)
-        cov_data = get_regions_data(regs_str, *regs_args)
-    except OSError:
-        # argument may be too long for OS; if so try subset instead of getting all regions at once
-        # print('Subseting regions to tabix.')
-        n = 2500
-        while n:
-            try: 
-                regs_str_lst = [' '.join(regs_lst[i:i+n]) for i in range(0, N, n)]
-                cov_data = pd.concat([get_regions_data(regs_str, *regs_args) for regs_str in regs_str_lst])
-            except OSError:
-                n -= 500
-                pass
-            else:
-                n = 0
-
-    return cov_data.set_index('row')
 
 #############################################################
 # Print input arguments to log
@@ -247,7 +150,7 @@ w_cols_ind, w_dtype = tg.weight_cols_dtype(w_cols)
 z_cols_ind, z_dtype = tg.zscore_cols_dtype(z_cols)
 
 # get columns names, indices for ld file
-ld_cols, ld_cols_ind = ld_cols(args.ld_path)
+ld_cols, ld_cols_ind = tg.ld_cols(args.ld_path)
 
 # PREP OUTPUT - print output headers to files
 print('Creating file: ' + out_twas_path + '\n')
@@ -365,31 +268,33 @@ def thread_process(num):
     snp_search_ids = ZW.snpID.values
 
     # Read in reference covariance matrix file by snpID
-    MCOV = get_ld_data(args.ld_path, snp_search_ids, ld_cols, ld_cols_ind)
+    MCOV = tg.get_ld_data(args.ld_path, snp_search_ids, ld_cols, ld_cols_ind)
 
     if MCOV.empty:
       print('No reference covariance information for target SNPs for TargetID: ' + target + '\n')
       return None
-    
-    MCOV['COV'] = MCOV['COV'].apply(lambda x:np.array(x.split(',')).astype(np.float32))
 
-    # construct covariance matrix
-    inds = MCOV.index
-    n_inds = inds.size
-    V_upper = np.zeros((n_inds,n_inds))
+    snp_Var, V = tg.get_ld_matrix(MCOV)
     
-    for i in range(n_inds):
-        cov_i = MCOV.COV.loc[inds[i]]
-        N = cov_i.size
+    # MCOV['COV'] = MCOV['COV'].apply(lambda x:np.array(x.split(',')).astype(np.float32))
+
+    # # construct covariance matrix
+    # inds = MCOV.index
+    # n_inds = inds.size
+    # V_upper = np.zeros((n_inds,n_inds))
+    
+    # for i in range(n_inds):
+    #     cov_i = MCOV.COV.loc[inds[i]]
+    #     N = cov_i.size
         
-        for j in range(i,n_inds):
-            if inds[j] - inds[i] < N:
-                V_upper[i,j] = cov_i[inds[j]-inds[i]]
-            else:
-                V_upper[i,j] = 0
+    #     for j in range(i,n_inds):
+    #         if inds[j] - inds[i] < N:
+    #             V_upper[i,j] = cov_i[inds[j]-inds[i]]
+    #         else:
+    #             V_upper[i,j] = 0
 
-    snp_Var = V_upper.diagonal()              
-    V = V_upper + V_upper.T - np.diag(snp_Var)   
+    # snp_Var = V_upper.diagonal()              
+    # V = V_upper + V_upper.T - np.diag(snp_Var)   
     
     # filter ZW to include only snpIDs also in MCOV
     ZW = ZW[ZW.snpID.isin(MCOV.snpID)]
