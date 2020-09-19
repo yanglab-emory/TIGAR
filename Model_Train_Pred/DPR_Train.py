@@ -81,8 +81,6 @@ args = parser.parse_args()
 
 sys.path.append(args.TIGAR_dir)
 
-DPR_path = args.TIGAR_dir + '/Model_Train_Pred/DPR'
-
 #############################################################
 # DEFINE, IMPORT FUNCTIONS
 import TIGARutils as tg
@@ -191,7 +189,7 @@ def calc_r2(out_weights_df, bimbam_test_df, pheno_test_df, cv=False):
 
 # function to do the ith cross validation step
 def do_cv(i, target, target_geno_df, target_exp_df, snp_annot_df, cv_trainID, cv_testID, ):
-    dpr_file_dir_cv = args.out_dir + '/CV_Files/'
+    dpr_file_dir_cv = abs_out_dir + '/CV_Files/'
     target_cv = target + '_CV' + str(i+1)
 
     trainID = cv_trainID[i]
@@ -229,6 +227,10 @@ def do_cv(i, target, target_geno_df, target_exp_df, snp_annot_df, cv_trainID, cv
     return(cv_rsquared)
 
 #############################################################
+# set absolute paths
+DPR_path = tg.get_abs_path(args.TIGAR_dir) + '/Model_Train_Pred/DPR'
+abs_out_dir = tg.get_abs_path(args.out_dir)
+
 # check input arguments
 if args.genofile_type == 'vcf':
     gcol_sampleids_strt_ind = 9
@@ -244,7 +246,6 @@ else:
     raise SystemExit('Please specify the type input genotype file type (--genofile_type) as either "vcf" or "dosage".\n')
 
 out_train_weight_path = args.out_dir + '/CHR' + args.chr + '_DPR_train_eQTLweights.txt'
-
 out_train_info_path = args.out_dir + '/CHR' + args.chr + '_DPR_train_GeneInfo.txt'
 
 #############################################################
@@ -460,7 +461,7 @@ def thread_process(num):
 
     # FINAL MODEL TRAINING
     print('Running DPR training.')
-    dpr_file_dir = args.out_dir + '/DPR_Files/'
+    dpr_file_dir = abs_out_dir + '/DPR_Files/'
     
     bimbam = target_geno[np.concatenate((['snpID','REF','ALT'],sampleID))]
 

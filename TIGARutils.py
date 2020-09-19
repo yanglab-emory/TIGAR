@@ -3,6 +3,7 @@
 #########################################################
 import functools
 import operator
+import os
 import subprocess
 import sys
 import traceback
@@ -14,6 +15,8 @@ import pandas as pd
 import numpy as np
 #########################################################
 ## FUNCTIONS:
+
+# error_handler
 
 # calc_maf
 # call_tabix
@@ -45,6 +48,7 @@ import numpy as np
 
 #########################################################
 
+# wrapper for thread_process functions; adds error catching/logging for failed targets
 def error_handler(func):
     @functools.wraps(func)
     def wrapper(num, *args, **kwargs):     
@@ -66,6 +70,8 @@ def error_handler(func):
     return wrapper
 
 
+# returns absolute path
+def get_abs_path(x): return os.path.abspath(os.path.expanduser(os.path.expandvars(x)))
 
 # Call tabix, read in lines into byt array
 def call_tabix(path, chr, start, end):
