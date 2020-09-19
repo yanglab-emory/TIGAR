@@ -61,7 +61,7 @@
 TIGAR_dir="/home/jyang/GIT/TIGAR"
 chmod 755 ${TIGAR_dir}/*.sh 
 ```
-- Make `DPR` file under the **TIGAR/Model_Train_Pred/** directory executable
+- Make `${TIGAR_dir}/Model_Train_Pred/DPR` file executable
 ```bash
 chmod 755 ${TIGAR_dir}/Model_Train_Pred/DPR
 ```
