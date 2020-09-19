@@ -110,10 +110,12 @@ import TIGARutils as tg
 
 ### Using grid search and cross-validation to find the best lambda(penalty)
 def elastic_net(train, test=None, k=args.cv, Alpha=args.alpha):
+    train = train.copy()
     trainX = train.iloc[:,0:-1]
     trainY = train.iloc[:,-1]
 
     if test is not None:
+        test = test.copy()
         testX = test.iloc[:,0:-1]
         testY = test.iloc[:,-1]
 
@@ -154,6 +156,7 @@ def elastic_net(train, test=None, k=args.cv, Alpha=args.alpha):
 
 # function to do the ith cross validation step
 def do_cv(i, target_geno_exp_df, cv_trainID, cv_testID):
+    target_geno_exp_df = target_geno_exp_df.copy()
     train_geno_exp = target_geno_exp_df.loc[cv_trainID[i]].dropna()
     test_geno_exp = target_geno_exp_df.loc[cv_testID[i]].dropna()
 
