@@ -61,6 +61,10 @@
 TIGAR_dir="/home/jyang/GIT/TIGAR"
 chmod 755 ${TIGAR_dir}/*.sh 
 ```
+- Make `${TIGAR_dir}/Model_Train_Pred/DPR` file executable
+```bash
+chmod 755 ${TIGAR_dir}/Model_Train_Pred/DPR
+```
 
 ## Input Files
 Example input files provided under `./ExampleData/` are generated artificially. All input files are *Tab Delimited Text Files*.
