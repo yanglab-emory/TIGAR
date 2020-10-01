@@ -73,7 +73,8 @@ def error_handler(func):
 # returns absolute path
 def get_abs_path(x): return os.path.abspath(os.path.expanduser(os.path.expandvars(x)))
 
-# Call tabix, read in lines into byt array
+
+# Call tabix, read in lines into byte array
 def call_tabix(path, chr, start, end):
 
     proc = subprocess.Popen(
@@ -84,23 +85,25 @@ def call_tabix(path, chr, start, end):
 
     proc_out = bytearray()
 
-    # process while subprocesses running
+    # while subprocesses running, read lines into byte array
     while proc.poll() is None:
         line =  proc.stdout.readline()
         if len(line) == 0:
             break
         proc_out += line
 
-    # get any remaining lines
+    # read in lines still remaining after subprocess completes
     for line in proc.stdout:
         proc_out += line
 
     return proc_out
 
 
-# Call tabix to get header, read in lines into byt array
+# Call tabix to get header, read in lines into byte array;
+# method for reading in headers for vcf files
 def call_tabix_header(path, out='tuple', rename={}):
-
+    # create dictionary for renaming columns
+    # the first column in the vcf file is expected to be parsed as #CHROM;  automatically add that to the rename list
     rename = {**{'#CHROM':'CHROM'}, **rename}
 
     proc = subprocess.Popen(
@@ -111,17 +114,21 @@ def call_tabix_header(path, out='tuple', rename={}):
 
     proc_out = bytearray()
 
+    # while subprocesses running, read lines into byte array
     while proc.poll() is None:
         line =  proc.stdout.readline()
         if len(line) == 0:
             break
+        # filter out lines starting with ##, which denotes comment in vcf file
         if not line.startswith(b"##"):
             proc_out += line
 
+    # read in lines still remaining after subprocess completes
     for line in proc.stdout:
         if not line.startswith(b"##"):
             proc_out += line
 
+    # decode bytes, use pandas to read in, rename columns from dictionary
     header = pd.read_csv(
         StringIO(proc_out.decode('utf-8')),
         sep='\t',
@@ -135,7 +142,8 @@ def call_tabix_header(path, out='tuple', rename={}):
 
     return header
 
-# RETURN HUMAN READABLE ELAPSED TIME STRING 
+
+# return human readable elapsed time string 
 def format_elapsed_time(time_secs):
     val = abs(int(time_secs))
 
@@ -155,10 +163,13 @@ def format_elapsed_time(time_secs):
 # get header from non-vcf file
 def get_header(path, out='tuple', zipped=False, rename={}):
 
+    # zipped files assumed to be bgzipped, tabixed files
     compress_type = 'gzip' if zipped else None
-    
+
+    # the first column in the file is expected to be parsed as #CHROM;  automatically add that to the rename list
     rename = {**{'#CHROM':'CHROM'}, **rename}
 
+    # decode bytes, use pandas to read in, rename columns from dictionary
     header = pd.read_csv(
         path,
         sep='\t',
@@ -175,7 +186,8 @@ def get_header(path, out='tuple', zipped=False, rename={}):
 
     return header
 
-# for testing on systems without tabix
+
+# for testing on systems without tabix; not currently used by any scripts
 def get_vcf_header(path, out='tuple'):
     
     proc = subprocess.Popen(
@@ -208,10 +220,12 @@ def get_vcf_header(path, out='tuple'):
     return header
 
 
-# USED TO DETERMINE INDICES OF EXPRESSION FILE COLS TO READ IN, DTYPE OF EACH COL
+# determine indices of expression file cols to read in, dtype of each col
 def exp_cols_dtype(file_cols, sampleid):
+    # columns should be exp file columns and sampleids
     cols = ['CHROM', 'GeneStart', 'GeneEnd', 'TargetID', 'GeneName'] + sampleid.tolist()
     
+    # column types for all sample ids should be float64
     dtype_dict = {
         'CHROM': object,
         'GeneEnd': np.int64,
@@ -223,14 +237,17 @@ def exp_cols_dtype(file_cols, sampleid):
     file_cols_ind = tuple([file_cols.index(x) for x in cols])
     file_dtype = {file_cols.index(x):dtype_dict[x] for x in cols}
 
+    # return the indices of the columns, the dtype at each column
     return file_cols_ind, file_dtype
 
 
-# USED TO DETERMINE INDICES OF GENOFILE COLS TO READ IN, DTYPE OF EACH COL
+# determine indices of genofile cols to read in, dtype of each coL
 def genofile_cols_dtype(file_cols, type, sampleid):
     cols = ['CHROM','POS','REF','ALT'] + sampleid.tolist()
+
     # 'dosage' files should only have 'DS' format for each sample
     sampleid_dtype = np.float64 if type == 'dosage' else object
+
     dtype_dict = {
         'CHROM': object,
         'POS': np.int64,
@@ -245,12 +262,14 @@ def genofile_cols_dtype(file_cols, type, sampleid):
     file_cols_ind = tuple([file_cols.index(x) for x in cols])
     file_dtype = {file_cols.index(x):dtype_dict[x] for x in cols}
     
+    # return the indices of the columns, the dtype at each column
     return file_cols_ind, file_dtype
 
 
-# USED TO DETERMINE INDICES OF WEIGHT FILE COLS TO READ IN, DTYPE OF EACH COL
+# determine indices of weight file cols to read in, dtype of each col
 def weight_cols_dtype(file_cols, add_cols=[], drop_cols=[], get_id=True):
     cols = ['CHROM','POS','REF','ALT','TargetID','ES'] + add_cols
+
     dtype_dict = {
         'CHROM': object,
         'POS': np.int64,
@@ -279,7 +298,7 @@ def weight_cols_dtype(file_cols, add_cols=[], drop_cols=[], get_id=True):
     return file_cols_ind, file_dtype
 
 
-# USED TO DETERMINE INDICES OF ZSCORE FILE COLS TO READ IN, DTYPE OF EACH COL
+# determine indices of zscore file cols to read in, dtype of each col
 def zscore_cols_dtype(file_cols):
     cols = ['CHROM','POS','REF','ALT','Zscore']
     dtype_dict = {
@@ -295,7 +314,7 @@ def zscore_cols_dtype(file_cols):
     return file_cols_ind, file_dtype
 
 
-# USED TO DETERMINE INDICES OF gwas FILE COLS TO READ IN, DTYPE OF EACH COL
+# determine indices of gwas file cols to read in, dtype of each col
 def gwas_cols_dtype(file_cols):
     cols = ['CHROM','POS','REF','ALT','BETA','SE']
     dtype_dict = {
@@ -312,7 +331,7 @@ def gwas_cols_dtype(file_cols):
     return file_cols_ind, file_dtype
 
 
-# USED TO DETERMINE INDICES OF MCOV FILE COLS TO READ IN, DTYPE OF EACH COL
+# used to determine indices of mcov file cols to read in, dtype of each col
 def MCOV_cols_dtype(file_cols, add_cols=[], drop_cols=[], get_id=True):
     cols = ['CHROM','POS','REF','ALT','COV'] + add_cols
     dtype_dict = {
@@ -348,6 +367,7 @@ def ld_cols(path):
         compression='gzip',
         low_memory=False,
         nrows=0).rename(columns={'#snpID':'snpID', '#ID':'snpID', 'ID':'snpID', '#0':'row', '#row':'row', '0':'row'}))
+
     # ld files have gone through a lot of format revisions hence the possible need to rename
     cols = ['row', 'snpID', 'COV']
 
@@ -355,36 +375,47 @@ def ld_cols(path):
 
     return file_cols, file_cols_ind
 
+
 # yields formatted tabix regions strings
 def get_regions_list(snp_ids):
+
     # 'chrm:' prefix for region string 
     chrm = snp_ids[0].split(':')[0] + ':'
+
     # snp pos values as integers
     pos_vals = [int(snp.split(':')[1]) for snp in snp_ids]
+
     # get intervals of start,end positions; convert to tabix string
     for x, y in groupby(enumerate(pos_vals), lambda p: p[1]-p[0]):
         y = list(y)
+
         # chr:start-end
         yield chrm + str(y[0][1]) + '-' + str(y[-1][1])
 
+
 # call tabix using regions string
 def call_tabix_regions(path, regs_str):
+
     proc = subprocess.Popen(
         ['tabix '+path+' '+regs_str],
         shell=True,
         stdout=subprocess.PIPE,
         bufsize=1)
     proc_out = bytearray()
+
     # process while subprocesses running
     while proc.poll() is None:
         line =  proc.stdout.readline()
         if len(line) == 0:
             break
         proc_out += line
+
     # leftover lines
     for line in proc.stdout:
         proc_out += line
+
     return proc_out
+
 
 # get proc_out from function and parse data for regions
 def get_regions_data(regs_str, path, snp_ids, ld_cols, ld_cols_ind):
@@ -408,11 +439,13 @@ def get_regions_data(regs_str, path, snp_ids, ld_cols, ld_cols_ind):
 
     return regs_data
 
+
 # read in covariance data for snps
 def get_ld_data(path, snp_ids, ld_cols, ld_cols_ind):
     # format tabix regions from snp_ids; 'chr:start-end'
     regs_lst = list(get_regions_list(snp_ids))
     N = len(regs_lst)
+
     # arguments to pass
     regs_args = [path, snp_ids, ld_cols, ld_cols_ind]
     try:
@@ -461,7 +494,7 @@ def get_ld_matrix(MCOV):
     return snp_sd, V
 
 
-# RETURN SNP IDS
+# return snp ids; join CHROM, POS, REF, ALT columns into : separated string
 def get_snpIDs(df: pd.DataFrame, flip=False):
     chroms = df['CHROM'].astype('str').values
     pos = df['POS'].astype('str').values
@@ -523,7 +556,9 @@ def reformat_vcf(df: pd.DataFrame, Format, sampleID, uniqfrmts, singleformat=Tru
     if singleformat:
         val_ind = uniqfrmts[0].split(':').index(Format)
         df[sampleID]=df[sampleID].applymap(lambda x:x.split(":")[val_ind])
+
     else:
+
         # reformats sample values in row to include only specified format
         def vals_by_format(row):
             if row.needsplit:
@@ -533,7 +568,8 @@ def reformat_vcf(df: pd.DataFrame, Format, sampleID, uniqfrmts, singleformat=Tru
                 return row[sampleID]
 
         # specify which rows need to be reformatted
-        df['needsplit'] = substr_in_strarray(':', uniqfrmts)        
+        df['needsplit'] = substr_in_strarray(':', uniqfrmts)
+
         # apply to each row        
         df[sampleID] = df.apply(lambda x: vals_by_format(x), axis=1)
         df = df.drop(columns=['needsplit'])
@@ -543,7 +579,7 @@ def reformat_vcf(df: pd.DataFrame, Format, sampleID, uniqfrmts, singleformat=Tru
 def check_prep_vcf(df: pd.DataFrame, Format, sampleID):
     df = df.copy()
 
-    # CHECK THAT ALL ROWS INCLUDE DATA IN THE ARGS.FORMAT FORMAT
+    # check that all rows include data in the args.format format
     rowfrmts = np.unique(df.FORMAT.values)
     frmt_in_all = np.all(substr_in_strarray(Format,rowfrmts))
 
@@ -571,7 +607,7 @@ def substr_in_strarray(substr, strarray):
    return np.frompyfunc(lambda x: substr in x, 1,1)(strarray)
 
 
-# CALCULATE MAF
+# calculate maf
 def calc_maf(df: pd.DataFrame, sampleID, maf, filter=True, op=operator.gt):
     df = df.copy()
 
