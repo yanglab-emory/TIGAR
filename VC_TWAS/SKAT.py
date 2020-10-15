@@ -189,8 +189,8 @@ def Get_Liu_Params_Mod(c1):
     s2 = c1[3] / pow(c1[1], 2)
     if pow(s1, 2) > s2:
         a = 1 / (s1 - sqrt(pow(s1, 2) - s2))
-        d = s1 *a^3 - a^2
-        l = a^2 - 2*d
+        d = s1 *pow(a, 3) - pow(a, 2)
+        l = pow(a, 2) - 2*d
     else: 
         l = 1/s2
         a = sqrt(l)
@@ -297,7 +297,7 @@ def Get_Liu_Params_Mod_Lambda(Lambda):
     s1 = c1[2] / (pow(c1[1], 3 / 2))
     s2 = c1[3] / (pow(c1[1], 2))
     if pow(s1, 2) > s2:
-        a = 1 / (s1 - sqrt(s1^2 - s2))
+        a = 1 / (s1 - sqrt(pow(s1,2) - s2))
         d = s1 * pow(a, 3) - pow(a, 2)
         l = pow(a, 2) - 2 * d
     else:
@@ -452,3 +452,4 @@ def SKAT_summary_withy(y_est,beta_estimate, weight, sample_size, COV, D):
     Q = square_res_geno.dot(weight_square)
     p_val = Get_pvalue(2 * W, Q)
     return p_val
+
