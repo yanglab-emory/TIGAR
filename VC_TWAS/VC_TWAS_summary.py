@@ -12,7 +12,6 @@ from time import time
 import numpy as np
 import pandas as pd
 import SKAT
-import TIGARutils as tg
 
 
 # %%
@@ -23,6 +22,10 @@ start_time = time()
 ###############################################################
 # parse input arguments
 parser = argparse.ArgumentParser(description='VC_TWAS summary statistics')
+
+# Specify tool directory
+parser.add_argument('--TIGAR_dir',type=str)
+
 ### Gene annotation file
 parser.add_argument("--gene_anno",type=str,dest='annot_path')
 
@@ -54,8 +57,10 @@ parser.add_argument('--thread',type=int)
 parser.add_argument('--out_dir',type=str)
 
 args = parser.parse_args()
-#sys.path.append(args.TIGAR_dir)
-#sys.path.append(args.TIGAR_dir + '/VC_TWAS')
+sys.path.append(args.TIGAR_dir)
+sys.path.append(args.TIGAR_dir + '/VC_TWAS')
+
+import TIGARutils as tg
 
 #############################################################
 # Print input arguments to log
