@@ -21,6 +21,7 @@ from sklearn.model_selection import KFold
 
 ### For Elastic Net Regression
 from sklearn.linear_model import ElasticNet
+from sklearn.linear_model import ElasticNetCV
 # from sklearn.metrics import r2_score
 
 ### For OLS regression in cross validation
@@ -123,18 +124,16 @@ def elastic_net(train, test=None, k=args.cv, Alpha=args.alpha):
         testX = trainX
         testY = trainY
 
-    clf = GridSearchCV(
-        ElasticNet(
-            l1_ratio=Alpha,
-            fit_intercept=False),
-        [{'alpha':np.arange(0,1.01,0.01)}],
+    reg = ElasticNetCV(
+        l1_ratio=Alpha,
+        fit_intercept=False,
+        alphas=np.arange(0,1.01,0.01),
+        selection='random',
         cv=k).fit(trainX,trainY)
 
-    Lambda = clf.best_params_['alpha']
-
-    reg = ElasticNet(
-            l1_ratio=Alpha,
-            alpha=Lambda).fit(trainX,trainY)
+    Lambda = reg.alpha_
+    cvm = np.min(reg.mse_path_)
+    beta = reg.coef_
 
     predY = reg.predict(testX)
 
@@ -145,11 +144,7 @@ def elastic_net(train, test=None, k=args.cv, Alpha=args.alpha):
     if test is not None:
         return Rsquared
 
-    beta = reg.coef_
-    ### r2_score IMPLEMENTED BY SKLEARN IS NOT CORRECT R2
-    # Rsquared = r2_score(trainY,predY)
     Pvalue = lm.f_pvalue
-    cvm = clf.best_score_
 
     return beta, Rsquared, Pvalue, Lambda, cvm
 
