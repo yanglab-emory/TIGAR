@@ -339,15 +339,29 @@ e_cols_ind, e_dtype = tg.exp_cols_dtype(exp_cols, sampleID)
 
 # extract expression level for chromosome
 print('Reading gene expression data.\n')
-GeneExp_chunks = pd.read_csv(
-    args.geneexp_path, 
-    sep='\t', 
-    iterator=True, 
-    chunksize=10000,
-    usecols=e_cols_ind,
-    dtype=e_dtype)
+try:
+    GeneExp_chunks = pd.read_csv(
+        args.geneexp_path, 
+        sep='\t', 
+        iterator=True, 
+        chunksize=10000,
+        usecols=e_cols_ind,
+        dtype=e_dtype)
 
-GeneExp = pd.concat([x[x['CHROM']==args.chr] for x in GeneExp_chunks]).reset_index(drop=True)
+    GeneExp = pd.concat([x[x['CHROM']==args.chr] for x in GeneExp_chunks]).reset_index(drop=True)
+
+except:
+    GeneExp_chunks = pd.read_csv(
+        args.geneexp_path, 
+        sep='\t', 
+        iterator=True, 
+        header=None,
+        chunksize=10000,
+        usecols=e_cols_ind)
+
+    GeneExp = pd.concat([x[x[0]==args.chr] for x in GeneExp_chunks]).reset_index(drop=True).astype(e_dtype)
+
+    GeneExp.columns = [exp_cols[i] for i in GeneExp.columns]
 
 if GeneExp.empty:
     raise SystemExit('There are no valid gene expression training data for chromosome ' + args.chr + '\n')
