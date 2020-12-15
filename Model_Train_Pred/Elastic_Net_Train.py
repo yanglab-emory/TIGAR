@@ -76,6 +76,9 @@ parser.add_argument('--cv',type=int)
 # Ratio of L1 and L2 (for EN model training)
 parser.add_argument('--alpha',type=float)
 
+# Use specified args.alpha? (0: [0.1, 0.5, 0.9, 1], 1: args.alpha)
+parser.add_argument('--use_alpha',type=int)
+
 # Number of thread
 parser.add_argument('--thread',type=int)
 
@@ -83,6 +86,8 @@ parser.add_argument('--thread',type=int)
 parser.add_argument('--out_dir',type=str)
 
 args = parser.parse_args()
+
+args.alpha = [0.1, 0.5, 0.9, 1] if not args.use_alpha
 
 sys.path.append(args.TIGAR_dir)
 
@@ -110,10 +115,12 @@ import TIGARutils as tg
 
 ### Using grid search and cross-validation to find the best lambda(penalty)
 def elastic_net(train, test=None, k=args.cv, Alpha=args.alpha):
+    train = train.copy()
     trainX = train.iloc[:,0:-1]
     trainY = train.iloc[:,-1]
 
     if test is not None:
+        test = test.copy()
         testX = test.iloc[:,0:-1]
         testY = test.iloc[:,-1]
 
@@ -121,18 +128,17 @@ def elastic_net(train, test=None, k=args.cv, Alpha=args.alpha):
         testX = trainX
         testY = trainY
 
-    clf = GridSearchCV(
-        ElasticNet(
-            l1_ratio=Alpha,
-            fit_intercept=False),
-        [{'alpha':np.arange(0,1.01,0.01)}],
+    reg = ElasticNetCV(
+        l1_ratio=Alpha,
+        fit_intercept=False,
+        alphas=np.arange(0,1.1,0.1),
+        selection='random',
         cv=k).fit(trainX,trainY)
 
-    Lambda = clf.best_params_['alpha']
-
-    reg = ElasticNet(
-            l1_ratio=Alpha,
-            alpha=Lambda).fit(trainX,trainY)
+    Alpha = reg.l1_ratio_
+    Lambda = reg.alpha_
+    cvm = np.min(reg.mse_path_)
+    beta = reg.coef_
 
     predY = reg.predict(testX)
 
@@ -143,13 +149,9 @@ def elastic_net(train, test=None, k=args.cv, Alpha=args.alpha):
     if test is not None:
         return Rsquared
 
-    beta = reg.coef_
-    ### r2_score IMPLEMENTED BY SKLEARN IS NOT CORRECT R2
-    # Rsquared = r2_score(trainY,predY)
     Pvalue = lm.f_pvalue
-    cvm = clf.best_score_
 
-    return beta, Rsquared, Pvalue, Lambda, cvm
+    return beta, Rsquared, Pvalue, Alpha, Lambda, cvm
 
 
 # function to do the ith cross validation step
@@ -320,135 +322,125 @@ print('********************************\n')
 
 ###############################################################
 # thread function
+@tg.error_handler
 def thread_process(num):
-    try:
-        target = TargetID[num]
-        print('num=' + str(num) + '\nTargetID=' + target)
-        target_exp = GeneExp.iloc[[num]]
+    target = TargetID[num]
+    print('num=' + str(num) + '\nTargetID=' + target)
+    target_exp = GeneExp.iloc[[num]]
 
-        start = str(max(int(target_exp.GeneStart) - args.window,0))
-        end = str(int(target_exp.GeneEnd) + args.window)
+    start = str(max(int(target_exp.GeneStart) - args.window,0))
+    end = str(int(target_exp.GeneEnd) + args.window)
 
-        # select corresponding vcf file by tabix
-        print('Reading genotype data.')
-        g_proc_out = tg.call_tabix(args.geno_path, args.chr, start, end)
+    # select corresponding vcf file by tabix
+    print('Reading genotype data.')
+    g_proc_out = tg.call_tabix(args.geno_path, args.chr, start, end)
 
-        if not g_proc_out:
-            print('There is no genotype data for TargetID: ' + target + '\n') 
+    if not g_proc_out:
+        print('There is no genotype data for TargetID: ' + target + '\n') 
+        return None
+
+    # Recode subprocess output in 'utf-8'
+    print('Preparing Elastic-Net input.')
+    target_geno = pd.read_csv(StringIO(g_proc_out.decode('utf-8')),
+            sep='\t',
+            low_memory=False,
+            header=None,
+            usecols=g_cols_ind,
+            dtype=g_dtype)
+    target_geno.columns = [g_cols[i] for i in target_geno.columns]
+    target_geno = tg.optimize_cols(target_geno)
+
+    # get snpIDs
+    target_geno['snpID'] = tg.get_snpIDs(target_geno)
+    target_geno = target_geno.drop_duplicates(['snpID'],keep='first').reset_index(drop=True)
+
+    n_snp = target_geno['snpID'].size
+
+    # prep vcf file
+    if args.genofile_type=='vcf':
+        target_geno = tg.check_prep_vcf(target_geno, args.format, sampleID)
+
+    # reformat sample values
+    target_geno[sampleID] = target_geno[sampleID].apply(lambda x:tg.reformat_sample_vals(x,args.format), axis=0)
+
+    # get, filter maf
+    target_geno = tg.calc_maf(target_geno, sampleID, args.maf, op=operator.ge)
+
+    # get, filter p_HWE
+    target_geno = tg.calc_p_hwe(target_geno, sampleID, args.hwe, op=operator.ge)
+
+    # merge geno, expression files, transpose
+    target_geno_exp = pd.concat([
+        target_geno.set_index(['snpID'])[sampleID],
+        target_exp.set_index(['TargetID'])[sampleID]
+        ]).T
+
+    # 5-FOLD CROSS-VALIDATION
+    # Evaluate whether Elastic Net model valid
+    if args.cvR2:
+        print('Running 5-fold CV.')
+        # print('Starting with Elastic-Net penalty parameter')
+        do_cv_args = [target_geno_exp, CV_trainID, CV_testID]
+        k_fold_R2 = [do_cv(i, *do_cv_args) for i in range(5)]
+
+        avg_r2_cv = sum(k_fold_R2) / 5
+
+        print('Average R2 for 5-fold CV: {:.4f}'.format(avg_r2_cv))
+
+        if avg_r2_cv < 0.005:
+            print('Average R2 < 0.005; Skipping Elastic-Net training for TargetID: ' + target + '\n')
             return None
 
-        # Recode subprocess output in 'utf-8'
-        print('Preparing Elastic-Net input.')
-        target_geno = pd.read_csv(StringIO(g_proc_out.decode('utf-8')),
-                sep='\t',
-                low_memory=False,
-                header=None,
-                usecols=g_cols_ind,
-                dtype=g_dtype)
-        target_geno.columns = [g_cols[i] for i in target_geno.columns]
-        target_geno = tg.optimize_cols(target_geno)
+    else:
+        avg_r2_cv = 0
+        print('Skipping evaluation by 5-fold CV average R2...')
 
-        # get snpIDs
-        target_geno['snpID'] = tg.get_snpIDs(target_geno)
-        target_geno = target_geno.drop_duplicates(['snpID'],keep='first').reset_index(drop=True)
+    # FINAL MODEL TRAINING
+    print('Running Elastic-Net training.')
+    # initialize target_weights dataframe
+    target_weights = target_geno[['CHROM','POS','snpID','REF','ALT','p_HWE','MAF']].copy()
 
-        n_snp = target_geno['snpID'].size
+    target_weights['TargetID'] = target
 
-        # prep vcf file
-        if args.genofile_type=='vcf':
-            target_geno = tg.check_prep_vcf(target_geno, args.format, sampleID)
+    # do elastic net training
+    target_weights['ES'], R2, Pvalue, Alpha, Lambda, cvm = elastic_net(target_geno_exp)
 
-        # reformat sample values
-        target_geno[sampleID] = target_geno[sampleID].apply(lambda x:tg.reformat_sample_vals(x,args.format), axis=0)
+    # filter
+    target_weights = target_weights[target_weights['ES']!=0]
 
-        # get, filter maf
-        target_geno = tg.calc_maf(target_geno, sampleID, args.maf, op=operator.ge)
+    # reorder columns for output
+    target_weights = target_weights[['CHROM','POS','snpID','REF','ALT','TargetID','MAF','p_HWE','ES']]
 
-        # get, filter p_HWE
-        target_geno = tg.calc_p_hwe(target_geno, sampleID, args.hwe, op=operator.ge)
+    target_weights.to_csv(
+        out_train_weight_path,
+        header=False,
+        index=None,
+        sep='\t',
+        mode='a')
 
-        # merge geno, expression files, transpose
-        target_geno_exp = pd.concat([
-            target_geno.set_index(['snpID'])[sampleID],
-            target_exp.set_index(['TargetID'])[sampleID]
-            ]).T
+    # output training information, result from elastic net
+    train_info = target_exp[['CHROM','GeneStart','GeneEnd','TargetID','GeneName']].copy()
 
-        # 5-FOLD CROSS-VALIDATION
-        # Evaluate whether Elastic Net model valid
-        if args.cvR2:
-            print('Running 5-fold CV.')
-            # print('Starting with Elastic-Net penalty parameter')
-            do_cv_args = [target_geno_exp, CV_trainID, CV_testID]
-            k_fold_R2 = [do_cv(i, *do_cv_args) for i in range(5)]
+    train_info['sample_size'] = sample_size
+    train_info['n_snp'] = n_snp
+    train_info['n_effect_snp'] = n_effect_snp = target_weights.ES.size
+    train_info['CVR2'] = avg_r2_cv
+    train_info['TrainPVALUE'] = Pvalue if not np.isnan(Pvalue) else 'NaN'
+    train_info['TrainR2'] = R2 if n_effect_snp else 0
+    train_info['k_fold'] = args.cv
+    train_info['alpha'] = Alpha
+    train_info['lambda'] = Lambda
+    train_info['cvm'] = cvm
 
-            avg_r2_cv = sum(k_fold_R2) / 5
+    train_info.to_csv(
+        out_train_info_path,
+        header=None,
+        index=None,
+        sep='\t',
+        mode='a')
 
-            print('Average R2 for 5-fold CV: {:.4f}'.format(avg_r2_cv))
+    print('Target Elastic-Net training completed.\n')
 
-            if avg_r2_cv < 0.005:
-                print('Average R2 < 0.005; Skipping Elastic-Net training for TargetID: ' + target + '\n')
-                return None
-
-        else:
-            avg_r2_cv = 0
-            print('Skipping evaluation by 5-fold CV average R2...')
-
-        # FINAL MODEL TRAINING
-        print('Running Elastic-Net training.')
-        # initialize target_weights dataframe
-        target_weights = target_geno[['CHROM','POS','snpID','REF','ALT','p_HWE','MAF']].copy()
-
-        target_weights['TargetID'] = target
-
-        # do elastic net training
-        target_weights['ES'],R2,Pvalue,Lambda,cvm = elastic_net(target_geno_exp)
-
-        # filter
-        target_weights = target_weights[target_weights['ES']!=0]
-
-        # reorder columns for output
-        target_weights = target_weights[['CHROM','POS','snpID','REF','ALT','TargetID','MAF','p_HWE','ES']]
-
-        target_weights.to_csv(
-            out_train_weight_path,
-            header=False,
-            index=None,
-            sep='\t',
-            mode='a')
-
-        # output training information, result from elastic net
-        train_info = target_exp[['CHROM','GeneStart','GeneEnd','TargetID','GeneName']].copy()
-
-        train_info['sample_size'] = sample_size
-        train_info['n_snp'] = n_snp
-        train_info['n_effect_snp'] = n_effect_snp = target_weights.ES.size
-        train_info['CVR2'] = avg_r2_cv
-        train_info['TrainPVALUE'] = Pvalue if not np.isnan(Pvalue) else 'NaN'
-        train_info['TrainR2'] = R2 if n_effect_snp else 0
-        train_info['k_fold'] = args.cv
-        train_info['alpha'] = args.alpha
-        train_info['lambda'] = Lambda
-        train_info['cvm'] = cvm
-
-        train_info.to_csv(
-            out_train_info_path,
-            header=None,
-            index=None,
-            sep='\t',
-            mode='a')
-
-        print('Target Elastic-Net training completed.\n')
-
-    except Exception as e:
-        e_type, e_obj, e_tracebk = sys.exc_info()
-        e_line_num = e_tracebk.tb_lineno
-        tb = traceback.extract_tb(e_tracebk)[-1]
-
-        print('Caught a type {} exception for TargetID={}, num={} on line {}:\n{}\n{}\n{}\n'.format(e_type, target, num, e_line_num, e), tb[2], tb[1])
-
-    finally:
-        # print info to log do not wait for buffer to fill up
-        sys.stdout.flush()
 
 ###############################################################
 # start thread process

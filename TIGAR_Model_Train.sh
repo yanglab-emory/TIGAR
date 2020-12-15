@@ -36,7 +36,7 @@
 
 #################################
 VARS=`getopt -o "" -a -l \
-model:,gene_exp:,train_sampleID:,chr:,genofile_type:,genofile:,format:,maf:,hwe:,window:,cvR2:,cv:,alpha:,dpr:,ES:,TIGAR_dir:,thread:,out_dir: \
+model:,gene_exp:,train_sampleID:,chr:,genofile_type:,genofile:,format:,maf:,hwe:,window:,cvR2:,cv:,alpha:,use_alpha:,dpr:,ES:,TIGAR_dir:,thread:,out_dir: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -63,6 +63,7 @@ do
         --cvR2|-cvR2) cvR2=$2; shift 2;;
         --cv|-cv) cv=$2; shift 2;;
         --alpha|-alpha) alpha=$2; shift 2;;
+        --use_alpha|-use_alpha) use_alpha=$2; shift 2;;
         --dpr|-dpr) dpr_num=$2; shift 2;;
         --ES|-ES) ES=$2; shift 2;;
         --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
@@ -86,7 +87,7 @@ cv=${cv:-5}
 alpha=${alpha:-0.5}
 dpr_num=${dpr_num:-1} # 1 is for VB ; 2 is for MCMC
 ES=${ES:-"fixed"}
-
+use_alpha=${use_alpha:-1}}
 
 #### Create output directory if not existed
 mkdir -p ${out_dir}
@@ -145,6 +146,7 @@ if [[ "$model"x == "elastic_net"x ]];then
     --cv ${cv} \
     --thread ${thread} \
     --alpha ${alpha} \
+    --use_alpha ${use_alpha} \
     --TIGAR_dir ${TIGAR_dir} \
     --out_dir ${out_dir}/EN_CHR${chr} \
     > ${out_dir}/logs/CHR${chr}_EN_train_log.txt
