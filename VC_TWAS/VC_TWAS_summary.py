@@ -90,9 +90,23 @@ Output TWAS results file: {out_path}
     **args.__dict__,
     out_path = out_sum_VCTWAS_path))
 
+###############################################################
+def handle_flip(df: pd.DataFrame, origID, flipID, origValCol, orig_overlap, flip_overlap):
+    orig = df[origID].values
+    flip = df[flipID].values
+    origval = df[origValCol].values
 
+    ids = np.empty_like(orig)
+    val = np.empty_like(origval)
 
-# %%
+    for i in range(len(df)):
+        if orig[i] in orig_overlap:
+            ids[i], val[i] = orig[i], origval[i]
+        elif flip[i] in flip_overlap:
+            ids[i], val[i] = flip[i], -origval[i]
+
+    return ids, val
+
 ###############################################################
 ### Read in gene annotation 
 print('Reading gene annotation file.')
@@ -201,37 +215,38 @@ def thread_process(num):
         #check ID 
         if 'ID' in GWAS_result.columns:
             GWAS_result = GWAS_result.rename(columns={'ID':'snpID'})
-
+        
         if not 'snpID' in GWAS_result.columns:
             GWAS_result['snpID'] = tg.get_snpIDs(GWAS_result)
             GWAS_result =GWAS_result.drop_duplicates(['snpID'],keep='first').reset_index(drop=True)
         
-        
+        #get flip snpID
+        GWAS_result['snpID_flip'] = tg.get_snpIDs(GWAS_result, flip=True)  
+    
         # check for overlapping SNPs in Weight, gwas data
-        snp_overlap = np.intersect1d(np.array(Weight.snpID), np.array(GWAS_result.snpID))
-
-        if not snp_overlap.size:
-            print('No overlapping test SNPs that have magnitude of cis-eQTL weights greater than threshold value and with GWAS result.Flipping REF and ALT for GWAS result file.')
-            # GET FLIPPED SNP IDS:
-            GWAS_result = GWAS_result.drop(columns=['snpID'])
-            GWAS_result['snpID'] = tg.get_snpIDs(GWAS_result, flip=True)
-            snp_overlap = np.intersect1d(np.array(Weight.snpID),np.array(GWAS_result.snpID))
-            GWAS_result['BETA'] = -GWAS_result['BETA']
-            if not snp_overlap.size:
-                print('No overlapping test SNPs that have magnitude of cis-eQTL weights greater than threshold value and with GWAS result for TargetID: ' + target + '\n')
-                return None
+        snp_overlap_orig = np.intersect1d(np.array(Weight.snpID), np.array(GWAS_result.snpID))
+        snp_overlap_flip = np.intersect1d(Weight.snpID, np.array(GWAS_result.snpID_flip))
+        snp_overlap = np.concatenate((snp_overlap_orig, snp_overlap_flip))   
 
         # filter dataframes by overlapping SNPs
         Weight = Weight[Weight.snpID.isin(snp_overlap)]
-        GWAS_result = GWAS_result[GWAS_result.snpID.isin(snp_overlap)]
-        GWAS_result = GWAS_result.drop(columns=['CHROM','POS','REF','ALT'])
-        print(len(snp_overlap))
-        # merge GWAS and Weight dataframes on snpIDs
+        GWAS_result = GWAS_result[GWAS_result.snpID.isin(snp_overlap_orig) | GWAS_result.snpID_flip.isin(snp_overlap_flip)]
+
+     
+        #handle flip
+        if (snp_overlap_orig.size > 0) and (snp_overlap_flip.size > 0):
+            GWAS_result['snpID'], GWAS_result['BETA'] = handle_flip(GWAS_result,'snpID','snpID_flip','BETA',snp_overlap_orig, snp_overlap_flip)
+         elif snp_overlap_orig.size == snp_overlap.size:   
+            GWAS_result['snpID'], GWAS_result['BETA'] = GWAS_result['snpID'], GWAS_result['BETA']
+        else:
+            GWAS_result['snpID'], GWAS_result['BETA'] = GWAS_result['snpID_flip'], -GWAS_result['BETA']
+        
+
         GW = Weight.merge(GWAS_result[['snpID','BETA','SE']], 
             left_on='snpID', 
             right_on='snpID').drop_duplicates(['snpID'], keep='first').reset_index(drop=True)
         GW = GW.sort_values(by='POS')
-        snp_search_ids = GW.snpID
+            snp_search_ids = GW.snpID
 
 
         # Read in reference covariance matrix file 
