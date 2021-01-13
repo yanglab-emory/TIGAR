@@ -151,6 +151,10 @@ if [[ "$model"x == "elastic_net"x ]];then
     --out_dir ${out_dir}/EN_CHR${chr} \
     > ${out_dir}/logs/CHR${chr}_EN_train_log.txt
 
+    # set temp, weight filepaths for sorting
+    temp=${out_dir}/EN_CHR${chr}/temp_CHR${chr}_EN_train_eQTLweights.txt
+    weight=${out_dir}/EN_CHR${chr}/CHR${chr}_EN_train_eQTLweights.txt
+
 
 elif [[ "$model"x == "DPR"x ]]; then
     echo "Training gene expression imputation models using Nonparametric Bayesian DPR method..."
@@ -206,12 +210,36 @@ elif [[ "$model"x == "DPR"x ]]; then
         rm -fr ${out_dir}/DPR_CHR${chr}/CV_Files
     fi
 
+    # set temp, weight filepaths for sorting
+    temp=${out_dir}/DPR_CHR${chr}/temp_CHR${chr}_DPR_train_eQTLweights.txt
+    weight=${out_dir}/DPR_CHR${chr}/CHR${chr}_DPR_train_eQTLweights.txt
+
+
 else
     echo "Error: Please specify --model as either elastic_net or DPR "
+    exit 1
 fi
 
+
+# SORT, BGZIP, AND TABIX
+echo "Sort/bgzip/tabix-ing output weight file."
+head -n1 ${temp} > ${weight}
+
+tail -n+2 ${temp} | \
+sort -nk1 -nk2 >> ${weight} && \
+rm ${temp}
+
+if [ ! -f "${temp}" ] ; then
+    echo "Sort successful. Bgzip/tabix-ing."
+    bgzip -f ${weight} && \
+    tabix -f -b 2 -e 2 -S 1 ${weight}.gz
+else
+    echo "Sort failed."
+    exit 1
+fi
+
+
+
 echo "Training ${model} model job completed for CHR ${chr}."
-# MAYBE TRY SORTING FILE AT THIS POINT????      
-#   head -n1 ${weight} > ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
-# tail -n+2 ${weight} | sort -nk1 -nk2  >> ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
+
 exit

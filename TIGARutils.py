@@ -458,9 +458,9 @@ def calc_maf(df: pd.DataFrame, sampleID, maf, filter=True, op=operator.gt):
 
     df['MAF'] = df[sampleID].apply(lambda x:sum(x)/(2*len(x.dropna())), axis=1)
 
-    ### Dealing with NaN
+    ### Dealing with NaN - impute missing with mean
     samp_maf_cols = np.append(sampleID,'MAF')
-    df[samp_maf_cols] = df[samp_maf_cols].apply(lambda x: x.fillna(2*x.MAF),axis=1)
+    df[samp_maf_cols] = df[samp_maf_cols].apply(lambda x: x.fillna(2*x.MAF), axis=1)
 
     # downcast floats
     df[samp_maf_cols] = df[samp_maf_cols].apply(pd.to_numeric, downcast='float')

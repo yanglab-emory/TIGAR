@@ -139,12 +139,12 @@ elif [[ "$asso"x == "2"x ]];then
     if [ ! -f "${weight}" ] ; then
         echo Error: Gene expression file ${weight} does not exist or is empty. >&2
         exit 1
-    else
-        head -n1 ${weight} > ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
-        tail -n+2 ${weight} | sort -nk1 -nk2  >> ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
-        bgzip -f ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
-        tabix -f -b 2 -e 2 -S 1  ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt.gz
-    fi
+    # else
+    #     head -n1 ${weight} > ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
+    #     tail -n+2 ${weight} | sort -nk1 -nk2  >> ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
+    #     bgzip -f ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
+    #     tabix -f -b 2 -e 2 -S 1  ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt.gz
+    # fi
 
     if [[ ! -x  ${TIGAR_dir}/TWAS/Asso_Study_02.py ]] ; then
         chmod 755  ${TIGAR_dir}/TWAS/Asso_Study_02.py
@@ -154,7 +154,7 @@ elif [[ "$asso"x == "2"x ]];then
     python ${TIGAR_dir}/TWAS/Asso_Study_02.py \
     --gene_anno ${gene_anno} \
     --Zscore ${Zscore} \
-    --weight ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt.gz \
+    --weight ${weight} \
     --LD ${LD} \
     --chr ${chr} \
     --window ${window} \

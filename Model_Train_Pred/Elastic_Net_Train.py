@@ -177,7 +177,7 @@ elif args.genofile_type == 'dosage':
 else:
     raise SystemExit('Please specify the type input genotype file type (--genofile_type) as either "vcf" or "dosage".\n')
     
-out_train_weight_path = args.out_dir + '/CHR' + args.chr+ '_EN_train_eQTLweights.txt'
+out_train_weight_path = args.out_dir + '/temp_CHR' + args.chr+ '_EN_train_eQTLweights.txt'
 
 out_train_info_path = args.out_dir + '/CHR' + args.chr+ '_EN_train_GeneInfo.txt'
 
