@@ -127,39 +127,22 @@ out_twas_path = args.out_dir + '/CHR' + args.chr + '_indv_VC_TWAS.txt'
 print(
 '''********************************
 Input Arguments
-
 Gene annotation file specifying genes for TWAS: {annot_path}
-
 PED phenotype/covariate data file: {ped_path}
-
 PED information file: {pedinfo_path}
-
 Test sampleID file: {sampleid_path}
-
 Chromosome: {chr}
-
 cis-eQTL weight file: {w_path}
-
 Test genotype file: {geno_path}
-
 Genotype file used for testing is type: {genofile_type}
-
 Genotype data format: {format}
-
 Gene testing region SNP inclusion window: +-{window}
-
 MAF threshold for SNP inclusion: {maf}
-
 HWE p-value threshold for SNP inclusion: {hwe}
-
 SNP weight inclusion threshold: {weight_threshold}
-
 {pheno_type_str} phenotype used for SKAT.
-
 Number of threads: {thread}
-
 Output directory: {out_dir}
-
 Output TWAS results file: {out_path}
 ********************************'''.format(
     **args.__dict__,
