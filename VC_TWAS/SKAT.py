@@ -452,3 +452,4 @@ def SKAT_summary_withy(y_est,beta_estimate, weight, sample_size, COV, D):
     Q = square_res_geno.dot(weight_square)
     p_val = Get_pvalue(2 * W, Q)
     return p_val
+
