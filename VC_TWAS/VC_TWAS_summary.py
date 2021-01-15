@@ -64,27 +64,16 @@ out_sum_VCTWAS_path = args.out_dir + '/CHR' + args.chr + '_sum_VC_TWAS.txt'
 print(
 '''********************************
 Input Arguments
-
 Gene annotation file specifying genes for VC-TWAS: {annot_path}
-
 GWAS summary statistics file: {gwas_path}
-
 cis-eQTL weight file: {w_path}
-
 sample—size:{sample_size}
-
 SNP weight inclusion threshold:{weight_threshold}
-
 Reference LD genotype covariance file: {ld_path}
-
 Chromosome: {chr}
-
 Gene training region SNP inclusion window: +-{window}
-
 Number of threads: {thread}
-
 Output directory: {out_dir}
-
 Output TWAS results file: {out_path}
 ********************************'''.format(
     **args.__dict__,
@@ -351,4 +340,3 @@ if __name__ == '__main__':
 elapsed_sec = time()-start_time
 elapsed_time = tg.format_elapsed_time(elapsed_sec)
 print('Computation time (DD:HH:MM:SS): ' + elapsed_time)
-
