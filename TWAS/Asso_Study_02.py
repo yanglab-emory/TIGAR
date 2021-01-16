@@ -166,9 +166,6 @@ z_cols = tg.get_header(args.z_path, zipped=True)
 w_cols_ind, w_dtype = tg.weight_cols_dtype(w_cols)
 z_cols_ind, z_dtype = tg.zscore_cols_dtype(z_cols)
 
-# get columns names, indices for ld file
-ld_cols, ld_cols_ind = tg.ld_cols(args.ld_path)
-
 # PREP OUTPUT - print output headers to files
 print('Creating file: ' + out_twas_path + '\n')
 out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName','n_snps']
@@ -285,7 +282,7 @@ def thread_process(num):
     snp_search_ids = ZW.snpID.values
 
     # Read in reference covariance matrix file by snpID
-    MCOV = tg.get_ld_data(args.ld_path, snp_search_ids, ld_cols, ld_cols_ind)
+    MCOV = tg.get_ld_data(args.ld_path, snp_search_ids)
 
     if MCOV.empty:
       print('No reference covariance information for target SNPs for TargetID: ' + target + '\n')
