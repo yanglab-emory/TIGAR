@@ -441,7 +441,11 @@ def get_regions_data(regs_str, path, snp_ids, ld_cols, ld_cols_ind):
 
 
 # read in covariance data for snps
-def get_ld_data(path, snp_ids, ld_cols, ld_cols_ind):
+def get_ld_data(path, snp_ids):
+
+    # get columns names, indices for ld file
+    ld_cols, ld_cols_ind = ld_cols(path)
+
     # format tabix regions from snp_ids; 'chr:start-end'
     regs_lst = list(get_regions_list(snp_ids))
     N = len(regs_lst)
