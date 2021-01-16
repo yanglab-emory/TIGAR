@@ -411,8 +411,8 @@ def thread_process(num):
     print('num=' + str(num) + '\nTargetID=' + target)
     target_exp = GeneExp.iloc[[num]]
 
-    start=str(max(int(target_exp.GeneStart) - args.window,0))
-    end=str(int(target_exp.GeneEnd) + args.window)
+    start = str(max(int(target_exp.GeneStart) - args.window, 0))
+    end = str(int(target_exp.GeneEnd) + args.window)
 
     # READ IN AND PROCESS GENOTYPE DATA 
     # Requirement for input vcf file: Must be bgzip and tabix
