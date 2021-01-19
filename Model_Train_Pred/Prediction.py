@@ -222,6 +222,7 @@ def thread_process(num):
     start = str(max(int(Gene_info.GeneStart)-args.window, 0))
     end = str(int(Gene_info.GeneEnd)+args.window)
 
+
     # tabix Weight file   
     w_proc_out = tg.call_tabix(args.w_path, args.chr, start, end)
 
@@ -275,6 +276,7 @@ def thread_process(num):
         target_weight['snpID'] = tg.get_snpIDs(target_weight)
 
     target_weight = target_weight[['snpID', 'ES', 'MAF']]
+
 
     # Intersect SNPs from eQTL weight file and test genotype file
     # initial filter to reduce amount of dataframe processing

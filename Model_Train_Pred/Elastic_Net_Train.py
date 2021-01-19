@@ -21,6 +21,7 @@ from sklearn.model_selection import KFold
 
 ### For Elastic Net Regression
 from sklearn.linear_model import ElasticNet
+from sklearn.linear_model import ElasticNetCV
 # from sklearn.metrics import r2_score
 
 ### For OLS regression in cross validation
@@ -131,11 +132,10 @@ def elastic_net(train, test=None, k=args.cv, Alpha=args.alpha):
     reg = ElasticNetCV(
         l1_ratio=Alpha,
         fit_intercept=False,
-        alphas=np.arange(0,1.1,0.1),
+        alphas=np.arange(0,1.01,0.01),
         selection='random',
         cv=k).fit(trainX,trainY)
 
-    Alpha = reg.l1_ratio_
     Lambda = reg.alpha_
     cvm = np.min(reg.mse_path_)
     beta = reg.coef_
@@ -156,6 +156,7 @@ def elastic_net(train, test=None, k=args.cv, Alpha=args.alpha):
 
 # function to do the ith cross validation step
 def do_cv(i, target_geno_exp_df, cv_trainID, cv_testID):
+    target_geno_exp_df = target_geno_exp_df.copy()
     train_geno_exp = target_geno_exp_df.loc[cv_trainID[i]].dropna()
     test_geno_exp = target_geno_exp_df.loc[cv_testID[i]].dropna()
 
@@ -327,7 +328,6 @@ def thread_process(num):
     target = TargetID[num]
     print('num=' + str(num) + '\nTargetID=' + target)
     target_exp = GeneExp.iloc[[num]]
-
     start = str(max(int(target_exp.GeneStart) - args.window,0))
     end = str(int(target_exp.GeneEnd) + args.window)
 
@@ -338,7 +338,7 @@ def thread_process(num):
     if not g_proc_out:
         print('There is no genotype data for TargetID: ' + target + '\n') 
         return None
-
+      
     # Recode subprocess output in 'utf-8'
     print('Preparing Elastic-Net input.')
     target_geno = pd.read_csv(StringIO(g_proc_out.decode('utf-8')),
@@ -403,7 +403,7 @@ def thread_process(num):
     target_weights['TargetID'] = target
 
     # do elastic net training
-    target_weights['ES'], R2, Pvalue, Alpha, Lambda, cvm = elastic_net(target_geno_exp)
+    target_weights['ES'], R2, Pvalue, Lambda, cvm = elastic_net(target_geno_exp)
 
     # filter
     target_weights = target_weights[target_weights['ES']!=0]
@@ -428,7 +428,7 @@ def thread_process(num):
     train_info['TrainPVALUE'] = Pvalue if not np.isnan(Pvalue) else 'NaN'
     train_info['TrainR2'] = R2 if n_effect_snp else 0
     train_info['k_fold'] = args.cv
-    train_info['alpha'] = Alpha
+    train_info['alpha'] = args.alpha
     train_info['lambda'] = Lambda
     train_info['cvm'] = cvm
 

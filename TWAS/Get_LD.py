@@ -61,7 +61,13 @@ sys.path.append(args.TIGAR_dir)
 import TIGARutils as tg
 
 # limit to 4 decimal places max, strip trailing 0s
-def cov_print_frmt(x): return ('%.4f' % x).rstrip('0').rstrip('.')
+def cov_print_frmt(x): return ('%.4f' % x).rstrip('0.')
+
+# returns formatted covariance string from a row array, 
+# max_line_width=np.Inf prevents adding '\n'
+# np.array2string wraps values in '[]', also need to strip leading ,
+def cov_str(x): return np.array2string(x, max_line_width=np.Inf, separator=',', 
+    formatter={'float_kind': cov_print_frmt}).strip('[,]')
 
 ###############################################################
 # check input arguments
@@ -144,7 +150,7 @@ g_cols_ind, g_dtype = tg.genofile_cols_dtype(g_cols, args.genofile_type, sampleI
 
 # write columns out to file
 print('Creating file: ' + out_ref_cov_path + '\n')
-out_cols = ['#CHROM', 'POS', 'REF', 'ALT', 'snpID','COV']
+out_cols = ['#snpID', 'CHROM', 'POS', 'COV']
 pd.DataFrame(columns=out_cols).to_csv(
     out_ref_cov_path,
     sep='\t',
@@ -155,67 +161,57 @@ pd.DataFrame(columns=out_cols).to_csv(
 print('********************************\n')
 
 ###############################################################
+@tg.error_handler
 def thread_process(num):
-    try:
-        block = chr_blocks.loc[num]
-        print('num=' + str(num))
-        
-        print('Reading genotype data.')
-        g_proc_out = tg.call_tabix(args.geno_path, args.chr, block.Start, block.End)
+    block = chr_blocks.loc[num]
+    print('num=' + str(num))
+    
+    print('Reading genotype data.')
+    g_proc_out = tg.call_tabix(args.geno_path, args.chr, block.Start, block.End)
 
-        if not g_proc_out:
-            print('There is no genotype data in this block.\n')
-            return None
+    if not g_proc_out:
+        print('There is no genotype data in this block.\n')
+        return None
 
-        block_geno = pd.read_csv(StringIO(g_proc_out.decode('utf-8')),
+    block_geno = pd.read_csv(StringIO(g_proc_out.decode('utf-8')),
+        sep='\t',
+        low_memory=False,
+        header=None,
+        usecols=g_cols_ind,
+        dtype=g_dtype)
+
+    block_geno.columns = [g_cols[i] for i in block_geno.columns]
+    block_geno = tg.optimize_cols(block_geno)
+
+    # get snpIDs
+    block_geno['snpID'] = tg.get_snpIDs(block_geno)
+    block_geno = block_geno.drop_duplicates(['snpID'],keep='first').reset_index(drop=True)
+
+    # prep vcf file
+    if args.genofile_type=='vcf':
+        block_geno = tg.check_prep_vcf(block_geno, args.format, sampleID)
+
+    # reformat sample values
+    block_geno[sampleID] = block_geno[sampleID].apply(lambda x:tg.reformat_sample_vals(x,args.format), axis=0)
+
+    # calculate, filter maf
+    block_geno = tg.calc_maf(block_geno, sampleID, args.maf)
+
+    # get upper covariance matrix
+    mcovar = np.triu(np.cov(block_geno[sampleID].values))
+
+    # output values
+    block_geno = block_geno[['snpID', 'CHROM', 'POS']]
+    block_geno['COV'] = [cov_str(x) for x in mcovar]
+    block_geno.to_csv(
+            out_ref_cov_path,
             sep='\t',
-            low_memory=False,
+            index=None,
             header=None,
-            usecols=g_cols_ind,
-            dtype=g_dtype)
+            mode='a')
 
-        block_geno.columns = [g_cols[i] for i in block_geno.columns]
-        block_geno = tg.optimize_cols(block_geno)
+    print('Block LD calculation completed for block.\n')
 
-        # get snpIDs
-        block_geno['snpID'] = tg.get_snpIDs(block_geno)
-        block_geno = block_geno.drop_duplicates(['snpID'],keep='first').reset_index(drop=True)
-
-        # prep vcf file
-        if args.genofile_type=='vcf':
-            block_geno = tg.check_prep_vcf(block_geno, args.format, sampleID)
-
-        # reformat sample values
-        block_geno[sampleID]=block_geno[sampleID].apply(lambda x:tg.reformat_sample_vals(x,args.format), axis=0)
-
-        # calculate, filter maf
-        block_geno = tg.calc_maf(block_geno, sampleID, args.maf)
-
-        # get covariance matrix
-        mcovar = np.cov(block_geno[sampleID])
-
-        for i in range(len(block_geno)):
-            snpinfo = block_geno.iloc[i][['CHROM','POS','REF','ALT','snpID']]
-            snpcov = ','.join([cov_print_frmt(x) for x in mcovar[i,i:]])
-            covar_info = pd.DataFrame(np.append(snpinfo, snpcov)).T
-            covar_info.to_csv(
-                out_ref_cov_path,
-                sep='\t',
-                index=None,
-                header=None,
-                mode='a')
-
-        print('Block LD calculation completed for block.\n')
-
-    except Exception as e:
-        e_type, e_obj, e_tracebk = sys.exc_info()
-        e_line_num = e_tracebk.tb_lineno
-
-        print('Caught a type {} exception for block num={} on line {}:\n{}\n'.format(e_type, num, e_line_num, e))
-
-    finally:
-        # print info to log do not wait for buffer to fill up
-        sys.stdout.flush()
 
 ##################################################################
 # thread process
