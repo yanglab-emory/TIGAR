@@ -154,33 +154,8 @@ Output prediction results file: {out_path}
 
 ###############################################################
 # Load eQTL weights (ES)
-w_cols = tg.get_header(args.w_path)
+w_cols = tg.get_header(args.w_path, zipped=True)
 w_cols_ind, w_dtype = tg.weight_cols_dtype(w_cols, ['MAF'])
-
-print('Reading eQTL weights file.')
-Weight_chunks=pd.read_csv(
-    args.w_path, 
-    sep='\t', 
-    iterator=True, 
-    chunksize=10000,
-    usecols=w_cols_ind,
-    dtype=w_dtype)
-
-Weight = pd.concat([x[x['CHROM']==args.chr] for x in Weight_chunks]).reset_index(drop=True)
-
-if Weight.empty:
-    raise SystemExit('There are no valid eQTL weights.')
-
-# Weight.columns = [w_cols[i] for i in tuple(Weight.columns)]
-Weight = tg.optimize_cols(Weight)
-
-if 'ID' in Weight.columns:
-    Weight.rename(columns={'ID':'snpID'})
-
-if not 'snpID' in Weight.columns:
-    Weight['snpID'] = tg.get_snpIDs(Weight)
-
-Weight = Weight.drop(columns=['CHROM','POS','REF','ALT'])
 
 # Load annotation file
 print('Reading gene annotation file.')
@@ -247,6 +222,15 @@ def thread_process(num):
     start = str(max(int(Gene_info.GeneStart)-args.window, 0))
     end = str(int(Gene_info.GeneEnd)+args.window)
 
+
+    # tabix Weight file   
+    w_proc_out = tg.call_tabix(args.w_path, args.chr, start, end)
+
+    if not w_proc_out:
+        print('No cis-eQTL weights for TargetID: ' + target + '\n')
+        return None
+
+    # tabix genotype file
     print('Reading genotype data.')
     g_proc_out = tg.call_tabix(args.geno_path, args.chr, start, end)
     
@@ -263,14 +247,39 @@ def thread_process(num):
     target_geno.columns = [g_cols[i] for i in target_geno.columns]
     target_geno = tg.optimize_cols(target_geno)
 
-    # Intersect SNPs from eQTL weight file and test genotype file
-    # initial filter to reduce amount of dataframe processing
     print('Getting weight data for target.')
-    target_weight = Weight[Weight.TargetID==target][['snpID', 'ES', 'MAF']]
+    # parse tabix output for Weight, filtered by target, threshold
+    Weight_chunks = pd.read_csv(
+        StringIO(w_proc_out.decode('utf-8')),
+        sep='\t',
+        header=None,
+        low_memory=False,
+        iterator=True, 
+        chunksize=10000,
+        usecols=w_cols_ind,
+        dtype=w_dtype)
+    
+    target_weight = pd.concat([x[ (x[w_cols_ind[4]]==target) ] for x in Weight_chunks]).reset_index(drop=True)
 
     if target_weight.empty:
         print('No cis-eQTL weights for TargetID: ' + target + '\n')
-        return None       
+        return None
+
+    target_weight.columns = [w_cols[i] for i in tuple(target_weight.columns)]
+
+    target_weight = tg.optimize_cols(target_weight)
+
+    if 'ID' in target_weight.columns:
+        target_weight.rename(columns={'ID':'snpID'})
+
+    if not 'snpID' in target_weight.columns:
+        target_weight['snpID'] = tg.get_snpIDs(target_weight)
+
+    target_weight = target_weight[['snpID', 'ES', 'MAF']]
+
+
+    # Intersect SNPs from eQTL weight file and test genotype file
+    # initial filter to reduce amount of dataframe processing
 
     # vcf files may have data in multiple formats, check if this is the case and remove unnecessary formats. requires that all rows have data in the user-specified format
     if args.genofile_type=='vcf':
@@ -368,5 +377,3 @@ if __name__ == '__main__':
 elapsed_sec = time()-start_time
 elapsed_time = tg.format_elapsed_time(elapsed_sec)
 print('Computation time (DD:HH:MM:SS): ' + elapsed_time)
-
-

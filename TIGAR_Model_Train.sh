@@ -36,7 +36,7 @@
 
 #################################
 VARS=`getopt -o "" -a -l \
-model:,gene_exp:,train_sampleID:,chr:,genofile_type:,genofile:,format:,maf:,hwe:,window:,cvR2:,cv:,alpha:,dpr:,ES:,TIGAR_dir:,thread:,out_dir: \
+model:,gene_exp:,train_sampleID:,chr:,genofile_type:,genofile:,format:,maf:,hwe:,window:,cvR2:,cv:,alpha:,use_alpha:,dpr:,ES:,TIGAR_dir:,thread:,out_dir: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -63,6 +63,7 @@ do
         --cvR2|-cvR2) cvR2=$2; shift 2;;
         --cv|-cv) cv=$2; shift 2;;
         --alpha|-alpha) alpha=$2; shift 2;;
+        --use_alpha|-use_alpha) use_alpha=$2; shift 2;;
         --dpr|-dpr) dpr_num=$2; shift 2;;
         --ES|-ES) ES=$2; shift 2;;
         --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
@@ -86,7 +87,7 @@ cv=${cv:-5}
 alpha=${alpha:-0.5}
 dpr_num=${dpr_num:-1} # 1 is for VB ; 2 is for MCMC
 ES=${ES:-"fixed"}
-
+use_alpha=${use_alpha:-1}
 
 #### Create output directory if not existed
 mkdir -p ${out_dir}
@@ -145,9 +146,14 @@ if [[ "$model"x == "elastic_net"x ]];then
     --cv ${cv} \
     --thread ${thread} \
     --alpha ${alpha} \
+    --use_alpha ${use_alpha} \
     --TIGAR_dir ${TIGAR_dir} \
     --out_dir ${out_dir}/EN_CHR${chr} \
     > ${out_dir}/logs/CHR${chr}_EN_train_log.txt
+
+    # set temp, weight filepaths for sorting
+    temp=${out_dir}/EN_CHR${chr}/temp_CHR${chr}_EN_train_eQTLweights.txt
+    weight=${out_dir}/EN_CHR${chr}/CHR${chr}_EN_train_eQTLweights.txt
 
 
 elif [[ "$model"x == "DPR"x ]]; then
@@ -204,12 +210,36 @@ elif [[ "$model"x == "DPR"x ]]; then
         rm -fr ${out_dir}/DPR_CHR${chr}/CV_Files
     fi
 
+    # set temp, weight filepaths for sorting
+    temp=${out_dir}/DPR_CHR${chr}/temp_CHR${chr}_DPR_train_eQTLweights.txt
+    weight=${out_dir}/DPR_CHR${chr}/CHR${chr}_DPR_train_eQTLweights.txt
+
+
 else
     echo "Error: Please specify --model as either elastic_net or DPR "
+    exit 1
 fi
 
 echo "Training ${model} model job completed for CHR ${chr}."
-# MAYBE TRY SORTING FILE AT THIS POINT????      
-#   head -n1 ${weight} > ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
-# tail -n+2 ${weight} | sort -nk1 -nk2  >> ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
+
+# SORT, BGZIP, AND TABIX
+echo "Sort/bgzip/tabix-ing output weight file."
+head -n1 ${temp} > ${weight}
+
+tail -n+2 ${temp} | \
+sort -nk1 -nk2 >> ${weight} && \
+rm ${temp}
+
+if [ ! -f "${temp}" ] ; then
+    echo "Sort successful. Bgzip/tabix-ing."
+    bgzip -f ${weight} && \
+    tabix -f -b 2 -e 2 -S 1 ${weight}.gz
+
+else
+    echo "Sort failed; Unable to bgzip/tabix output weights file."
+    exit 1
+fi
+
+
+
 exit

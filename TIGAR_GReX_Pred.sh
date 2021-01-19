@@ -89,7 +89,7 @@ fi
 
 # Check gene annotation file
 if [ ! -f "${gene_anno}" ] ; then
-    echo Error: eQTL weight file ${gene_anno} does not exist or is empty. >&2
+    echo Error: gene info file ${gene_anno} does not exist or is empty. >&2
     exit 1
 fi
 

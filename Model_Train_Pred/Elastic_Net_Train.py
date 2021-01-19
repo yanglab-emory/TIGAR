@@ -77,6 +77,9 @@ parser.add_argument('--cv',type=int)
 # Ratio of L1 and L2 (for EN model training)
 parser.add_argument('--alpha',type=float)
 
+# Use specified args.alpha? (0: [0.1, 0.5, 0.9, 1], 1: args.alpha)
+parser.add_argument('--use_alpha',type=int)
+
 # Number of thread
 parser.add_argument('--thread',type=int)
 
@@ -84,6 +87,8 @@ parser.add_argument('--thread',type=int)
 parser.add_argument('--out_dir',type=str)
 
 args = parser.parse_args()
+
+args.alpha = [0.1, 0.5, 0.9, 1] if not args.use_alpha else args.alpha
 
 sys.path.append(args.TIGAR_dir)
 
@@ -146,7 +151,7 @@ def elastic_net(train, test=None, k=args.cv, Alpha=args.alpha):
 
     Pvalue = lm.f_pvalue
 
-    return beta, Rsquared, Pvalue, Lambda, cvm
+    return beta, Rsquared, Pvalue, Alpha, Lambda, cvm
 
 
 # function to do the ith cross validation step
@@ -173,7 +178,7 @@ elif args.genofile_type == 'dosage':
 else:
     raise SystemExit('Please specify the type input genotype file type (--genofile_type) as either "vcf" or "dosage".\n')
     
-out_train_weight_path = args.out_dir + '/CHR' + args.chr+ '_EN_train_eQTLweights.txt'
+out_train_weight_path = args.out_dir + '/temp_CHR' + args.chr+ '_EN_train_eQTLweights.txt'
 
 out_train_info_path = args.out_dir + '/CHR' + args.chr+ '_EN_train_GeneInfo.txt'
 
@@ -323,7 +328,6 @@ def thread_process(num):
     target = TargetID[num]
     print('num=' + str(num) + '\nTargetID=' + target)
     target_exp = GeneExp.iloc[[num]]
-
     start = str(max(int(target_exp.GeneStart) - args.window,0))
     end = str(int(target_exp.GeneEnd) + args.window)
 
@@ -334,7 +338,7 @@ def thread_process(num):
     if not g_proc_out:
         print('There is no genotype data for TargetID: ' + target + '\n') 
         return None
-
+      
     # Recode subprocess output in 'utf-8'
     print('Preparing Elastic-Net input.')
     target_geno = pd.read_csv(StringIO(g_proc_out.decode('utf-8')),
@@ -399,7 +403,7 @@ def thread_process(num):
     target_weights['TargetID'] = target
 
     # do elastic net training
-    target_weights['ES'],R2,Pvalue,Lambda,cvm = elastic_net(target_geno_exp)
+    target_weights['ES'], R2, Pvalue, Lambda, cvm = elastic_net(target_geno_exp)
 
     # filter
     target_weights = target_weights[target_weights['ES']!=0]
