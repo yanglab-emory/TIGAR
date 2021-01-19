@@ -144,7 +144,7 @@ elif [[ "$asso"x == "2"x ]];then
     #     tail -n+2 ${weight} | sort -nk1 -nk2  >> ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
     #     bgzip -f ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
     #     tabix -f -b 2 -e 2 -S 1  ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt.gz
-    # fi
+    fi
 
     if [[ ! -x  ${TIGAR_dir}/TWAS/Asso_Study_02.py ]] ; then
         chmod 755  ${TIGAR_dir}/TWAS/Asso_Study_02.py

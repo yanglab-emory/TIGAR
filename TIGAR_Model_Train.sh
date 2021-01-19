@@ -87,7 +87,7 @@ cv=${cv:-5}
 alpha=${alpha:-0.5}
 dpr_num=${dpr_num:-1} # 1 is for VB ; 2 is for MCMC
 ES=${ES:-"fixed"}
-use_alpha=${use_alpha:-1}}
+use_alpha=${use_alpha:-1}
 
 #### Create output directory if not existed
 mkdir -p ${out_dir}
@@ -220,6 +220,7 @@ else
     exit 1
 fi
 
+echo "Training ${model} model job completed for CHR ${chr}."
 
 # SORT, BGZIP, AND TABIX
 echo "Sort/bgzip/tabix-ing output weight file."
@@ -233,13 +234,12 @@ if [ ! -f "${temp}" ] ; then
     echo "Sort successful. Bgzip/tabix-ing."
     bgzip -f ${weight} && \
     tabix -f -b 2 -e 2 -S 1 ${weight}.gz
+
 else
-    echo "Sort failed."
+    echo "Sort failed; Unable to bgzip/tabix output weights file."
     exit 1
 fi
 
 
-
-echo "Training ${model} model job completed for CHR ${chr}."
 
 exit

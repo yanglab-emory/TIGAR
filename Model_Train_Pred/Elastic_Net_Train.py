@@ -87,7 +87,7 @@ parser.add_argument('--out_dir',type=str)
 
 args = parser.parse_args()
 
-args.alpha = [0.1, 0.5, 0.9, 1] if not args.use_alpha
+args.alpha = [0.1, 0.5, 0.9, 1] if not args.use_alpha else args.alpha
 
 sys.path.append(args.TIGAR_dir)
 
