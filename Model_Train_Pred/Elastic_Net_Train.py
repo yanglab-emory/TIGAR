@@ -403,7 +403,7 @@ def thread_process(num):
     target_weights['TargetID'] = target
 
     # do elastic net training
-    target_weights['ES'], R2, Pvalue, Lambda, cvm = elastic_net(target_geno_exp)
+    target_weights['ES'], R2, Pvalue, Alpha, Lambda, cvm = elastic_net(target_geno_exp)
 
     # filter
     target_weights = target_weights[target_weights['ES']!=0]
@@ -428,7 +428,7 @@ def thread_process(num):
     train_info['TrainPVALUE'] = Pvalue if not np.isnan(Pvalue) else 'NaN'
     train_info['TrainR2'] = R2 if n_effect_snp else 0
     train_info['k_fold'] = args.cv
-    train_info['alpha'] = args.alpha
+    train_info['alpha'] = Alpha
     train_info['lambda'] = Lambda
     train_info['cvm'] = cvm
 
