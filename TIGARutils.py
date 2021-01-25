@@ -610,6 +610,31 @@ def check_prep_vcf(df: pd.DataFrame, Format, sampleID):
 def substr_in_strarray(substr, strarray):
    return np.frompyfunc(lambda x: substr in x, 1,1)(strarray)
 
+# count the number of non-nan values
+def count_notnan(x):
+    return x.size - np.count_nonzero(np.isnan(x))
+
+
+# drop variants with missing rate that exceeds threshold
+def handle_missing(df: pd.DataFrame, sampleID, missing_rate, filter=True, op=operator.lt):
+    df = df.copy()
+
+    # if all sample data for a row is NaN, drop the row
+    drop_index = df.loc[df[sampleID].count(axis=1) == 0].index
+    df = df.drop(index=drop_index)
+
+    # calculate missing rate for each snp
+    df['missing_rate'] = df[sampleID].apply(lambda x: np.count_nonzero(np.isnan(x))/x.size, axis=1)
+
+    # downcast floats
+    samp_miss_cols = np.append(sampleID,'missing_rate')
+    df[samp_miss_cols] = df[samp_miss_cols].apply(pd.to_numeric, downcast='float')
+
+    if filter:
+        df = df[op(df.missing_rate, missing_rate)].reset_index(drop=True)
+
+    return df
+
 
 # calculate maf
 def calc_maf(df: pd.DataFrame, sampleID, maf, filter=True, op=operator.gt):
@@ -619,7 +644,7 @@ def calc_maf(df: pd.DataFrame, sampleID, maf, filter=True, op=operator.gt):
     drop_index = df.loc[df[sampleID].count(axis=1) == 0].index
     df = df.drop(index=drop_index)
 
-    df['MAF'] = df[sampleID].apply(lambda x:np.sum(x)/(2 * (x.size - np.count_nonzero(np.isnan(x)))), axis=1)
+    df['MAF'] = df[sampleID].apply(lambda x:np.sum(x)/(2 * count_notnan(x)), axis=1)
 
     ### Dealing with NaN - impute missing with mean
     samp_maf_cols = np.append(sampleID,'MAF')
