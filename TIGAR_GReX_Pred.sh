@@ -21,7 +21,7 @@
 
 #######################################################################
 VARS=`getopt -o "" -a -l \
-chr:,weight:,gene_anno:,genofile_type:,genofile:,test_sampleID:,format:,window:,maf_diff:,TIGAR_dir:,thread:,out_dir: \
+chr:,weight:,gene_anno:,genofile_type:,genofile:,test_sampleID:,format:,window:,missing_rate:,maf_diff:,TIGAR_dir:,thread:,out_dir: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -43,6 +43,7 @@ do
         --test_sampleID|-test_sampleID) test_sampleID_file=$2; shift 2;;
         --format|-format) format=$2; shift 2;;
         --window|-window) window=$2; shift 2;;
+        --missing_rate|-missing_rate) missing_rate=$2; shift 2;;
         --maf_diff|-maf_diff) maf_diff=$2; shift 2;;
         --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
         --thread|-thread) thread=$2; shift 2;;
@@ -54,6 +55,7 @@ done
 
 #### default value
 window=${window:-$((10**6))}
+missing_rate=${missing_rate:-0.2}
 maf_diff=${maf_diff:-0.2}
 thread=${thread:-1}
 
@@ -111,6 +113,7 @@ python ${TIGAR_dir}/Model_Train_Pred/Prediction.py \
 --window ${window} \
 --thread ${thread} \
 --maf_diff ${maf_diff} \
+--missing_rate ${missing_rate} \
 --TIGAR_dir ${TIGAR_dir} \
 --out_dir ${out_dir}/Pred_CHR${chr} \
 > ${out_dir}/logs/CHR${chr}_Pred_log.txt

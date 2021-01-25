@@ -50,6 +50,9 @@ parser.add_argument('--format',type=str)
 # window
 parser.add_argument('--window',type=int)
 
+# missing rate: threshold for excluding SNPs with too many missing values
+parser.add_argument('--missing_rate',type=float)
+
 # maf
 parser.add_argument('--maf',type=float)
 
@@ -268,6 +271,8 @@ Genotype data format: {format}
 
 Gene training region SNP inclusion window: +-{window}
 
+Excluding SNPs if missing rate exceeds: {missing_rate}
+
 MAF threshold for SNP inclusion: {maf}
 
 HWE p-value threshold for SNP inclusion: {hwe}
@@ -444,6 +449,9 @@ def thread_process(num):
 
     # reformat sample values
     target_geno[sampleID]=target_geno[sampleID].apply(lambda x: tg.reformat_sample_vals(x,args.format), axis=0)
+
+    # filter out variants that exceed missing rate threshold
+    target_geno = tg.handle_missing(target_geno, sampleID, args.missing_rate)
 
     # get, filter maf
     target_geno = tg.calc_maf(target_geno, sampleID, args.maf)

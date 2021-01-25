@@ -36,7 +36,7 @@
 
 #################################
 VARS=`getopt -o "" -a -l \
-model:,gene_exp:,train_sampleID:,chr:,genofile_type:,genofile:,format:,maf:,hwe:,window:,cvR2:,cv:,alpha:,use_alpha:,dpr:,ES:,TIGAR_dir:,thread:,out_dir: \
+model:,gene_exp:,train_sampleID:,chr:,genofile_type:,genofile:,format:,missing_rate:,maf:,hwe:,window:,cvR2:,cv:,alpha:,use_alpha:,dpr:,ES:,TIGAR_dir:,thread:,out_dir: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -58,6 +58,7 @@ do
         --genofile|-genofile) genofile=$2; shift 2;;
         --format|-format) format=$2; shift 2;;
         --maf|-maf) maf=$2; shift 2;;
+        --missing_rate|-missing_rate) missing_rate=$2; shift 2;;
         --hwe|-hwe) hwe=$2; shift 2;;
         --window|-window) window=$2; shift 2;;
         --cvR2|-cvR2) cvR2=$2; shift 2;;
@@ -79,6 +80,7 @@ done
 ##########################################
 
 thread=${thread:-1}
+missing_rate=${missing_rate:-0.2}
 maf=${maf:-0.01}
 hwe=${hwe:-0.00001}
 window=${window:-$((10**6))}
@@ -139,6 +141,7 @@ if [[ "$model"x == "elastic_net"x ]];then
     --genofile ${genofile} \
     --genofile_type ${genofile_type} \
     --format ${format} \
+    --missing_rate ${missing_rate} \
     --maf ${maf} \
     --hwe ${hwe} \
     --window ${window} \
@@ -191,6 +194,7 @@ elif [[ "$model"x == "DPR"x ]]; then
     --genofile_type ${genofile_type} \
     --format ${format} \
     --hwe ${hwe} \
+    --missing_rate ${missing_rate} \
     --maf ${maf} \
     --window ${window} \
     --cvR2 ${cvR2} \
