@@ -611,7 +611,6 @@ def substr_in_strarray(substr, strarray):
    return np.frompyfunc(lambda x: substr in x, 1,1)(strarray)
 
 
-
 # calculate maf
 def calc_maf(df: pd.DataFrame, sampleID, maf, filter=True, op=operator.gt):
     df = df.copy()
@@ -620,7 +619,7 @@ def calc_maf(df: pd.DataFrame, sampleID, maf, filter=True, op=operator.gt):
     drop_index = df.loc[df[sampleID].count(axis=1) == 0].index
     df = df.drop(index=drop_index)
 
-    df['MAF'] = df[sampleID].apply(lambda x:np.sum(x)/(2*len(x.dropna())), axis=1)
+    df['MAF'] = df[sampleID].apply(lambda x:np.sum(x)/(2 * (x.size - np.count_nonzero(np.isnan(x)))), axis=1)
 
     ### Dealing with NaN - impute missing with mean
     samp_maf_cols = np.append(sampleID,'MAF')
