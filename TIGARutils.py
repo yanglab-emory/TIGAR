@@ -616,7 +616,7 @@ def count_notnan(x):
 
 
 # drop variants with missing rate that exceeds threshold
-def handle_missing(df: pd.DataFrame, sampleID, missing_rate, filter=True, op=operator.lt):
+def handle_missing(df: pd.DataFrame, sampleID, missing_rate, filter=True, op=operator.le):
     df = df.copy()
 
     # if all sample data for a row is NaN, drop the row
