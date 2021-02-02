@@ -317,6 +317,7 @@ Example input files provided under `./ExampleData/` are generated artificially. 
 - `--format`: (Required if `genofile_type` is `vcf`) Genotype data format that should be used: `GT` or `DS`
 	- `GT`: genotype data
 	- `DS`: dosage data
+- `--missing rate`: Missing rate threshold. If the rate of missing values for a SNP exceeds this value the SNP will be excluded. Otherwise, missing values for non-excluded SNPs will be imputed as the mean. (default: `0.2`)
 - `--maf`: Minor Allele Frequency threshold (ranges from 0 to 1) to exclude rare variants (default: `0.01`
 - `--hwe`: Hardy Weinberg Equilibrium p-value threshold to exclude variants that violated HWE (default: `0.00001`)
 - `--window`: Window size (in base pairs) around gene region from which to include SNPs (default: `1000000` [`+- 1MB` region around gene region])
@@ -416,7 +417,8 @@ Predict GReX value with given variant weights (eQTL effect sizes) from trained g
 	- `GT`: genotype data
 	- `DS`: dosage data
 - `--window`: Window size (in base pairs) around gene region from which to include SNPs (default: `1000000` [`+- 1MB` region around gene region])
-- `--maf_diff`: MAF difference threshold. If the MAF Exclude SNPs  for matching SNPs from eQTL weight file and test genotype file. If SNP MAF difference is greater than `maf_diff`, the SNP will be excluded. (default: `0.2`)
+- `--missing rate`: Missing rate threshold. If the rate of missing values for a SNP exceeds this value the SNP will be excluded. Otherwise, missing values for non-excluded SNPs will be imputed as the mean. (default: `0.2`)
+- `--maf_diff`: MAF difference threshold. If the difference in MAF between a matching SNP in the eQTL weight file and test genotype file is greater than `maf_diff`, that SNP will be excluded. (default: `0.2`)
 - `--thread`: Number of simultaneous *processes* to use for parallel computation (default: `1`)
 - `--out_dir`: Output directory (will be created if it does not exist)
 - `--TIGAR_dir`: Specify the directory of **TIGAR** source code
@@ -429,7 +431,7 @@ Predict GReX value with given variant weights (eQTL effect sizes) from trained g
 ```bash
 gene_anno_file="${TIGAR_dir}/ExampleData/gene_anno.txt"
 test_sample_ID_file="${TIGAR_dir}/ExampleData/test_sampleID.txt"
-eQTL_ES_file="${TIGAR_dir}/ExampleData/eQTLweights.txt"
+eQTL_ES_file="${TIGAR_dir}/ExampleData/eQTLweights.txt.gz"
 
 ${TIGAR_dir}/TIGAR_GReX_Pred.sh \
 --gene_anno ${gene_anno_file} \
@@ -508,7 +510,7 @@ ${TIGAR_dir}/TIGAR_TWAS.sh \
 ##### Example Command
 ```bash
 gene_anno_file="${TIGAR_dir}/ExampleData/gene_anno.txt"
-eQTL_ES_file="${TIGAR_dir}/ExampleData/eQTLweights.txt"
+eQTL_ES_file="${TIGAR_dir}/ExampleData/eQTLweights.txt.gz"
 Zscore_file="${TIGAR_dir}/ExampleData/CHR1_GWAS_Zscore.txt.gz"
 LD_file="${TIGAR_dir}/ExampleData/CHR1_reference_cov.txt.gz"
 
@@ -675,6 +677,8 @@ ${TIGAR_dir}/VC_TWAS_summary.sh \
 
 
 ## Updates
+- added `--missing_rate` option (for excluding SNPs with many missing values) to model training and prediction scripts(default: `0.2`)
+- weight files now automatically sorted and bgzipped/tabixed during training step
 - Removed 'dfply' Python package dependency
 - Added VC-TWAS method
 - Added `SPrediXcan` test statistic calculation to TWAS with summary-level GWAS data (in addition to existing `FUSION` test statistic); added option (`--test_stat`) to select which test statistic to use (default: `both`)

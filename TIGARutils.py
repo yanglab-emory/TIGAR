@@ -616,7 +616,7 @@ def count_notnan(x):
 
 
 # drop variants with missing rate that exceeds threshold
-def handle_missing(df: pd.DataFrame, sampleID, missing_rate, filter=True, op=operator.lt):
+def handle_missing(df: pd.DataFrame, sampleID, missing_rate, filter=True, op=operator.le):
     df = df.copy()
 
     # if all sample data for a row is NaN, drop the row
@@ -640,10 +640,7 @@ def handle_missing(df: pd.DataFrame, sampleID, missing_rate, filter=True, op=ope
 def calc_maf(df: pd.DataFrame, sampleID, maf, filter=True, op=operator.gt):
     df = df.copy()
 
-    # if all sample data for a row is NaN, drop the row
-    drop_index = df.loc[df[sampleID].count(axis=1) == 0].index
-    df = df.drop(index=drop_index)
-
+    # calculate MAF
     df['MAF'] = df[sampleID].apply(lambda x:np.sum(x)/(2 * count_notnan(x)), axis=1)
 
     ### Dealing with NaN - impute missing with mean
