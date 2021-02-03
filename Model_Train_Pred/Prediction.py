@@ -287,11 +287,11 @@ def thread_process(num):
     # initial filter to reduce amount of dataframe processing
 
     # vcf files may have data in multiple formats, check if this is the case and remove unnecessary formats. requires that all rows have data in the user-specified format
-    if args.genofile_type=='vcf':
+    if args.genofile_type == 'vcf':
         target_geno = tg.check_prep_vcf(target_geno, args.format, sampleID)
 
     # reformat values in target_geno data frame
-    target_geno[sampleID]=target_geno[sampleID].apply(lambda x:tg.reformat_sample_vals(x,args.format), axis=0)
+    target_geno = tg.reformat_sample_vals(target_geno, args.format, sampleID)
 
     # filter out variants that exceed missing rate threshold
     target_geno = tg.handle_missing(target_geno, sampleID, args.missing_rate)

@@ -541,17 +541,19 @@ def optimize_cols(df: pd.DataFrame):
 
 ### For DS Format:
 ### code '.' as nan(missing)
-def reformat_sample_vals(sample_col, Format):
-    vals = sample_col.values
+def reformat_sample_vals(df: pd.DataFrame, Format, sampleID):
+    df = df.copy()
+    vals = df[sampleID].values
     if Format=='GT':
         vals[(vals=='0|0')|(vals=='0/0')] = 0
         vals[(vals=='1|0')|(vals=='1/0')|(vals=='0|1')|(vals=='0/1')] = 1
         vals[(vals=='1|1')|(vals=='1/1')] = 2
         vals[(vals=='.|.')|(vals=='./.')] = np.nan
-        return vals.astype(np.float32)
     elif Format=='DS':
-        vals[(vals==".")] = np.nan
-        return vals.astype('float')
+        vals[(vals=='.')] = np.nan
+    vals = vals.astype(np.float32)
+    df = pd.concat([df.drop(columns=sampleID), pd.DataFrame(vals, columns=sampleID)], axis=1)
+    return df
 
 
 # reformats a vcf dataframe
