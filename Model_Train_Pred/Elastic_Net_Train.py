@@ -366,7 +366,7 @@ def thread_process(num):
         target_geno = tg.check_prep_vcf(target_geno, args.format, sampleID)
 
     # reformat sample values
-    target_geno[sampleID] = target_geno[sampleID].apply(lambda x:tg.reformat_sample_vals(x,args.format), axis=0)
+    target_geno = tg.reformat_sample_vals(target_geno, args.format, sampleID)
 
     # filter out variants that exceed missing rate threshold
     target_geno = tg.handle_missing(target_geno, sampleID, args.missing_rate)
