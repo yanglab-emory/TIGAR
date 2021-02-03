@@ -358,7 +358,7 @@ def MCOV_cols_dtype(file_cols, add_cols=[], drop_cols=[], get_id=True):
 
 
 # get header of ld file, get indices of columns to read in
-def ld_cols(path):
+def get_ld_cols(path):
     # get header
     file_cols = tuple(pd.read_csv(
         path,
@@ -444,7 +444,7 @@ def get_regions_data(regs_str, path, snp_ids, ld_cols, ld_cols_ind):
 def get_ld_data(path, snp_ids):
 
     # get columns names, indices for ld file
-    ld_cols, ld_cols_ind = ld_cols(path)
+    ld_cols, ld_cols_ind = get_ld_cols(path)
 
     # format tabix regions from snp_ids; 'chr:start-end'
     regs_lst = list(get_regions_list(snp_ids))
