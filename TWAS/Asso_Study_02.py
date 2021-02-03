@@ -97,20 +97,6 @@ def get_V_cor(V_cov):
     V_cor[V_cov == 0] = 0
     return V_cor
 
-# def get_z_denom(V, ZW):
-#     return np.sqrt(np.linalg.multi_dot([ZW.ES.values, V_cov, ZW.ES.values]))
-
-# def get_spred_zscore(V_cov, ZW, snp_sd):
-#     ZW = ZW.copy()
-#     zscore = snp_sd.dot(ZW.ES.values * ZW.Zscore.values) / get_z_denom(V_cov, ZW)
-#     return zscore, get_pval(zscore)
-    
-# def get_fusion_zscore(V_cov, ZW, snp_sd=None):
-#     ZW = ZW.copy()
-#     V_cor = get_V_cor(V_cov)
-#     zscore = np.vdot(ZW.Zscore.values, ZW.ES.values) / get_z_denom(V_cor, ZW)
-#     return zscore, get_pval(zscore)
-
 def get_z_denom(V, w):
     return np.sqrt(np.linalg.multi_dot([w, V, w]))
 
