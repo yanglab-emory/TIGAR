@@ -110,8 +110,9 @@ def get_V_cor(V_cov):
 #     V_cor = get_V_cor(V_cov)
 #     zscore = np.vdot(ZW.Zscore.values, ZW.ES.values) / get_z_denom(V_cor, ZW)
 #     return zscore, get_pval(zscore)
+
 def get_z_denom(V, w):
-    return np.sqrt(np.linalg.multi_dot([w, V_cov, w]))
+    return np.sqrt(np.linalg.multi_dot([w, V, w]))
 
 def get_spred_zscore(V_cov, w, Z_gwas, snp_sd):
     Z_twas = snp_sd.dot(w * Z_gwas) / get_z_denom(V_cov, w)
