@@ -87,17 +87,27 @@ def handle_flip(df: pd.DataFrame, origID, flipID, origValCol, orig_overlap, flip
 
     return ids, val
 
-def get_pval(z): return np.format_float_scientific(1-chi2.cdf(z**2, 1), precision=15, exp_digits=4)
+def get_pval(z): return np.format_float_scientific(1-chi2.cdf(z**2, 1), precision=15, exp_digits=0)
 
-def get_spred_zscore(z_denom, ZW, snp_sd):
-    ZW = ZW.copy()
-    zscore = snp_sd.dot(ZW.ES.values * ZW.Zscore.values) / z_denom
-    return zscore, get_pval(zscore)
+def get_V_cor(V_cov):
+    V_cov = V_cov.copy()
+    v = np.sqrt(np.diag(V_cov))
+    outer_v = np.outer(v, v)
+    V_cor = V_cov / outer_v
+    V_cor[V_cov == 0] = 0
+    return V_cor
+
+def get_z_denom(V, w):
+    return np.sqrt(np.linalg.multi_dot([w, V, w]))
+
+def get_spred_zscore(V_cov, w, Z_gwas, snp_sd):
+    Z_twas = snp_sd.dot(w * Z_gwas) / get_z_denom(V_cov, w)
+    return Z_twas, get_pval(Z_twas)
     
-def get_fusion_zscore(z_denom, ZW, snp_sd=None):
-    ZW = ZW.copy()
-    zscore = np.vdot(ZW.Zscore.values, ZW.ES.values) / z_denom
-    return zscore, get_pval(zscore)
+def get_fusion_zscore(V_cov, w, Z_gwas, snp_sd=None):
+    V_cor = get_V_cor(V_cov)
+    Z_twas = np.vdot(Z_gwas, w) / get_z_denom(V_cor, w)
+    return Z_twas, get_pval(Z_twas)
 
 def get_burden_zscore(test_stat, get_zscore_args):
     if test_stat =='FUSION':
@@ -289,7 +299,7 @@ def thread_process(num):
       return None
 
     # get the snp variance and covariance matrix
-    snp_sd, V = tg.get_ld_matrix(MCOV)
+    snp_sd, V_cov = tg.get_ld_matrix(MCOV)
 
     ZW = ZW[ZW.snpID.isin(MCOV.snpID)]
     n_snps = str(ZW.snpID.size)
@@ -301,9 +311,8 @@ def thread_process(num):
     result['n_snps'] = n_snps
 
     ### calculate zscore(s), pvalue(s)
-    z_denom = np.sqrt(np.linalg.multi_dot([ZW.ES.values, V, ZW.ES.values]))
-
-    get_zscore_args = [z_denom, ZW, snp_sd]
+    # get_zscore_args = [V_cov, ZW, snp_sd]
+    get_zscore_args = [V_cov, ZW.ES.values, ZW.Zscore.values, snp_sd]
 
     if args.test_stat == 'both':
         result['FUSION_Z'], result['FUSION_PVAL'] = get_fusion_zscore(*get_zscore_args)
