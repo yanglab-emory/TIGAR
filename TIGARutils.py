@@ -612,6 +612,7 @@ def check_prep_vcf(df: pd.DataFrame, Format, sampleID):
 def substr_in_strarray(substr, strarray):
    return np.frompyfunc(lambda x: substr in x, 1,1)(strarray)
 
+
 # count the number of non-nan values
 def count_notnan(x):
     return x.size - np.count_nonzero(np.isnan(x))
@@ -771,3 +772,11 @@ def calc_HWE(obs_hets, obs_hom1, obs_hom2):
     p_hwe = 1.0 if p_hwe > 1.0 else p_hwe
 
     return p_hwe
+
+
+# standardize
+def standardize(df: pd.DataFrame, sampleID):
+    df = df.copy()
+    df[sampleID] = df[sampleID].apply(lambda x: (x - np.mean(x)) / np.std(x, ddof=1), axis=1)
+    return df
+

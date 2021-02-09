@@ -74,6 +74,10 @@ parser.add_argument('--dpr',type=str)
 ## 'additive' (fixed + random)
 parser.add_argument('--ES', type=str)
 
+# file paths
+parser.add_argument('--out_weight_file', type=str)
+parser.add_argument('--out_info_file', type=str)
+
 # threads to use
 parser.add_argument('--thread',type=int)
 
@@ -248,9 +252,8 @@ elif args.genofile_type == 'dosage':
 else:
     raise SystemExit('Please specify the type input genotype file type (--genofile_type) as either "vcf" or "dosage".\n')
 
-out_train_weight_path = args.out_dir + '/temp_CHR' + args.chr + '_DPR_train_eQTLweights.txt'
-out_train_info_path = args.out_dir + '/CHR' + args.chr + '_DPR_train_GeneInfo.txt'
-
+out_train_weight_path = args.out_dir + '/temp_' + args.out_weight_file
+out_train_info_path = args.out_dir + '/' +  args.out_info_file
 #############################################################
 # Print input arguments to log
 print(
@@ -458,6 +461,10 @@ def thread_process(num):
 
     # get, filter p_HWE
     target_geno = tg.calc_p_hwe(target_geno, sampleID, args.hwe)
+
+    # standardize, center
+    target_geno = tg.standardize(target_geno, sampleID)
+    target_exp = tg.standardize(target_exp, sampleID)
 
     snp_annot = target_geno[['snpID','POS','CHROM']]
 

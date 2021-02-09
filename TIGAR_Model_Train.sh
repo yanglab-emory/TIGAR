@@ -36,7 +36,7 @@
 
 #################################
 VARS=`getopt -o "" -a -l \
-model:,gene_exp:,train_sampleID:,chr:,genofile_type:,genofile:,format:,missing_rate:,maf:,hwe:,window:,cvR2:,cv:,alpha:,use_alpha:,dpr:,ES:,TIGAR_dir:,thread:,out_dir: \
+model:,gene_exp:,train_sampleID:,chr:,genofile_type:,genofile:,format:,missing_rate:,maf:,hwe:,window:,cvR2:,cv:,alpha:,use_alpha:,dpr:,ES:,TIGAR_dir:,thread:,out_dir:,sub_dir:,out_weight_file:,out_info_file: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -69,6 +69,9 @@ do
         --ES|-ES) ES=$2; shift 2;;
         --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
         --thread|-thread) thread=$2; shift 2;;
+        --sub_dir|-sub_dir) sub_dir=$2; shift 2;;
+        --out_weight_file|-out_weight_file) out_weight_file=$2; shift 2;;
+        --out_info_file|-out_info_file) out_info_file=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
         --) shift;break;;
         *) echo "Wrong input arguments!";exit 1;;
@@ -90,6 +93,7 @@ alpha=${alpha:-0.5}
 dpr_num=${dpr_num:-1} # 1 is for VB ; 2 is for MCMC
 ES=${ES:-"fixed"}
 use_alpha=${use_alpha:-1}
+format=${format:-"GT"}
 
 #### Create output directory if not existed
 mkdir -p ${out_dir}
@@ -132,7 +136,13 @@ if [[ "$model"x == "elastic_net"x ]];then
         chmod 755 ${TIGAR_dir}/Model_Train_Pred/Elastic_Net_Train.py
     fi
 
-    mkdir -p ${out_dir}/EN_CHR${chr}
+    # sub directory in out directory
+    sub_dir=${sub_dir:-EN_CHR${chr}}
+
+    out_weight_file=${out_weight_file:-CHR${chr}_EN_train_eQTLweights.txt}
+    out_info_file=${out_info_file:-CHR${chr}_EN_train_GeneInfo.txt}
+
+    mkdir -p ${out_dir}/${sub_dir}
 
     python ${TIGAR_dir}/Model_Train_Pred/Elastic_Net_Train.py \
     --gene_exp ${gene_exp} \
@@ -150,27 +160,32 @@ if [[ "$model"x == "elastic_net"x ]];then
     --thread ${thread} \
     --alpha ${alpha} \
     --use_alpha ${use_alpha} \
+    --out_weight_file ${out_weight_file} \
+    --out_info_file ${out_info_file} \
     --TIGAR_dir ${TIGAR_dir} \
-    --out_dir ${out_dir}/EN_CHR${chr} \
+    --out_dir ${out_dir}/${sub_dir} \
     > ${out_dir}/logs/CHR${chr}_EN_train_log.txt
 
-    # set temp, weight filepaths for sorting
-    temp=${out_dir}/EN_CHR${chr}/temp_CHR${chr}_EN_train_eQTLweights.txt
-    weight=${out_dir}/EN_CHR${chr}/CHR${chr}_EN_train_eQTLweights.txt
 
 
 elif [[ "$model"x == "DPR"x ]]; then
     echo "Training gene expression imputation models using Nonparametric Bayesian DPR method..."
 
+    # sub directory in out directory
+    sub_dir=${sub_dir:-DPR_CHR${chr}}
+
+    out_weight_file=${out_weight_file:-CHR${chr}_DPR_train_eQTLweights.txt}
+    out_info_file=${out_info_file:-CHR${chr}_DPR_train_GeneInfo.txt}
+
     ### Store DPR Results
-    mkdir -p ${out_dir}/DPR_CHR${chr}
+    mkdir -p ${out_dir}/${sub_dir}
 
     ### Store files for DPR under DPR_Files
-    mkdir -p ${out_dir}/DPR_CHR${chr}/DPR_Files
+    mkdir -p ${out_dir}/${sub_dir}/DPR_Files
 
     ### Store Cross Validation DPR input files and outputs
     if [ ${cvR2} == "1" ] ; then
-        mkdir -p ${out_dir}/DPR_CHR${chr}/CV_Files
+        mkdir -p ${out_dir}/${sub_dir}/CV_Files
         echo "Running 5-fold cross validation to evaluate DPR model."
     else
         echo "Skipping 5-fold CV."
@@ -200,24 +215,21 @@ elif [[ "$model"x == "DPR"x ]]; then
     --cvR2 ${cvR2} \
     --dpr ${dpr_num} \
     --ES ${ES} \
+    --out_weight_file ${out_weight_file} \
+    --out_info_file ${out_info_file} \
     --TIGAR_dir ${TIGAR_dir} \
     --thread ${thread} \
-    --out_dir ${out_dir}/DPR_CHR${chr} \
+    --out_dir ${out_dir}/${sub_dir} \
     > ${out_dir}/logs/CHR${chr}_DPR_train_log.txt
 
     ### 4. Remove DPR input files
     echo Removing DPR input files used for training.
-    rm -fr ${out_dir}/DPR_CHR${chr}/DPR_Files
+    rm -fr ${out_dir}/${sub_dir}/DPR_Files
 
     if [ ${cvR2} == "1" ] ; then
         echo Removing DPR input files used for CV.
-        rm -fr ${out_dir}/DPR_CHR${chr}/CV_Files
+        rm -fr ${out_dir}/${sub_dir}/CV_Files
     fi
-
-    # set temp, weight filepaths for sorting
-    temp=${out_dir}/DPR_CHR${chr}/temp_CHR${chr}_DPR_train_eQTLweights.txt
-    weight=${out_dir}/DPR_CHR${chr}/CHR${chr}_DPR_train_eQTLweights.txt
-
 
 else
     echo "Error: Please specify --model as either elastic_net or DPR "
@@ -226,7 +238,13 @@ fi
 
 echo "Training ${model} model job completed for CHR ${chr}."
 
+
 # SORT, BGZIP, AND TABIX
+
+# set temp, weight filepaths for sorting
+temp=${out_dir}/${sub_dir}/temp_${out_weight_file}
+weight=${out_dir}/${sub_dir}/${out_weight_file}
+
 echo "Sort/bgzip/tabix-ing output weight file."
 head -n1 ${temp} > ${weight}
 
