@@ -771,3 +771,11 @@ def calc_HWE(obs_hets, obs_hom1, obs_hom2):
     p_hwe = 1.0 if p_hwe > 1.0 else p_hwe
 
     return p_hwe
+
+
+# standardize
+def standardize(df: pd.DataFrame, sampleID):
+    df = df.copy()
+    df[sampleID] = df[sampleID].apply(lambda x: (x - np.mean(x)) / np.std(x, ddof=1), axis=1)
+    return df
+    
