@@ -549,8 +549,9 @@ def reformat_sample_vals(df: pd.DataFrame, Format, sampleID):
         vals[(vals=='1|0')|(vals=='1/0')|(vals=='0|1')|(vals=='0/1')] = 1
         vals[(vals=='1|1')|(vals=='1/1')] = 2
         vals[(vals=='.|.')|(vals=='./.')] = np.nan
-    elif Format=='DS':
-        vals[(vals=='.')] = np.nan
+    # shouldnt ever *be* a string '.' since the dtype for DS is automatically a float?
+    # elif Format=='DS':
+    #     vals[(vals=='.')] = np.nan
     vals = vals.astype(np.float32)
     df = pd.concat([df.drop(columns=sampleID), pd.DataFrame(vals, columns=sampleID)], axis=1)
     return df

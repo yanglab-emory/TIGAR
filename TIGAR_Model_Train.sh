@@ -36,7 +36,7 @@
 
 #################################
 VARS=`getopt -o "" -a -l \
-model:,gene_exp:,train_sampleID:,chr:,genofile_type:,genofile:,format:,missing_rate:,maf:,hwe:,window:,cvR2:,cv:,alpha:,use_alpha:,dpr:,ES:,TIGAR_dir:,thread:,out_dir:,sub_dir:,out_weight_file:,out_info_file: \
+model:,gene_exp:,train_sampleID:,chr:,genofile_type:,genofile:,format:,missing_rate:,maf:,hwe:,window:,cvR2:,cv:,alpha:,use_alpha:,dpr:,ES:,TIGAR_dir:,thread:,out_dir:,sub_dir:,out_weight_file:,out_info_file:,log_file: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -72,6 +72,7 @@ do
         --sub_dir|-sub_dir) sub_dir=$2; shift 2;;
         --out_weight_file|-out_weight_file) out_weight_file=$2; shift 2;;
         --out_info_file|-out_info_file) out_info_file=$2; shift 2;;
+        --log_file|-log_file) log_file=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
         --) shift;break;;
         *) echo "Wrong input arguments!";exit 1;;
@@ -141,6 +142,7 @@ if [[ "$model"x == "elastic_net"x ]];then
 
     out_weight_file=${out_weight_file:-CHR${chr}_EN_train_eQTLweights.txt}
     out_info_file=${out_info_file:-CHR${chr}_EN_train_GeneInfo.txt}
+    log_file=${log_file:-CHR${chr}_EN_train_log.txt}
 
     mkdir -p ${out_dir}/${sub_dir}
 
@@ -164,7 +166,7 @@ if [[ "$model"x == "elastic_net"x ]];then
     --out_info_file ${out_info_file} \
     --TIGAR_dir ${TIGAR_dir} \
     --out_dir ${out_dir}/${sub_dir} \
-    > ${out_dir}/logs/CHR${chr}_EN_train_log.txt
+    > ${out_dir}/logs/${log_file}
 
 
 
@@ -176,6 +178,7 @@ elif [[ "$model"x == "DPR"x ]]; then
 
     out_weight_file=${out_weight_file:-CHR${chr}_DPR_train_eQTLweights.txt}
     out_info_file=${out_info_file:-CHR${chr}_DPR_train_GeneInfo.txt}
+    log_file=${log_file:-CHR${chr}_DPR_train_log.txt}
 
     ### Store DPR Results
     mkdir -p ${out_dir}/${sub_dir}
@@ -220,7 +223,8 @@ elif [[ "$model"x == "DPR"x ]]; then
     --TIGAR_dir ${TIGAR_dir} \
     --thread ${thread} \
     --out_dir ${out_dir}/${sub_dir} \
-    > ${out_dir}/logs/CHR${chr}_DPR_train_log.txt
+    > ${out_dir}/logs/${log_file}
+
 
     ### 4. Remove DPR input files
     echo Removing DPR input files used for training.

@@ -128,6 +128,7 @@ def prep_call_dpr(bimbam_df, pheno_df, snpannot_df, dpr_file_dir, targetid):
             '-p', pheno_pth, 
             '-a', snpannot_pth, 
             '-dpr', args.dpr, 
+            '-notsnp',
             '-o', 'DPR_' + targetid]
 
         subprocess.check_call(
@@ -317,7 +318,12 @@ exp_cols = tg.get_header(args.geneexp_path)
 exp_sampleids = exp_cols[5:]
 
 # genofile header, sampleIDs
-g_cols = tg.call_tabix_header(args.geno_path)
+try:
+    g_cols = tg.call_tabix_header(args.geno_path)
+except: 
+    g_cols = tg.get_header(args.geno_path, zipped=True)
+
+
 gcol_sampleids = g_cols[gcol_sampleids_strt_ind:]
 
 # geno, exp overlapping sampleIDs
