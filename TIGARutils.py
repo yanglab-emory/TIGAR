@@ -778,8 +778,12 @@ def calc_HWE(obs_hets, obs_hom1, obs_hom2):
 def standardize(df: pd.DataFrame, sampleID, center=True):
     df = df.copy()
     df[sampleID] = df[sampleID].apply(lambda x: (x - (np.mean(x) * center)) / np.std(x, ddof=1), axis=1)
-    return df
 
+    # rows with std=0 will be converted to all nan values and need to be dropped
+    drop_index = df.loc[df[sampleID].count(axis=1) == 0].index
+    df = df.drop(index=drop_index).reset_index(drop=True)
+    
+    return df
 
 # print args (for testing)
 def print_args(args):
