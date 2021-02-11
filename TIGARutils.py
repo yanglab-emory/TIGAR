@@ -253,11 +253,11 @@ def genofile_cols_dtype(file_cols, type, sampleid):
         'POS': np.int64,
         'REF': object,
         'ALT': object,
+        'FORMAT': object,
          **{x:sampleid_dtype for x in sampleid}}
 
     if type == 'vcf':
         cols.append('FORMAT')
-        dtype_dict['FORMAT'] = object
 
     file_cols_ind = tuple([file_cols.index(x) for x in cols])
     file_dtype = {file_cols.index(x):dtype_dict[x] for x in cols}
@@ -354,6 +354,7 @@ def MCOV_cols_dtype(file_cols, add_cols=[], drop_cols=[], get_id=True):
     
     file_cols_ind = tuple([file_cols.index(x) for x in cols])
     file_dtype = {file_cols.index(x):dtype_dict[x] for x in cols}
+
     return file_cols_ind, file_dtype
 
 
@@ -774,8 +775,17 @@ def calc_HWE(obs_hets, obs_hom1, obs_hom2):
 
 
 # standardize
-def standardize(df: pd.DataFrame, sampleID):
+def standardize(df: pd.DataFrame, sampleID, center=True):
     df = df.copy()
-    df[sampleID] = df[sampleID].apply(lambda x: (x - np.mean(x)) / np.std(x, ddof=1), axis=1)
+    df[sampleID] = df[sampleID].apply(lambda x: (x - (np.mean(x) * center)) / np.std(x, ddof=1), axis=1)
     return df
-    
+
+
+# print args (for testing)
+def print_args(args):
+    for key, value in args.__dict__.items():
+        if isinstance(value, str):
+            print('args.', key, ' = \'', value, '\'', sep='')
+        else:
+            print('args.', key, ' = ', value, sep='')
+

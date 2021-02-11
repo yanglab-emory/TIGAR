@@ -5,6 +5,7 @@
 import argparse
 import multiprocessing
 import operator
+import os
 import subprocess
 import sys
 
@@ -101,21 +102,24 @@ def prep_call_dpr(bimbam_df, pheno_df, snpannot_df, dpr_file_dir, targetid):
         header=False,
         index=None,
         sep='\t',
-        mode='w')
+        mode='w',
+        float_format='%f')
 
     pheno_df.to_csv(
         pheno_pth,
         header=False,
         index=None,
         sep='\t',
-        mode='w')
+        mode='w',
+        float_format='%f')
 
     snpannot_df.to_csv(
-            snpannot_pth,
-            header=False,
-            index=None,
-            sep='\t',
-            mode='w')
+        snpannot_pth,
+        header=False,
+        index=None,
+        sep='\t',
+        mode='w',
+        float_format='%f')
 
     # CALL DPR
     try:
@@ -135,14 +139,23 @@ def prep_call_dpr(bimbam_df, pheno_df, snpannot_df, dpr_file_dir, targetid):
     except subprocess.CalledProcessError as err:
         raise err
 
+    finally:
+        os.remove(bimbam_pth)
+        os.remove(pheno_pth)
+        os.remove(snpannot_pth)
+
     # READ IN AND PROCESS DPR OUTPUT
+    dpr_out_pth = dpr_file_dir + 'output/DPR_' + targetid + '.param.txt'
+
     dpr_out = pd.read_csv(
-        dpr_file_dir + 'output/DPR_' + targetid + '.param.txt',
-            sep='\t',
-            header=0,
-            names=['CHROM','snpID','POS','n_miss','b','beta','gamma'],
-            usecols=['snpID','b','beta'],
-            dtype={'snpID': object, 'b': np.float64, 'beta': np.float64})
+        dpr_out_pth,
+        sep='\t',
+        header=0,
+        names=['CHROM','snpID','POS','n_miss','b','beta','gamma'],
+        usecols=['snpID','b','beta'],
+        dtype={'snpID': object, 'b': np.float64, 'beta': np.float64})
+
+    os.remove(dpr_out_pth)
 
     dpr_out = tg.optimize_cols(dpr_out)
 
@@ -436,7 +449,8 @@ def thread_process(num):
             low_memory=False,
             header=None,
             usecols=g_cols_ind,
-            dtype=g_dtype)
+            dtype=g_dtype,
+            na_values=['.', '.|.', './.'])
     target_geno.columns = [g_cols[i] for i in target_geno.columns]
     target_geno = tg.optimize_cols(target_geno)
 
@@ -445,24 +459,26 @@ def thread_process(num):
     target_geno = target_geno.drop_duplicates(['snpID'],keep='first').reset_index(drop=True)
 
     # prep vcf file
-    if args.genofile_type=='vcf':
+    if args.genofile_type == 'vcf':
         target_geno = tg.check_prep_vcf(target_geno, args.format, sampleID)
 
     # reformat sample values
     target_geno = tg.reformat_sample_vals(target_geno, args.format, sampleID)
-
+    
     # filter out variants that exceed missing rate threshold
     target_geno = tg.handle_missing(target_geno, sampleID, args.missing_rate)
-
+    
     # get, filter maf
     target_geno = tg.calc_maf(target_geno, sampleID, args.maf)
 
     # get, filter p_HWE
     target_geno = tg.calc_p_hwe(target_geno, sampleID, args.hwe)
 
-    # standardize, center
-    target_geno = tg.standardize(target_geno, sampleID)
-    target_exp = tg.standardize(target_exp, sampleID)
+    # standardize; not centered since 
+    ## 1) DPR script centers input 
+    ## 2) DPR script sometimes segfaults when reading in genotype files when data was centered
+    target_geno = tg.standardize(target_geno, sampleID, center=False)
+    target_exp = tg.standardize(target_exp, sampleID, center=False)
 
     snp_annot = target_geno[['snpID','POS','CHROM']]
 
