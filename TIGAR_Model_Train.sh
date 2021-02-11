@@ -36,7 +36,7 @@
 
 #################################
 VARS=`getopt -o "" -a -l \
-model:,gene_exp:,train_sampleID:,chr:,genofile_type:,genofile:,format:,missing_rate:,maf:,hwe:,window:,cvR2:,cv:,alpha:,use_alpha:,dpr:,ES:,TIGAR_dir:,thread:,out_dir:,sub_dir:,out_weight_file:,out_info_file:,log_file: \
+model:,gene_exp:,train_sampleID:,chr:,genofile_type:,genofile:,format:,missing_rate:,maf:,hwe:,window:,cvR2:,cv:,alpha:,use_alpha:,dpr:,ES:,TIGAR_dir:,thread:,out_dir:,sub_dir:,out_weight_file:,out_info_file:,log_file:,job_suf: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -73,6 +73,7 @@ do
         --out_weight_file|-out_weight_file) out_weight_file=$2; shift 2;;
         --out_info_file|-out_info_file) out_info_file=$2; shift 2;;
         --log_file|-log_file) log_file=$2; shift 2;;
+        --job_suf|-job_suf) job_suf=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
         --) shift;break;;
         *) echo "Wrong input arguments!";exit 1;;
@@ -95,6 +96,13 @@ dpr_num=${dpr_num:-1} # 1 is for VB ; 2 is for MCMC
 ES=${ES:-"fixed"}
 use_alpha=${use_alpha:-1}
 format=${format:-"GT"}
+# sub_dir: whether to use subdirectory inside out_dir for output files
+sub_dir=${sub_dir:-1}
+
+# used to differentiate intermmediate file folders when sub_dir!=1
+# script deletes DPR_Files_, CV_Files_ directories by default; job_suf prevents issues with deleting a directory used by simultaneous jobs
+job_suf=${job_suf-"_"}
+
 
 #### Create output directory if not existed
 mkdir -p ${out_dir}
@@ -138,13 +146,17 @@ if [[ "$model"x == "elastic_net"x ]];then
     fi
 
     # sub directory in out directory
-    sub_dir=${sub_dir:-EN_CHR${chr}}
+    if [[ "$sub_dir"x == "1"x ]];then
+        out_sub_dir=${out_dir}/EN_CHR${chr}
+    else
+        out_sub_dir=${out_dir}
+    fi
 
     out_weight_file=${out_weight_file:-CHR${chr}_EN_train_eQTLweights.txt}
     out_info_file=${out_info_file:-CHR${chr}_EN_train_GeneInfo.txt}
     log_file=${log_file:-CHR${chr}_EN_train_log.txt}
 
-    mkdir -p ${out_dir}/${sub_dir}
+    mkdir -p ${out_sub_dir}
 
     python ${TIGAR_dir}/Model_Train_Pred/Elastic_Net_Train.py \
     --gene_exp ${gene_exp} \
@@ -165,30 +177,33 @@ if [[ "$model"x == "elastic_net"x ]];then
     --out_weight_file ${out_weight_file} \
     --out_info_file ${out_info_file} \
     --TIGAR_dir ${TIGAR_dir} \
-    --out_dir ${out_dir}/${sub_dir} \
+    --out_dir ${out_sub_dir} \
     > ${out_dir}/logs/${log_file}
-
 
 
 elif [[ "$model"x == "DPR"x ]]; then
     echo "Training gene expression imputation models using Nonparametric Bayesian DPR method..."
 
     # sub directory in out directory
-    sub_dir=${sub_dir:-DPR_CHR${chr}}
+    if [[ "$sub_dir"x == "1"x ]];then
+        out_sub_dir=${out_dir}/DPR_CHR${chr}
+    else
+        out_sub_dir=${out_dir}
+    fi
 
     out_weight_file=${out_weight_file:-CHR${chr}_DPR_train_eQTLweights.txt}
     out_info_file=${out_info_file:-CHR${chr}_DPR_train_GeneInfo.txt}
     log_file=${log_file:-CHR${chr}_DPR_train_log.txt}
 
     ### Store DPR Results
-    mkdir -p ${out_dir}/${sub_dir}
+    mkdir -p ${out_sub_dir}
 
     ### Store files for DPR under DPR_Files
-    mkdir -p ${out_dir}/${sub_dir}/DPR_Files
+    mkdir -p ${out_sub_dir}/DPR_Files${job_suf}
 
     ### Store Cross Validation DPR input files and outputs
     if [ ${cvR2} == "1" ] ; then
-        mkdir -p ${out_dir}/${sub_dir}/CV_Files
+        mkdir -p ${out_sub_dir}/CV_Files${job_suf}
         echo "Running 5-fold cross validation to evaluate DPR model."
     else
         echo "Skipping 5-fold CV."
@@ -220,19 +235,20 @@ elif [[ "$model"x == "DPR"x ]]; then
     --ES ${ES} \
     --out_weight_file ${out_weight_file} \
     --out_info_file ${out_info_file} \
+    --job_suf ${job_suf} \
     --TIGAR_dir ${TIGAR_dir} \
     --thread ${thread} \
-    --out_dir ${out_dir}/${sub_dir} \
+    --out_dir ${out_sub_dir} \
     > ${out_dir}/logs/${log_file}
 
 
     ### 4. Remove DPR input files
     echo Removing DPR input files used for training.
-    rm -fr ${out_dir}/${sub_dir}/DPR_Files
+    rm -fr ${out_sub_dir}/DPR_Files${job_suf} \
 
     if [ ${cvR2} == "1" ] ; then
         echo Removing DPR input files used for CV.
-        rm -fr ${out_dir}/${sub_dir}/CV_Files
+        rm -fr ${out_sub_dir}/CV_Files${job_suf}
     fi
 
 else
@@ -246,8 +262,8 @@ echo "Training ${model} model job completed for CHR ${chr}."
 # SORT, BGZIP, AND TABIX
 
 # set temp, weight filepaths for sorting
-temp=${out_dir}/${sub_dir}/temp_${out_weight_file}
-weight=${out_dir}/${sub_dir}/${out_weight_file}
+temp=${out_sub_dir}/temp_${out_weight_file}
+weight=${out_sub_dir}/${out_weight_file}
 
 echo "Sort/bgzip/tabix-ing output weight file."
 head -n1 ${temp} > ${weight}

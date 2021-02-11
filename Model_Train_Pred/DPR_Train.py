@@ -78,6 +78,9 @@ parser.add_argument('--ES', type=str)
 parser.add_argument('--out_weight_file', type=str)
 parser.add_argument('--out_info_file', type=str)
 
+# suffix to directories for DPR intermmediate files
+parser.add_argument('--job_suf', type=str)
+
 # threads to use
 parser.add_argument('--thread',type=int)
 
@@ -197,7 +200,7 @@ def calc_r2(out_weights_df, bimbam_test_df, pheno_test_df, cv=False):
 
 # function to do the ith cross validation step
 def do_cv(i, target, target_geno_df, target_exp_df, snp_annot_df, cv_trainID, cv_testID, ):
-    dpr_file_dir_cv = abs_out_dir + '/CV_Files/'
+    dpr_file_dir_cv = abs_out_dir + '/CV_Files' + args.job_suf + '/'
     target_cv = target + '_CV' + str(i+1)
 
     trainID = cv_trainID[i]
@@ -469,8 +472,8 @@ def thread_process(num):
     target_geno = tg.calc_p_hwe(target_geno, sampleID, args.hwe)
 
     # standardize, center
-    target_geno = tg.standardize(target_geno, sampleID)
-    target_exp = tg.standardize(target_exp, sampleID)
+    target_geno = tg.standardize(target_geno, sampleID, center=False)
+    target_exp = tg.standardize(target_exp, sampleID, center=False)
 
     snp_annot = target_geno[['snpID','POS','CHROM']]
 
@@ -496,7 +499,7 @@ def thread_process(num):
 
     # FINAL MODEL TRAINING
     print('Running DPR training.')
-    dpr_file_dir = abs_out_dir + '/DPR_Files/'
+    dpr_file_dir = abs_out_dir + '/DPR_Files' + args.job_suf + '/'
     
     bimbam = target_geno[np.concatenate((['snpID','REF','ALT'],sampleID))]
 
