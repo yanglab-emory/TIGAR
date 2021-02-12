@@ -384,9 +384,9 @@ def thread_process(num):
     # get, filter p_HWE
     target_geno = tg.calc_p_hwe(target_geno, sampleID, args.hwe, op=operator.ge)
 
-    # standardize, center
-    target_geno = tg.standardize(target_geno, sampleID)
-    target_exp = tg.standardize(target_exp, sampleID)
+    # center data
+    target_geno = tg.center(target_geno, sampleID)
+    target_exp = tg.center(target_exp, sampleID)
 
     # merge geno, expression files, transpose
     target_geno_exp = pd.concat([

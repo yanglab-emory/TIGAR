@@ -299,6 +299,9 @@ def thread_process(num):
     # calculate MAF
     target_geno = tg.calc_maf(target_geno, sampleID, 0, op=operator.ge)
 
+    # center data
+    target_geno = tg.center(target_geno, sampleID)
+
     # Get original and flipped snpIDs, filter out duplicates
     target_geno['IDorig'] = tg.get_snpIDs(target_geno)
     target_geno['IDflip'] = tg.get_snpIDs(target_geno, flip=True)

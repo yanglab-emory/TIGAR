@@ -485,11 +485,9 @@ def thread_process(num):
     # get, filter p_HWE
     target_geno = tg.calc_p_hwe(target_geno, sampleID, args.hwe)
 
-    # standardize; not centered since 
+    # target_geno, target_expr not centered since 
     ## 1) DPR script centers input 
     ## 2) DPR script sometimes segfaults when reading in genotype files when data was centered
-    target_geno = tg.standardize(target_geno, sampleID, center=False)
-    target_exp = tg.standardize(target_exp, sampleID, center=False)
 
     snp_annot = target_geno[['snpID','POS','CHROM']]
 
