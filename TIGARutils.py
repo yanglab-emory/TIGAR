@@ -550,8 +550,9 @@ def reformat_sample_vals(df: pd.DataFrame, Format, sampleID):
         vals[(vals=='1|0')|(vals=='1/0')|(vals=='0|1')|(vals=='0/1')] = 1
         vals[(vals=='1|1')|(vals=='1/1')] = 2
         vals[(vals=='.|.')|(vals=='./.')] = np.nan
-    elif Format=='DS':
-        vals[(vals=='.')] = np.nan
+    # shouldnt ever *be* a string '.' since the dtype for DS is automatically a float?
+    # elif Format=='DS':
+    #     vals[(vals=='.')] = np.nan
     vals = vals.astype(np.float32)
     df = pd.concat([df.drop(columns=sampleID), pd.DataFrame(vals, columns=sampleID)], axis=1)
     return df
@@ -612,6 +613,7 @@ def check_prep_vcf(df: pd.DataFrame, Format, sampleID):
 # returns a boolean array; whether substring is in a np object array
 def substr_in_strarray(substr, strarray):
    return np.frompyfunc(lambda x: substr in x, 1,1)(strarray)
+
 
 # count the number of non-nan values
 def count_notnan(x):
@@ -792,4 +794,3 @@ def print_args(args):
             print('args.', key, ' = \'', value, '\'', sep='')
         else:
             print('args.', key, ' = ', value, sep='')
-

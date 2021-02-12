@@ -75,6 +75,13 @@ parser.add_argument('--dpr',type=str)
 ## 'additive' (fixed + random)
 parser.add_argument('--ES', type=str)
 
+# file paths
+parser.add_argument('--out_weight_file', type=str)
+parser.add_argument('--out_info_file', type=str)
+
+# suffix to directories for DPR intermmediate files
+parser.add_argument('--job_suf', type=str)
+
 # threads to use
 parser.add_argument('--thread',type=int)
 
@@ -206,7 +213,7 @@ def calc_r2(out_weights_df, bimbam_test_df, pheno_test_df, cv=False):
 
 # function to do the ith cross validation step
 def do_cv(i, target, target_geno_df, target_exp_df, snp_annot_df, cv_trainID, cv_testID, ):
-    dpr_file_dir_cv = abs_out_dir + '/CV_Files/'
+    dpr_file_dir_cv = abs_out_dir + '/CV_Files' + args.job_suf + '/'
     target_cv = target + '_CV' + str(i+1)
 
     trainID = cv_trainID[i]
@@ -262,9 +269,8 @@ elif args.genofile_type == 'dosage':
 else:
     raise SystemExit('Please specify the type input genotype file type (--genofile_type) as either "vcf" or "dosage".\n')
 
-out_train_weight_path = args.out_dir + '/temp_CHR' + args.chr + '_DPR_train_eQTLweights.txt'
-out_train_info_path = args.out_dir + '/CHR' + args.chr + '_DPR_train_GeneInfo.txt'
-
+out_train_weight_path = args.out_dir + '/temp_' + args.out_weight_file
+out_train_info_path = args.out_dir + '/' +  args.out_info_file
 #############################################################
 # Print input arguments to log
 print(
@@ -328,7 +334,12 @@ exp_cols = tg.get_header(args.geneexp_path)
 exp_sampleids = exp_cols[5:]
 
 # genofile header, sampleIDs
-g_cols = tg.call_tabix_header(args.geno_path)
+try:
+    g_cols = tg.call_tabix_header(args.geno_path)
+except: 
+    g_cols = tg.get_header(args.geno_path, zipped=True)
+
+
 gcol_sampleids = g_cols[gcol_sampleids_strt_ind:]
 
 # geno, exp overlapping sampleIDs
@@ -504,7 +515,7 @@ def thread_process(num):
 
     # FINAL MODEL TRAINING
     print('Running DPR training.')
-    dpr_file_dir = abs_out_dir + '/DPR_Files/'
+    dpr_file_dir = abs_out_dir + '/DPR_Files' + args.job_suf + '/'
     
     bimbam = target_geno[np.concatenate((['snpID','REF','ALT'],sampleID))]
 

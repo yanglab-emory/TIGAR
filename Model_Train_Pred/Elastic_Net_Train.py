@@ -83,6 +83,10 @@ parser.add_argument('--alpha',type=float)
 # Use specified args.alpha? (0: [0.1, 0.5, 0.9, 1], 1: args.alpha)
 parser.add_argument('--use_alpha',type=int)
 
+# file paths
+parser.add_argument('--out_weight_file', type=str)
+parser.add_argument('--out_info_file', type=str)
+
 # Number of thread
 parser.add_argument('--thread',type=int)
 
@@ -181,9 +185,8 @@ elif args.genofile_type == 'dosage':
 else:
     raise SystemExit('Please specify the type input genotype file type (--genofile_type) as either "vcf" or "dosage".\n')
     
-out_train_weight_path = args.out_dir + '/temp_CHR' + args.chr+ '_EN_train_eQTLweights.txt'
-
-out_train_info_path = args.out_dir + '/CHR' + args.chr+ '_EN_train_GeneInfo.txt'
+out_train_weight_path = args.out_dir + '/temp_' + args.out_weight_file
+out_train_info_path = args.out_dir + '/' +  args.out_info_file
 
 ###############################################################
 # Print input arguments
@@ -246,7 +249,11 @@ exp_cols = tg.get_header(args.geneexp_path)
 exp_sampleids = exp_cols[5:]
 
 # genofile header, sampleIDs
-g_cols = tg.call_tabix_header(args.geno_path)
+try:
+    g_cols = tg.call_tabix_header(args.geno_path)
+except: 
+    g_cols = tg.get_header(args.geno_path, zipped=True)
+
 gcol_sampleids = g_cols[gcol_sampleids_strt_ind:]
 
 # geno, exp overlapping sampleIDs
