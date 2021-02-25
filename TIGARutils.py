@@ -551,8 +551,9 @@ def reformat_sample_vals(df: pd.DataFrame, Format, sampleID):
         vals[(vals=='1|1')|(vals=='1/1')] = 2
         vals[(vals=='.|.')|(vals=='./.')] = np.nan
     # shouldnt ever *be* a string '.' since the dtype for DS is automatically a float?
-    # elif Format=='DS':
-    #     vals[(vals=='.')] = np.nan
+    # EDIT: ONLY TRUE FOR DOSAGE FILES; maybe not always either
+    elif Format=='DS':
+        vals[(vals=='.')] = np.nan
     vals = vals.astype(np.float32)
     df = pd.concat([df.drop(columns=sampleID), pd.DataFrame(vals, columns=sampleID)], axis=1)
     return df
@@ -563,7 +564,7 @@ def reformat_vcf(df: pd.DataFrame, Format, sampleID, uniqfrmts, singleformat=Tru
     df = df.copy()
     if singleformat:
         val_ind = uniqfrmts[0].split(':').index(Format)
-        df[sampleID]=df[sampleID].applymap(lambda x:x.split(":")[val_ind])
+        df[sampleID]=df[sampleID].applymap(lambda x: x.split(':')[val_ind])
 
     else:
 
