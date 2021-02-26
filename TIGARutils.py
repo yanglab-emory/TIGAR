@@ -33,9 +33,9 @@ import numpy as np
 
 ## Handling covariance files:
 # ld_cols
-# get_regions_list
+# get_ld_regions_list
 # call_tabix_regions
-# get_regions_data
+# get_ld_regions_data
 # get_ld_data
 # get_ld_matrix
 
@@ -72,6 +72,97 @@ def error_handler(func):
 
 # returns absolute path
 def get_abs_path(x): return os.path.abspath(os.path.expanduser(os.path.expandvars(x)))
+
+
+# divide range of positions into intervals of size n or less, convert to tabixable string
+def get_gt_regions_list(chrm, start, end, n):
+    start = int(start)
+    end = int(end)
+    n_regions = ((end - start) // n) + 1
+    for i in range(n_regions):
+        yield chrm + ':' + str(start + (n * i) + i) + '-' + str(min(start + (n * (i + 1)) + i, end))
+
+
+# get proc_out from function and parse data for regions
+def get_gt_regions_data(regs_str, path, g_cols, g_cols_ind, g_dtype):
+
+    proc_out = call_tabix_regions(path, regs_str)
+
+    regs_data = pd.read_csv(
+        StringIO(proc_out.decode('utf-8')),
+        sep='\t',
+        low_memory=False,
+        header=None,
+        names=g_cols,
+        usecols=g_cols_ind,
+        dtype=g_dtype,
+        na_values=['.', '.|.', './.'])
+    regs_data = optimize_cols(regs_data)
+
+    # get snpIDs
+    regs_data['snpID'] = get_snpIDs(regs_data)
+    regs_data = regs_data.drop_duplicates(['snpID'],keep='first').reset_index(drop=True)
+
+    return regs_data
+
+# get genotype data in format needed
+def prep_gt_regions_data(regs_data, genofile_type, format, sampleID): 
+    # prep vcf file
+    if genofile_type == 'vcf':
+        regs_data = check_prep_vcf(regs_data, format, sampleID)
+
+    # reformat sample values
+    regs_data = reformat_sample_vals(regs_data, format, sampleID)
+    
+    return regs_data
+
+# get proc_out from function and parse data for regions, then prep
+def get_prep_gt_regions_data(regs_str, path, g_cols, g_cols_ind, g_dtype, genofile_type, format, sampleID):
+
+    regs_data = get_gt_regions_data(regs_str, path, g_cols, g_cols_ind, g_dtype)
+
+    regs_data = prep_gt_regions_data(regs_data, genofile_type, format, sampleID)
+
+    return regs_data
+
+# read in and prep genotype data
+def read_genotype(path, chr, start, end, g_cols, g_cols_ind, g_dtype, genofile_type, format, sampleID ):
+
+    regs_args = [path, g_cols, g_cols_ind, g_dtype]
+    prep_args = [genofile_type, format, sampleID]
+
+    try:
+        regs_str = chr + ':' + start + '-' + end
+        gt_data = get_prep_gt_regions_data(regs_str, *regs_args, *prep_args)
+    except MemoryError:
+        # data may be too large; if so try subset instead of getting all SNPs at once
+        n = 5000
+        while n:
+            try: 
+                regs_str_lst = get_gt_regions_list(chrm, start, end, n)
+                gt_data = pd.concat([get_gt_regions_data(regs_str, *regs_args) for regs_str in regs_str_lst])
+            except MemoryError:
+                n -= 500
+                pass
+            else:
+                n = 0
+        # if still memory issues, read in AND prep data by format
+        if not gt_data:
+            n = 5000
+            while n:
+                try: 
+                    regs_str_lst = get_gt_regions_list(chrm, start, end, n)
+                    gt_data = pd.concat([get_prep_gt_regions_data(regs_str, *regs_args, *prep_args) for regs_str in regs_str_lst])
+                except MemoryError:
+                    n -= 500
+                    pass
+                else:
+                    n = 0
+        else:
+            # if able to read in SNPs, still need to prep
+            gt_data = prep_gt_regions_data(gt_data, genofile_type, format, sampleID)
+
+    return gt_data
 
 
 # Call tabix, read in lines into byte array
@@ -378,7 +469,7 @@ def get_ld_cols(path):
 
 
 # yields formatted tabix regions strings
-def get_regions_list(snp_ids):
+def get_ld_regions_list(snp_ids):
 
     # 'chrm:' prefix for region string 
     chrm = snp_ids[0].split(':')[0] + ':'
@@ -419,7 +510,7 @@ def call_tabix_regions(path, regs_str):
 
 
 # get proc_out from function and parse data for regions
-def get_regions_data(regs_str, path, snp_ids, ld_cols, ld_cols_ind):
+def get_ld_regions_data(regs_str, path, snp_ids, ld_cols, ld_cols_ind):
 
     proc_out = call_tabix_regions(path, regs_str)
 
@@ -448,14 +539,14 @@ def get_ld_data(path, snp_ids):
     ld_cols, ld_cols_ind = get_ld_cols(path)
 
     # format tabix regions from snp_ids; 'chr:start-end'
-    regs_lst = list(get_regions_list(snp_ids))
+    regs_lst = list(get_ld_regions_list(snp_ids))
     N = len(regs_lst)
 
     # arguments to pass
     regs_args = [path, snp_ids, ld_cols, ld_cols_ind]
     try:
         regs_str = ' '.join(regs_lst)
-        cov_data = get_regions_data(regs_str, *regs_args)
+        cov_data = get_ld_regions_data(regs_str, *regs_args)
     except OSError:
         # argument may be too long for OS; if so try subset instead of getting all regions at once
         # print('Subseting regions to tabix.')
@@ -463,7 +554,7 @@ def get_ld_data(path, snp_ids):
         while n:
             try: 
                 regs_str_lst = [' '.join(regs_lst[i:i+n]) for i in range(0, N, n)]
-                cov_data = pd.concat([get_regions_data(regs_str, *regs_args) for regs_str in regs_str_lst])
+                cov_data = pd.concat([get_ld_regions_data(regs_str, *regs_args) for regs_str in regs_str_lst])
             except OSError:
                 n -= 500
                 pass
