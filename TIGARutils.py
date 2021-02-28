@@ -345,6 +345,8 @@ def genofile_cols_dtype(file_cols, type, sampleid):
         'REF': object,
         'ALT': object,
         'FORMAT': object,
+        'snpID': object,
+        'ID': object,
          **{x:sampleid_dtype for x in sampleid}}
 
     if type == 'vcf':
@@ -634,16 +636,15 @@ def optimize_cols(df: pd.DataFrame):
 ### For DS Format:
 ### code '.' as nan(missing)
 def reformat_sample_vals(df: pd.DataFrame, Format, sampleID):
-    df = df.copy()
+    df = df.reset_index(drop=True).copy()
     vals = df[sampleID].values
     if Format=='GT':
         vals[(vals=='0|0')|(vals=='0/0')] = 0
         vals[(vals=='1|0')|(vals=='1/0')|(vals=='0|1')|(vals=='0/1')] = 1
         vals[(vals=='1|1')|(vals=='1/1')] = 2
         vals[(vals=='.|.')|(vals=='./.')] = np.nan
-    # shouldnt ever *be* a string '.' since the dtype for DS is automatically a float?
-    # elif Format=='DS':
-    #     vals[(vals=='.')] = np.nan
+    elif Format=='DS':
+        vals[(vals=='.')] = np.nan
     vals = vals.astype(np.float32)
     df = pd.concat([df.drop(columns=sampleID), pd.DataFrame(vals, columns=sampleID)], axis=1)
     return df
@@ -654,7 +655,7 @@ def reformat_vcf(df: pd.DataFrame, Format, sampleID, uniqfrmts, singleformat=Tru
     df = df.copy()
     if singleformat:
         val_ind = uniqfrmts[0].split(':').index(Format)
-        df[sampleID]=df[sampleID].applymap(lambda x:x.split(":")[val_ind])
+        df[sampleID]=df[sampleID].applymap(lambda x: x.split(':')[val_ind])
 
     else:
 
