@@ -445,7 +445,7 @@ def thread_process(num):
     end = str(int(target_exp.GeneEnd) + args.window)
 
     # READ IN AND PROCESS GENOTYPE DATA 
-    target_geno = read_genotype(args.geno_path, args.chr, start, end, g_cols, g_cols_ind, g_dtype, args.genofile_type, args.format, sampleID)
+    target_geno = tg.read_genotype(args.geno_path, args.chr, start, end, g_cols, g_cols_ind, g_dtype, args.genofile_type, args.format, sampleID)
     # # Requirement for input vcf file: Must be bgzip and tabix
     # ### select corresponding vcf file by tabix
     # print('Reading genotype data.')
