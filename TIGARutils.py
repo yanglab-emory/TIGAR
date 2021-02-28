@@ -139,7 +139,7 @@ def read_genotype(path, chr, start, end, g_cols, g_cols_ind, g_dtype, genofile_t
         n = 5000
         while n:
             try: 
-                regs_str_lst = get_gt_regions_list(chrm, start, end, n)
+                regs_str_lst = get_gt_regions_list(chr, start, end, n)
                 gt_data = pd.concat([get_gt_regions_data(regs_str, *regs_args) for regs_str in regs_str_lst])
             except MemoryError:
                 n -= 500
@@ -151,7 +151,7 @@ def read_genotype(path, chr, start, end, g_cols, g_cols_ind, g_dtype, genofile_t
             n = 5000
             while n:
                 try: 
-                    regs_str_lst = get_gt_regions_list(chrm, start, end, n)
+                    regs_str_lst = get_gt_regions_list(chr, start, end, n)
                     gt_data = pd.concat([get_prep_gt_regions_data(regs_str, *regs_args, *prep_args) for regs_str in regs_str_lst])
                 except MemoryError:
                     n -= 500
