@@ -82,7 +82,7 @@ def empty_df_handler(func):
         try:
             return func(num, *args, **kwargs)
 
-        except pd.errors.EmptyDataError as e:
+        except (pd.errors.EmptyDataError, pd.errors.ParserError, AttributeError) as e:
             e_info = sys.exc_info()
             e_type = e_info[0].__name__
             
@@ -108,14 +108,26 @@ def get_gt_regions_data(regs_str, path, g_cols, g_cols_ind, g_dtype):
 
     proc_out = call_tabix_regions(path, regs_str)
 
-    regs_data = pd.read_csv(
-        StringIO(proc_out.decode('utf-8')),
-        sep='\t',
-        low_memory=False,
-        header=None,
-        usecols=g_cols_ind,
-        dtype=g_dtype,
-        na_values=['.', '.|.', './.'])
+    try:
+        regs_data = pd.read_csv(
+            StringIO(proc_out.decode('utf-8')),
+            sep='\t',
+            low_memory=False,
+            header=None,
+            usecols=g_cols_ind,
+            dtype=g_dtype)
+    except pd.errors.ParserError as e:
+        regs_chunks = pd.read_csv(
+            StringIO(proc_out.decode('utf-8')),
+            sep='\t',
+            low_memory=False,
+            header=None,
+            iterator=True,
+            chunksize=5000,
+            usecols=g_cols_ind,
+            dtype=g_dtype)
+        regs_data = pd.concat([chunk for chunk in regs_chunks]).reset_index(drop=True)
+
     regs_data.columns = [g_cols[i] for i in regs_data.columns]
     regs_data = optimize_cols(regs_data)
 
@@ -156,14 +168,14 @@ def read_genotype(path, chr, start, end, g_cols, g_cols_ind, g_dtype, genofile_t
     try:
         regs_str = chr + ':' + start + '-' + end
         gt_data = get_prep_gt_regions_data(regs_str, *regs_args, *prep_args)
-    except MemoryError:
+    except (MemoryError, pd.errors.ParserError):
         # data may be too large; if so try subset instead of getting all SNPs at once
-        n = 45000
+        n = 25000
         while n:
             try: 
                 regs_str_lst = get_gt_regions_list(chr, start, end, n)
-                gt_data = pd.concat([get_gt_regions_data(regs_str, *regs_args) for regs_str in regs_str_lst])
-            except MemoryError:
+                gt_data = pd.concat([get_prep_gt_regions_data(regs_str, *regs_args, *prep_args) for regs_str in regs_str_lst])
+            except (MemoryError, pd.errors.ParserError):
                 if (n > 10000):
                     n -= 10000
                 elif (n > 3000):
@@ -173,27 +185,6 @@ def read_genotype(path, chr, start, end, g_cols, g_cols_ind, g_dtype, genofile_t
                 pass
             else:
                 n = 0
-        # if still memory issues, read in AND prep data by format
-        if gt_data.empty:
-            n = 45000
-            while n:
-                try: 
-                    regs_str_lst = get_gt_regions_list(chr, start, end, n)
-                    gt_data = pd.concat([get_prep_gt_regions_data(regs_str, *regs_args, *prep_args) for regs_str in regs_str_lst])
-                except MemoryError:
-                    if (n > 10000):
-                        n -= 10000
-                    elif (n > 3000):
-                        n -= 1000
-                    else:
-                        n -= 500
-                    pass
-                else:
-                    n = 0
-        else:
-            # if able to read in SNPs, still need to prep
-            gt_data = prep_gt_regions_data(gt_data, genofile_type, format, sampleID)
-
     return gt_data
 
 
@@ -684,7 +675,7 @@ def reformat_sample_vals(df: pd.DataFrame, Format, sampleID):
 
 # reformats a vcf dataframe
 def reformat_vcf(df: pd.DataFrame, Format, sampleID, uniqfrmts, singleformat=True):
-    df = df.copy()
+    # df = df.copy()
     if singleformat:
         val_ind = uniqfrmts[0].split(':').index(Format)
         df[sampleID]=df[sampleID].applymap(lambda x: x.split(':')[val_ind])
@@ -699,9 +690,9 @@ def reformat_vcf(df: pd.DataFrame, Format, sampleID, uniqfrmts, singleformat=Tru
 
     return df
 
-
+@empty_df_handler
 def check_prep_vcf(df: pd.DataFrame, Format, sampleID):
-    df = df.copy()
+    # df = df.copy()
 
     # check that all rows include data in the args.format format
     rowfrmts = np.unique(df.FORMAT.values)
@@ -731,6 +722,7 @@ def check_prep_vcf(df: pd.DataFrame, Format, sampleID):
 
 
 # TIGAR currently only works with bi-allelic GT data
+@empty_df_handler
 def handle_multi_allele(df: pd.DataFrame, sampleID):
     df = df.copy()
 
@@ -738,18 +730,18 @@ def handle_multi_allele(df: pd.DataFrame, sampleID):
         './.', '0/0', '0/1', '1/0', '1/1']
 
     # remove rows where any value contains an alt alleles; remaining values should be biallelic or missing
-    n_snps = df.shape[0]
+    # n_snps = df.shape[0]
 
-    drop_index = df.loc[np.all(df[sampleID].isin(valid_GT), axis=1)].index
+    drop_index = df.loc[~np.all(df[sampleID].isin(valid_GT), axis=1)].index
     df = df.drop(index=drop_index)
     df = df.reset_index(drop=True)
 
     # df = df[np.all(df[sampleID].isin(valid_GT), axis=1)].reset_index(drop=True)
 
-    n_snps_removed = n_snps - df.shape[0]
+    # n_snps_removed = n_snps - df.shape[0]
 
-    if n_snps_removed:
-        print('Multi-allelic GT calls: Removed {} variants with alternate call >1.'.format(n_snps_removed))
+    # if n_snps_removed:
+    #     print('Multi-allelic GT calls: Removed {} variants with alternate call >1.'.format(n_snps_removed))
 
     # reformat ALT and snpIDs for remaining rows to contain only first alt allele
     df[['snpID','ALT']] = df[['snpID','ALT']].applymap(lambda x: x.split(',')[0])
