@@ -171,6 +171,7 @@ def read_genotype(path, chr, start, end, g_cols, g_cols_ind, g_dtype, genofile_t
     except (MemoryError, pd.errors.ParserError):
         # data may be too large; if so try subset instead of getting all SNPs at once
         n = 25000
+        # *** DECREASE THIS
         while n:
             try: 
                 regs_str_lst = get_gt_regions_list(chr, start, end, n)
