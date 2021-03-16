@@ -35,8 +35,9 @@
 		- [TWAS with individual-level GWAS data](#twas-using-individual-level-gwas-data)
 		- [TWAS with summary-level GWAS data](#twas-using-summary-level-gwas-data)
 	- [4. Generate Reference LD Genotype Covariance Files](#4-generate-reference-ld-genotype-covariance-files)
-	- [5. VC-TWAS with individual-level GWAS data](#5-vc-twas-using-individual-level-gwas-data)
-	- [6. VC-TWAS with summary-level GWAS data](#5-vc-twas-using-summary-level-gwas-data)
+	- [5. VC-TWAS](#5-vc-twas)
+		- [VC-TWAS with individual-level GWAS data](#vc-twas-using-individual-level-gwas-data)
+		- [VC-TWAS with summary-level GWAS data](#vc-twas-using-summary-level-gwas-data)
 - [Updates](#updates)
 - [Reference](#reference)
 
