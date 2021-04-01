@@ -28,47 +28,50 @@ start_time = time()
 parser = argparse.ArgumentParser(description='DPR Training')
 
 # Specify tool directory
-parser.add_argument('--TIGAR_dir',type=str)
+parser.add_argument('--TIGAR_dir', type=str)
 
 # for Gene annotation and Expression-level file path
-parser.add_argument('--gene_exp',type=str,dest='geneexp_path')
+parser.add_argument('--gene_exp', type=str, dest='geneexp_path')
 
 # training genotype file sampleIDs path
-parser.add_argument('--train_sampleID',type=str,dest='sampleid_path')
+parser.add_argument('--train_sampleID', type=str, dest='sampleid_path')
 
 # specified chromosome number
-parser.add_argument('--chr',type=str)
+parser.add_argument('--chr', type=str)
 
 # Genotype file path
-parser.add_argument('--genofile',type=str,dest='geno_path')
+parser.add_argument('--genofile', type=str, dest='geno_path')
 
 # specified input file type (vcf or dosages)
-parser.add_argument('--genofile_type',type=str)
+parser.add_argument('--genofile_type', type=str)
 
 # format of genotype data 'DS' or 'GT'
-parser.add_argument('--format',type=str)
+parser.add_argument('--format', type=str)
 
 # window
-parser.add_argument('--window',type=int)
+parser.add_argument('--window', type=int)
 
 # missing rate: threshold for excluding SNPs with too many missing values
-parser.add_argument('--missing_rate',type=float)
+parser.add_argument('--missing_rate', type=float)
 
 # maf
-parser.add_argument('--maf',type=float)
+parser.add_argument('--maf', type=float)
 
 # p-value for HW test
-parser.add_argument('--hwe',type=float)
+parser.add_argument('--hwe', type=float)
 
 # cvR2
 ## 0 do not run cvR2
 ## 1 run cvR2 [default]
-parser.add_argument('--cvR2',type=int)
+parser.add_argument('--cvR2', type=int)
+
+# threshold cvR2 value for training (default: 0.005)
+parser.add_argument('--cvR2_threshold', type=float)
 
 # Bayesian inference algorithm used by DPR: 
 ## '1' (Variational Bayesian)
 ## '2' (MCMC)
-parser.add_argument('--dpr',type=str)
+parser.add_argument('--dpr', type=str)
 
 # output effect-size
 ## 'fixed' (fixed effects) [default]
@@ -83,10 +86,10 @@ parser.add_argument('--out_info_file', type=str)
 parser.add_argument('--job_suf', type=str)
 
 # threads to use
-parser.add_argument('--thread',type=int)
+parser.add_argument('--thread', type=int)
 
 # output dir
-parser.add_argument('--out_dir',type=str)
+parser.add_argument('--out_dir', type=str)
 
 args = parser.parse_args()
 
@@ -297,7 +300,7 @@ MAF threshold for SNP inclusion: {maf}
 
 HWE p-value threshold for SNP inclusion: {hwe}
 
-{cvR2_str} DPR model by 5-fold cross validation.
+{cvR2_str1} DPR model by 5-fold cross validation{cvR2_str2}.
 
 DPR model: {dpr} - {dpr_type}
 
@@ -313,7 +316,8 @@ Output training info file: {out_info}
 ********************************'''.format(
     **args.__dict__,
     dpr_type = {'1':'Variational Bayesian', '2':'MCMC'}[args.dpr],
-    cvR2_str = {0:'Skipping evaluation of', 1:'Evaluating'}[args.cvR2],
+    cvR2_str1 = {0:'Skipping evaluation of', 1:'Evaluating'}[args.cvR2],
+    cvR2_str2 = {0:'', 1:' with inclusion threshold Avg.CVR2 >' + args.cvR2_threshold}[args.cvR2],
     out_weight = out_train_weight_path,
     out_info = out_train_info_path))
 
@@ -338,7 +342,6 @@ try:
     g_cols = tg.call_tabix_header(args.geno_path)
 except: 
     g_cols = tg.get_header(args.geno_path, zipped=True)
-
 
 gcol_sampleids = g_cols[gcol_sampleids_strt_ind:]
 
@@ -423,7 +426,7 @@ pd.DataFrame(columns=weight_out_cols).to_csv(
     mode='w')
 
 print('Creating file: ' + out_train_info_path + '\n')
-info_out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName','sample_size','n_snp', 'n_effect_snp','CVR2','TrainPVALUE','TrainR2']
+info_out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName','sample_size','n_snp', 'n_effect_snp','CVR2','TrainPVALUE','TrainR2','CVR2_threshold']
 pd.DataFrame(columns=info_out_cols).to_csv(
     out_train_info_path,
     sep='\t',
@@ -502,8 +505,8 @@ def thread_process(num):
 
         print('Average R2 for 5-fold CV: {:.4f}'.format(avg_r2_cv))
 
-        if avg_r2_cv < 0.005:
-            print('Average R2 < 0.005; Skipping DPR training for TargetID: ' + target + '\n')
+        if avg_r2_cv < args.cvR2_threshold:
+            print('Average R2 < ' + args.cvR2_threshold + '; Skipping DPR training for TargetID: ' + target + '\n')
             return None
 
     else:
@@ -571,6 +574,7 @@ def thread_process(num):
     train_info['CVR2'] = avg_r2_cv
     train_info['TrainPVALUE'] = train_pvalue
     train_info['TrainR2'] = train_rsquared
+    train_info['CVR2_threshold'] = args.cvR2_threshold
 
     # output training info
     train_info.to_csv(

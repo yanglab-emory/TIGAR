@@ -36,7 +36,7 @@
 
 #################################
 VARS=`getopt -o "" -a -l \
-model:,gene_exp:,train_sampleID:,chr:,genofile_type:,genofile:,format:,missing_rate:,maf:,hwe:,window:,cvR2:,cv:,alpha:,use_alpha:,dpr:,ES:,TIGAR_dir:,thread:,out_dir:,sub_dir:,out_weight_file:,out_info_file:,log_file:,job_suf: \
+model:,gene_exp:,train_sampleID:,chr:,genofile_type:,genofile:,format:,missing_rate:,maf:,hwe:,window:,cvR2:,cvR2_threshold:,cv:,alpha:,use_alpha:,dpr:,ES:,TIGAR_dir:,thread:,out_dir:,sub_dir:,out_weight_file:,out_info_file:,log_file:,job_suf: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -62,6 +62,7 @@ do
         --hwe|-hwe) hwe=$2; shift 2;;
         --window|-window) window=$2; shift 2;;
         --cvR2|-cvR2) cvR2=$2; shift 2;;
+        --cvR2_threshold|-cvR2_threshold) cvR2_threshold=$2; shift 2;;
         --cv|-cv) cv=$2; shift 2;;
         --alpha|-alpha) alpha=$2; shift 2;;
         --use_alpha|-use_alpha) use_alpha=$2; shift 2;;
@@ -80,6 +81,8 @@ do
         esac
 done
 
+
+
 ##########################################
 # Setting Default Input Argument Values 
 ##########################################
@@ -90,6 +93,7 @@ maf=${maf:-0.01}
 hwe=${hwe:-0.00001}
 window=${window:-$((10**6))}
 cvR2=${cvR2:-1}
+cvR2_threshold=${cvR2_threshold:-0.005}
 cv=${cv:-5}
 alpha=${alpha:-0.5}
 dpr_num=${dpr_num:-1} # 1 is for VB ; 2 is for MCMC
@@ -170,6 +174,7 @@ if [[ "$model"x == "elastic_net"x ]];then
     --hwe ${hwe} \
     --window ${window} \
     --cvR2 ${cvR2} \
+    --cvR2_threshold ${cvR2_threshold} \
     --cv ${cv} \
     --thread ${thread} \
     --alpha ${alpha} \
@@ -231,6 +236,7 @@ elif [[ "$model"x == "DPR"x ]]; then
     --maf ${maf} \
     --window ${window} \
     --cvR2 ${cvR2} \
+    --cvR2_threshold ${cvR2_threshold} \
     --dpr ${dpr_num} \
     --ES ${ES} \
     --out_weight_file ${out_weight_file} \

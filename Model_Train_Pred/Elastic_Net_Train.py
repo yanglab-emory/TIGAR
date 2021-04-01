@@ -39,59 +39,62 @@ start_time = time()
 parser = argparse.ArgumentParser(description='Elastic Net Training')
 
 # Specify tool directory
-parser.add_argument('--TIGAR_dir',type=str)
+parser.add_argument('--TIGAR_dir', type=str)
 
 # Gene Annotation and Expression level file path
-parser.add_argument('--gene_exp',type=str,dest='geneexp_path')
+parser.add_argument('--gene_exp', type=str, dest='geneexp_path')
 
 # Training sampleID path
-parser.add_argument('--train_sampleID',type=str,dest='sampleid_path')
+parser.add_argument('--train_sampleID', type=str, dest='sampleid_path')
 
 # Specified chromosome number
-parser.add_argument('--chr',type=str)
+parser.add_argument('--chr', type=str)
 
 # Training genotype file path
-parser.add_argument('--genofile',type=str,dest='geno_path')
+parser.add_argument('--genofile', type=str, dest='geno_path')
 
 # Specified input file type(vcf or dosages)
-parser.add_argument('--genofile_type',type=str)
+parser.add_argument('--genofile_type', type=str)
 
 # 'DS' or 'GT' for VCF genotype file
-parser.add_argument('--format',type=str)
+parser.add_argument('--format', type=str)
 
 # window
-parser.add_argument('--window',type=int)
+parser.add_argument('--window', type=int)
 
 # missing rate: threshold for excluding SNPs with too many missing values
-parser.add_argument('--missing_rate',type=float)
+parser.add_argument('--missing_rate', type=float)
 
 # Folded Minor Allele Frequency (range from 0-0.5) threshold
-parser.add_argument('--maf',type=float)
+parser.add_argument('--maf', type=float)
 
 # p-value for Hardy Weinberg Equilibrium exact test threshold
-parser.add_argument('--hwe',type=float)
+parser.add_argument('--hwe', type=float)
 
 # cvR2 (0: no CV, 1: CV)
-parser.add_argument('--cvR2',type=int)
+parser.add_argument('--cvR2', type=int)
+
+# threshold cvR2 value for training (default: 0.005)
+parser.add_argument('--cvR2_threshold', type=float)
 
 # k-fold cross validation (for EN model training)
-parser.add_argument('--cv',type=int)
+parser.add_argument('--cv', type=int)
 
 # Ratio of L1 and L2 (for EN model training)
-parser.add_argument('--alpha',type=float)
+parser.add_argument('--alpha', type=float)
 
 # Use specified args.alpha? (0: [0.1, 0.5, 0.9, 1], 1: args.alpha)
-parser.add_argument('--use_alpha',type=int)
+parser.add_argument('--use_alpha', type=int)
 
 # file paths
 parser.add_argument('--out_weight_file', type=str)
 parser.add_argument('--out_info_file', type=str)
 
 # Number of thread
-parser.add_argument('--thread',type=int)
+parser.add_argument('--thread', type=int)
 
 # output dir
-parser.add_argument('--out_dir',type=str)
+parser.add_argument('--out_dir', type=str)
 
 args = parser.parse_args()
 
@@ -214,7 +217,7 @@ MAF threshold for SNP inclusion: {maf}
 
 HWE p-value threshold for SNP inclusion: {hwe}
 
-{cvR2_str} Elastic-Net model by 5-fold cross validation.
+{cvR2_str1} Elastic-Net model by 5-fold cross validation{cvR2_str2}.
 
 Number of cross-validation folds used to tune Elastic-Net penalty parameter (lambda): {cv}
 
@@ -229,7 +232,8 @@ Output training weights file: {out_weight}
 Output training info file: {out_info}
 ********************************'''.format(
     **args.__dict__,
-    cvR2_str = {0:'Skipping evaluation of', 1:'Evaluating'}[args.cvR2],
+    cvR2_str1 = {0:'Skipping evaluation of', 1:'Evaluating'}[args.cvR2],
+    cvR2_str2 = {0:'', 1:' with inclusion threshold Avg.CVR2 >' + args.cvR2_threshold}[args.cvR2],
     out_weight = out_train_weight_path,
     out_info = out_train_info_path))
 
@@ -323,7 +327,7 @@ pd.DataFrame(columns=weight_out_cols).to_csv(
     mode='w')
 
 print('Creating file: ' + out_train_info_path + '\n')
-info_out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName','sample_size','n_snp','n_effect_snp','CVR2','TrainPVALUE','TrainR2','k-fold','alpha','Lambda','cvm']
+info_out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName','sample_size','n_snp','n_effect_snp','CVR2','TrainPVALUE','TrainR2','k-fold','alpha','Lambda','cvm','CVR2_threshold']
 pd.DataFrame(columns=info_out_cols).to_csv(
     out_train_info_path,
     header=True,
@@ -364,7 +368,7 @@ def thread_process(num):
 
     # get snpIDs
     target_geno['snpID'] = tg.get_snpIDs(target_geno)
-    target_geno = target_geno.drop_duplicates(['snpID'],keep='first').reset_index(drop=True)
+    target_geno = target_geno.drop_duplicates(['snpID'], keep='first').reset_index(drop=True)
 
     n_snp = target_geno['snpID'].size
 
@@ -406,10 +410,9 @@ def thread_process(num):
 
         print('Average R2 for 5-fold CV: {:.4f}'.format(avg_r2_cv))
 
-        if avg_r2_cv < 0.005:
-            print('Average R2 < 0.005; Skipping Elastic-Net training for TargetID: ' + target + '\n')
+        if avg_r2_cv < args.cvR2_threshold:
+            print('Average R2 < ' + args.cvR2_threshold + '; Skipping Elastic-Net training for TargetID: ' + target + '\n')
             return None
-
     else:
         avg_r2_cv = 0
         print('Skipping evaluation by 5-fold CV average R2...')
@@ -450,6 +453,7 @@ def thread_process(num):
     train_info['alpha'] = Alpha
     train_info['lambda'] = Lambda
     train_info['cvm'] = cvm
+    train_info['CVR2_threshold'] = args.cvR2_threshold
 
     train_info.to_csv(
         out_train_info_path,
