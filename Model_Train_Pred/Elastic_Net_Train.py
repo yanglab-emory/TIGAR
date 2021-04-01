@@ -16,13 +16,10 @@ import numpy as np
 import pandas as pd
 
 ### import grid search for model selection
-from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import KFold
 
 ### For Elastic Net Regression
-from sklearn.linear_model import ElasticNet
 from sklearn.linear_model import ElasticNetCV
-# from sklearn.metrics import r2_score
 
 ### For OLS regression in cross validation
 from scipy import stats
