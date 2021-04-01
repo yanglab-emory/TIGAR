@@ -21,7 +21,7 @@
 
 #######################################################################
 VARS=`getopt -o "" -a -l \
-chr:,weight:,gene_anno:,genofile_type:,genofile:,test_sampleID:,format:,window:,missing_rate:,maf_diff:,TIGAR_dir:,thread:,out_dir: \
+chr:,weight:,gene_anno:,genofile_type:,genofile:,test_sampleID:,format:,window:,missing_rate:,maf_diff:,TIGAR_dir:,sub_dir:,thread:,out_dir: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -45,6 +45,7 @@ do
         --window|-window) window=$2; shift 2;;
         --missing_rate|-missing_rate) missing_rate=$2; shift 2;;
         --maf_diff|-maf_diff) maf_diff=$2; shift 2;;
+        --sub_dir|-sub_dir) sub_dir=$2; shift 2;;
         --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
         --thread|-thread) thread=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
@@ -58,11 +59,18 @@ window=${window:-$((10**6))}
 missing_rate=${missing_rate:-0.2}
 maf_diff=${maf_diff:-0.2}
 thread=${thread:-1}
+sub_dir=${sub_dir:-1}
 
 #### Create output directory if not existed
 mkdir -p ${out_dir}
 mkdir -p ${out_dir}/logs
-mkdir -p ${out_dir}/Pred_CHR${chr}
+
+if [[ "$sub_dir"x == "1"x ]];then
+    out_sub_dir=${out_dir}/Pred_CHR${chr}
+else
+    out_sub_dir=${out_dir}
+fi
+mkdir -p ${out_sub_dir}
 
 ####################################################
 # check tabix command
@@ -115,7 +123,7 @@ python ${TIGAR_dir}/Model_Train_Pred/Prediction.py \
 --maf_diff ${maf_diff} \
 --missing_rate ${missing_rate} \
 --TIGAR_dir ${TIGAR_dir} \
---out_dir ${out_dir}/Pred_CHR${chr} \
+--out_dir ${out_sub_dir} \
 > ${out_dir}/logs/CHR${chr}_Pred_log.txt
     
 
