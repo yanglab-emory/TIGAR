@@ -233,7 +233,7 @@ Output training info file: {out_info}
 ********************************'''.format(
     **args.__dict__,
     cvR2_str1 = {0:'Skipping evaluation of', 1:'Evaluating'}[args.cvR2],
-    cvR2_str2 = {0:'', 1:' with inclusion threshold Avg.CVR2 >' + args.cvR2_threshold}[args.cvR2],
+    cvR2_str2 = {0:'', 1:' with inclusion threshold Avg.CVR2 >' + str(args.cvR2_threshold)}[args.cvR2],
     out_weight = out_train_weight_path,
     out_info = out_train_info_path))
 
@@ -411,7 +411,7 @@ def thread_process(num):
         print('Average R2 for 5-fold CV: {:.4f}'.format(avg_r2_cv))
 
         if avg_r2_cv < args.cvR2_threshold:
-            print('Average R2 < ' + args.cvR2_threshold + '; Skipping Elastic-Net training for TargetID: ' + target + '\n')
+            print('Average R2 < ' + str(args.cvR2_threshold) + '; Skipping Elastic-Net training for TargetID: ' + target + '\n')
             return None
     else:
         avg_r2_cv = 0
