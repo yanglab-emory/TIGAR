@@ -281,7 +281,23 @@ def thread_process(num):
         return None
 
     Weight = Weight[Weight.snpID.isin(snp_overlap)]
-    Zscore = Zscore[Zscore.snpID.isin(snp_overlap)]
+    
+    Zscore = Zscore[Zscore.IDorig.isin(snp_overlap_orig) | Zscore.IDflip.isin(snp_overlap_flip)]
+    Zscore = Zscore.drop(columns=['CHROM','POS','REF','ALT'])
+
+    # np where equiv to 
+    # [xv if c else yv for c, xv, yv in zip(condition, x, y)]
+    Zscore['flip_factor'] = np.where(Zscore.IDorig.isin(snp_overlap_orig), 1, -1)
+    Zscore['snpID'] = np.where(Zscore['flip_factor'] == 1, Zscore.IDorig, Zscore.IDflip)
+    Zscore['Zscore'] = Zscore['flip_factor'] * Zscore['Zscore']
+    
+    # # if handle any flipped matches in Zscore using Weight snpIDs as reference
+    # if (snp_overlap_orig.size > 0) and (snp_overlap_flip.size > 0):
+    #     Zscore['snpID'], Zscore['Zscore'] = handle_flip(Zscore,'IDorig','IDflip','Zscore',snp_overlap_orig, snp_overlap_flip)
+    # elif snp_overlap_orig.size == snp_overlap.size:   
+    #     Zscore['snpID'], Zscore['Zscore'] = Zscore['IDorig'], Zscore['Zscore']
+    # else:
+    #     Zscore['snpID'], Zscore['Zscore'] = Zscore['IDflip'], -Zscore['Zscore']
 
     # merge Zscore and Weight dataframes on snpIDs
     ZW = Weight.merge(Zscore[['snpID','Zscore']], 

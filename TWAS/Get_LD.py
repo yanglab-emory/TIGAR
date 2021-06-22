@@ -61,7 +61,14 @@ sys.path.append(args.TIGAR_dir)
 import TIGARutils as tg
 
 # limit to 4 decimal places max, strip trailing 0s
+# def cov_print_frmt(x): return ('%.4f' % x).rstrip('0').rstrip('.')
 def cov_fmt(x): return ('%.4f' % x).rstrip('0').rstrip('.')
+
+# # returns formatted covariance string from a row array, 
+# # max_line_width=np.Inf prevents adding '\n'
+# # np.array2string wraps values in '[]', also need to strip leading ,
+# def cov_str(x): return np.array2string(x, threshold=np.inf, max_line_width=np.inf, separator=',', 
+#     formatter={'float_kind': cov_print_frmt}).strip('[,]')
 
 # trim array by positionin matrix (length should be rownumber:total for each row);
 # format each element in each row, join all together separated by comma
@@ -113,6 +120,8 @@ Output reference covariance results file: {out_rc}
     **args.__dict__,
     out_rc = out_ref_cov_path))
 
+tg.print_args(args)
+
 ###############################################################
 # Read in block information
 print('Reading block annotation file.')
@@ -148,7 +157,7 @@ g_cols_ind, g_dtype = tg.genofile_cols_dtype(g_cols, args.genofile_type, sampleI
 
 # write columns out to file
 print('Creating file: ' + out_ref_cov_path + '\n')
-out_cols = ['#snpID', 'CHROM', 'POS', 'COV']
+out_cols = ['#snpID', 'CHROM', 'POS', 'block', 'blockpos',  'COV']
 pd.DataFrame(columns=out_cols).to_csv(
     out_ref_cov_path,
     sep='\t',
@@ -200,6 +209,9 @@ def thread_process(num):
 
     # output values
     block_geno = block_geno[['snpID', 'CHROM', 'POS']]
+    block_geno['block'] = num
+    block_geno['blockpos'] = block_geno.index
+    # block_geno['COV'] = [cov_str(x) for x in mcovar]
     block_geno['COV'] = cov_str(mcovar)
     block_geno.to_csv(
             out_ref_cov_path,

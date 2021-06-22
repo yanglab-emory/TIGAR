@@ -49,14 +49,18 @@ parser.add_argument('--window',type=int)
 # Gene annotation file path
 parser.add_argument('--gene_anno',type=str,dest='annot_path')
 
-# number of thread
-parser.add_argument('--thread',type=int)
 
 # missing rate: threshold for excluding SNPs with too many missing values
 parser.add_argument('--missing_rate',type=float)
 
 # Threshold of difference of maf between training data and testing data
 parser.add_argument('--maf_diff',type=float)
+
+# number of thread
+parser.add_argument('--thread',type=int)
+
+# file paths
+parser.add_argument('--out_pred_file', type=str)
 
 # output dir
 parser.add_argument('--out_dir',type=str)
@@ -120,7 +124,7 @@ elif args.genofile_type == 'dosage':
 else:
     raise SystemExit('Please specify the type input genotype file type (--genofile_type) as either "vcf" or "dosage".\n')
 
-out_pred_path = args.out_dir + '/CHR' + args.chr + '_Pred_GReX.txt'
+out_pred_path = args.out_dir + '/' + args.out_pred_file
 
 ###############################################################
 # Print input arguments

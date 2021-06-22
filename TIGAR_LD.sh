@@ -55,6 +55,7 @@ mkdir -p ${out_dir}
 mkdir -p ${out_dir}/logs
 # mkdir -p ${out_dir}/RefLD
 
+
 # check tabix command
 if [ ! -x "$(command -v tabix)" ]; then
     echo 'Error: required tool TABIX is not available.' >&2
@@ -66,7 +67,7 @@ if [ ! -f "${genofile}" ] ; then
     echo Error: Reference genotype file ${genofile} does not exist or is empty. >&2
     exit 1
 fi
-echo $genofile
+
 
 ################################################
 ### 1. Calculate covariance matrix (LD) of genetic variants
@@ -97,11 +98,16 @@ if [ ! -f ${out_dir}/CHR${chr}_reference_cov.txt ] ; then
     echo Error: Reference LD covariance file ${out_dir}/CHR${chr}_reference_cov.txt was not generated successfully. >&2
     exit 1
 else
+    # tail -n+2 ${out_dir}/CHR${chr}_reference_cov.txt | sort -n -k3 | \
+    #     nl -nln -s$'\t' | \
+    #     awk 'BEGIN{FS=OFS="\t"}{if(NR == 1){print "#0\tsnpID\tCHROM\tPOS\tCOV";} print;}' | \
+    #     bgzip -c > ${out_dir}/CHR${chr}_reference_cov.txt.gz
+    # tabix -f -s3 -b4 -e4 -S1 ${out_dir}/CHR${chr}_reference_cov.txt.gz    
+    # rm -f ${out_dir}/CHR${chr}_reference_cov.txt
     tail -n+2 ${out_dir}/CHR${chr}_reference_cov.txt | sort -n -k3 | \
-        nl -nln -s$'\t' | \
-        awk 'BEGIN{FS=OFS="\t"}{if(NR == 1){print "#0\tsnpID\tCHROM\tPOS\tCOV";} print;}' | \
+        awk 'BEGIN{FS=OFS="\t"}{if(NR == 1){print "#snpID\tCHROM\tPOS\tblock\tblockpos\tCOV";} print;}' | \
         bgzip -c > ${out_dir}/CHR${chr}_reference_cov.txt.gz
-    tabix -f -s3 -b4 -e4 -S1 ${out_dir}/CHR${chr}_reference_cov.txt.gz    
+    tabix -f -s2 -b3 -e3 -S1 ${out_dir}/CHR${chr}_reference_cov.txt.gz    
     rm -f ${out_dir}/CHR${chr}_reference_cov.txt
 fi
 

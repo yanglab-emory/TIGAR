@@ -448,36 +448,37 @@ def thread_process(num):
     end = str(int(target_exp.GeneEnd) + args.window)
 
     # READ IN AND PROCESS GENOTYPE DATA 
-    # Requirement for input vcf file: Must be bgzip and tabix
-    ### select corresponding vcf file by tabix
-    print('Reading genotype data.')
-    g_proc_out = tg.call_tabix(args.geno_path, args.chr, start, end)
+    target_geno = tg.read_genotype(args.geno_path, args.chr, start, end, g_cols, g_cols_ind, g_dtype, args.genofile_type, args.format, sampleID)
+    # # Requirement for input vcf file: Must be bgzip and tabix
+    # ### select corresponding vcf file by tabix
+    # print('Reading genotype data.')
+    # g_proc_out = tg.call_tabix(args.geno_path, args.chr, start, end)
 
-    if not g_proc_out:
-        print('There is no genotype data for TargetID: ' + target + '\n')
-        return None
+    # if not g_proc_out:
+    #     print('There is no genotype data for TargetID: ' + target + '\n')
+    #     return None
 
-    print('Preparing DPR input.')
-    target_geno = pd.read_csv(StringIO(g_proc_out.decode('utf-8')),
-            sep='\t',
-            low_memory=False,
-            header=None,
-            usecols=g_cols_ind,
-            dtype=g_dtype,
-            na_values=['.', '.|.', './.'])
-    target_geno.columns = [g_cols[i] for i in target_geno.columns]
-    target_geno = tg.optimize_cols(target_geno)
+    # print('Preparing DPR input.')
+    # target_geno = pd.read_csv(StringIO(g_proc_out.decode('utf-8')),
+    #         sep='\t',
+    #         low_memory=False,
+    #         header=None,
+    #         usecols=g_cols_ind,
+    #         dtype=g_dtype,
+    #         na_values=['.', '.|.', './.'])
+    # target_geno.columns = [g_cols[i] for i in target_geno.columns]
+    # target_geno = tg.optimize_cols(target_geno)
 
-    # get snpIDs
-    target_geno['snpID'] = tg.get_snpIDs(target_geno)
-    target_geno = target_geno.drop_duplicates(['snpID'],keep='first').reset_index(drop=True)
+    # # get snpIDs
+    # target_geno['snpID'] = tg.get_snpIDs(target_geno)
+    # target_geno = target_geno.drop_duplicates(['snpID'],keep='first').reset_index(drop=True)
 
-    # prep vcf file
-    if args.genofile_type == 'vcf':
-        target_geno = tg.check_prep_vcf(target_geno, args.format, sampleID)
+    # # prep vcf file
+    # if args.genofile_type == 'vcf':
+    #     target_geno = tg.check_prep_vcf(target_geno, args.format, sampleID)
 
-    # reformat sample values
-    target_geno = tg.reformat_sample_vals(target_geno, args.format, sampleID)
+    # # reformat sample values
+    # target_geno = tg.reformat_sample_vals(target_geno, args.format, sampleID)
     
     # filter out variants that exceed missing rate threshold
     target_geno = tg.handle_missing(target_geno, sampleID, args.missing_rate)

@@ -4,6 +4,7 @@
 import functools
 import operator
 import os
+import re
 import subprocess
 import sys
 import traceback
@@ -33,9 +34,9 @@ import numpy as np
 
 ## Handling covariance files:
 # ld_cols
-# get_regions_list
+# get_ld_regions_list
 # call_tabix_regions
-# get_regions_data
+# get_ld_regions_data
 # get_ld_data
 # get_ld_matrix
 
@@ -72,6 +73,120 @@ def error_handler(func):
 
 # returns absolute path
 def get_abs_path(x): return os.path.abspath(os.path.expanduser(os.path.expandvars(x)))
+
+
+# wrapper for genotype functions; adds error handling for when an empty dataframe is read in during concatenation
+def empty_df_handler(func):
+    @functools.wraps(func)
+    def wrapper(num, *args, **kwargs):     
+        try:
+            return func(num, *args, **kwargs)
+
+        except (pd.errors.EmptyDataError, pd.errors.ParserError, AttributeError) as e:
+            e_info = sys.exc_info()
+            e_type = e_info[0].__name__
+            
+            # don't print traceback info for wrapper
+            e_tracebk = ''.join(traceback.format_tb(e_info[2])[1:])
+            return None
+
+    return wrapper
+
+
+# divide range of positions into intervals of size n or less, convert to tabixable string
+def get_gt_regions_list(chrm, start, end, n):
+    start = int(start)
+    end = int(end)
+    n_regions = ((end - start) // n) + 1
+    for i in range(n_regions):
+        yield chrm + ':' + str(start + (n * i) + i) + '-' + str(min(start + (n * (i + 1)) + i, end))
+
+
+# get proc_out from function and parse data for regions
+@empty_df_handler
+def get_gt_regions_data(regs_str, path, g_cols, g_cols_ind, g_dtype):
+
+    proc_out = call_tabix_regions(path, regs_str)
+
+    try:
+        regs_data = pd.read_csv(
+            StringIO(proc_out.decode('utf-8')),
+            sep='\t',
+            low_memory=False,
+            header=None,
+            usecols=g_cols_ind,
+            dtype=g_dtype)
+    except pd.errors.ParserError as e:
+        regs_chunks = pd.read_csv(
+            StringIO(proc_out.decode('utf-8')),
+            sep='\t',
+            low_memory=False,
+            header=None,
+            iterator=True,
+            chunksize=5000,
+            usecols=g_cols_ind,
+            dtype=g_dtype)
+        regs_data = pd.concat([chunk for chunk in regs_chunks]).reset_index(drop=True)
+
+    regs_data.columns = [g_cols[i] for i in regs_data.columns]
+    regs_data = optimize_cols(regs_data)
+
+    # get snpIDs
+    regs_data['snpID'] = get_snpIDs(regs_data)
+    regs_data = regs_data.drop_duplicates(['snpID'],keep='first').reset_index(drop=True)
+
+    return regs_data
+
+# get genotype data in format needed
+@empty_df_handler
+def prep_gt_regions_data(regs_data, genofile_type, format, sampleID): 
+    # prep vcf file
+    if genofile_type == 'vcf':
+        regs_data = check_prep_vcf(regs_data, format, sampleID)
+
+    # reformat sample values
+    regs_data = reformat_sample_vals(regs_data, format, sampleID)
+    
+    return regs_data
+
+# get proc_out from function and parse data for regions, then prep
+@empty_df_handler
+def get_prep_gt_regions_data(regs_str, path, g_cols, g_cols_ind, g_dtype, genofile_type, format, sampleID):
+
+    regs_data = get_gt_regions_data(regs_str, path, g_cols, g_cols_ind, g_dtype)
+
+    regs_data = prep_gt_regions_data(regs_data, genofile_type, format, sampleID)
+
+    return regs_data
+
+# read in and prep genotype data
+def read_genotype(path, chr, start, end, g_cols, g_cols_ind, g_dtype, genofile_type, format, sampleID ):
+
+    regs_args = [path, g_cols, g_cols_ind, g_dtype]
+    prep_args = [genofile_type, format, sampleID]
+
+    try:
+        regs_str = chr + ':' + start + '-' + end
+        gt_data = get_prep_gt_regions_data(regs_str, *regs_args, *prep_args)
+    except (MemoryError, pd.errors.ParserError):
+        # data may be too large; if so try subset instead of getting all SNPs at once
+        n = 25000
+        # *** DECREASE THIS
+        while n:
+            try: 
+                regs_str_lst = get_gt_regions_list(chr, start, end, n)
+                gt_data = pd.concat([get_prep_gt_regions_data(regs_str, *regs_args, *prep_args) for regs_str in regs_str_lst])
+            except (MemoryError, pd.errors.ParserError):
+                if (n > 10000):
+                    n -= 10000
+                elif (n > 3000):
+                    n -= 1000
+                else:
+                    n -= 500
+                pass
+            else:
+                n = 0
+    return gt_data
 
 
 # Call tabix, read in lines into byte array
@@ -380,7 +495,7 @@ def get_ld_cols(path):
 
 
 # yields formatted tabix regions strings
-def get_regions_list(snp_ids):
+def get_ld_regions_list(snp_ids):
 
     # 'chrm:' prefix for region string 
     chrm = snp_ids[0].split(':')[0] + ':'
@@ -421,7 +536,7 @@ def call_tabix_regions(path, regs_str):
 
 
 # get proc_out from function and parse data for regions
-def get_regions_data(regs_str, path, snp_ids, ld_cols, ld_cols_ind):
+def get_ld_regions_data(regs_str, path, snp_ids, ld_cols, ld_cols_ind):
 
     proc_out = call_tabix_regions(path, regs_str)
 
@@ -450,14 +565,14 @@ def get_ld_data(path, snp_ids):
     ld_cols, ld_cols_ind = get_ld_cols(path)
 
     # format tabix regions from snp_ids; 'chr:start-end'
-    regs_lst = list(get_regions_list(snp_ids))
+    regs_lst = list(get_ld_regions_list(snp_ids))
     N = len(regs_lst)
 
     # arguments to pass
     regs_args = [path, snp_ids, ld_cols, ld_cols_ind]
     try:
         regs_str = ' '.join(regs_lst)
-        cov_data = get_regions_data(regs_str, *regs_args)
+        cov_data = get_ld_regions_data(regs_str, *regs_args)
     except OSError:
         # argument may be too long for OS; if so try subset instead of getting all regions at once
         # print('Subseting regions to tabix.')
@@ -465,7 +580,7 @@ def get_ld_data(path, snp_ids):
         while n:
             try: 
                 regs_str_lst = [' '.join(regs_lst[i:i+n]) for i in range(0, N, n)]
-                cov_data = pd.concat([get_regions_data(regs_str, *regs_args) for regs_str in regs_str_lst])
+                cov_data = pd.concat([get_ld_regions_data(regs_str, *regs_args) for regs_str in regs_str_lst])
             except OSError:
                 n -= 500
                 pass
@@ -561,32 +676,24 @@ def reformat_sample_vals(df: pd.DataFrame, Format, sampleID):
 
 # reformats a vcf dataframe
 def reformat_vcf(df: pd.DataFrame, Format, sampleID, uniqfrmts, singleformat=True):
-    df = df.copy()
+    # df = df.copy()
     if singleformat:
         val_ind = uniqfrmts[0].split(':').index(Format)
         df[sampleID]=df[sampleID].applymap(lambda x: x.split(':')[val_ind])
-
     else:
-
         # reformats sample values in row to include only specified format
         def vals_by_format(row):
-            if row.needsplit:
-                val_ind = row.FORMAT.split(':').index(Format)
-                return row[sampleID].apply(lambda y: y.split(':')[val_ind])
-            else:
-                return row[sampleID]
-
-        # specify which rows need to be reformatted
-        df['needsplit'] = substr_in_strarray(':', uniqfrmts)
+            val_ind = row.FORMAT.split(':').index(Format)
+            return row[sampleID].apply(lambda y: y.split(':')[val_ind])
 
         # apply to each row        
         df[sampleID] = df.apply(lambda x: vals_by_format(x), axis=1)
-        df = df.drop(columns=['needsplit'])
+
     return df
 
-
+@empty_df_handler
 def check_prep_vcf(df: pd.DataFrame, Format, sampleID):
-    df = df.copy()
+    # df = df.copy()
 
     # check that all rows include data in the args.format format
     rowfrmts = np.unique(df.FORMAT.values)
@@ -608,7 +715,40 @@ def check_prep_vcf(df: pd.DataFrame, Format, sampleID):
 
     df = df.drop(columns=['FORMAT'])
 
+    # handle multi-allelic
+    if Format == 'GT':
+        df = handle_multi_allele(df, sampleID)
+
     return df
+
+
+# TIGAR currently only works with bi-allelic GT data
+@empty_df_handler
+def handle_multi_allele(df: pd.DataFrame, sampleID):
+    df = df.copy()
+
+    valid_GT = ['.|.', '0|0', '0|1', '1|0', '1|1', 
+        './.', '0/0', '0/1', '1/0', '1/1']
+
+    # remove rows where any value contains an alt alleles; remaining values should be biallelic or missing
+    # n_snps = df.shape[0]
+
+    drop_index = df.loc[~np.all(df[sampleID].isin(valid_GT), axis=1)].index
+    df = df.drop(index=drop_index)
+    df = df.reset_index(drop=True)
+
+    # df = df[np.all(df[sampleID].isin(valid_GT), axis=1)].reset_index(drop=True)
+
+    # n_snps_removed = n_snps - df.shape[0]
+
+    # if n_snps_removed:
+    #     print('Multi-allelic GT calls: Removed {} variants with alternate call >1.'.format(n_snps_removed))
+
+    # reformat ALT and snpIDs for remaining rows to contain only first alt allele
+    df[['snpID','ALT']] = df[['snpID','ALT']].applymap(lambda x: x.split(',')[0])
+
+    return df
+
 
 
 # returns a boolean array; whether substring is in a np object array
@@ -789,4 +929,4 @@ def print_args(args):
             print('args.', key, ' = \'', value, '\'', sep='')
         else:
             print('args.', key, ' = ', value, sep='')
-    print('')
+    print('\n')
