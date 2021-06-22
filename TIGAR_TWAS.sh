@@ -28,7 +28,7 @@
 
 ###############################################################
 VARS=`getopt -o "" -a -l \
-asso:,gene_exp:,gene_anno:,PED:,PED_info:,method:,Zscore:,weight:,LD:,chr:,window:,TIGAR_dir:,thread:,weight_threshold:,out_dir:,sampleID:,test_stat:,test_sampleID: \
+asso:,gene_exp:,gene_anno:,PED:,PED_info:,method:,Zscore:,weight:,LD:,chr:,window:,TIGAR_dir:,thread:,weight_threshold:,sub_dir:,out_dir:,sampleID:,test_stat:,test_sampleID: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -59,6 +59,7 @@ do
         --test_stat|-test_stat) test_stat=$2; shift 2;;
         --sampleID|-sampleID) sampleID=$2; shift 2;;
         --test_sampleID|-test_sampleID) test_sampleID=$2; shift 2;;
+        --sub_dir|-sub_dir) sub_dir=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
         --) shift;break;;
         *) echo "Internal error!";exit 1;;
@@ -71,12 +72,21 @@ window=${window:-$((10**6))}
 method=${method:-'OLS'}
 weight_threshold=${weight_threshold:-0}
 test_stat=${test_stat:-'both'}
+sub_dir=${sub_dir:-1}
+
+# sub directory in out directory
+if [[ "$sub_dir"x == "1"x ]];then
+    out_sub_dir=${out_dir}/TWAS_CHR${chr}
+else
+    out_sub_dir=${out_dir}
+fi
 
 ############# TWAS 
 
 ## make output directory
-mkdir -p ${out_dir}/TWAS_CHR${chr}
+mkdir -p ${out_dir}
 mkdir -p ${out_dir}/logs
+mkdir -p ${out_sub_dir}
 
 if [[ "$asso"x == "1"x ]];then
     echo "Conducting TWAS using individual-level GReX and phenotype data ... "
@@ -111,7 +121,7 @@ if [[ "$asso"x == "1"x ]];then
     --method ${method} \
     --thread ${thread} \
     --TIGAR_dir ${TIGAR_dir} \
-    --out_dir ${out_dir}/TWAS_CHR${chr} \
+    --out_dir ${out_sub_dir} \
     > ${out_dir}/logs/indv_${method}_TWAS_log.txt
 
 elif [[ "$asso"x == "2"x ]];then
@@ -161,7 +171,7 @@ elif [[ "$asso"x == "2"x ]];then
     --thread ${thread} \
     --weight_threshold ${weight_threshold} \
     --test_stat ${test_stat} \
-    --out_dir ${out_dir}/TWAS_CHR${chr} \
+    --out_dir ${out_sub_dir} \
     --TIGAR_dir ${TIGAR_dir} \
     > ${out_dir}/logs/CHR${chr}_TWAS_log.txt
 

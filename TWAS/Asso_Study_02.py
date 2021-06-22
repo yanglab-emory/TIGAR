@@ -149,6 +149,8 @@ Output TWAS results file: {out_path}
     test_stat_str = 'FUSION and SPrediXcan' if args.test_stat=='both' else args.test_stat,
     out_path = out_twas_path))
 
+tg.print_args(args)
+
 ###############################################################
 ### Read in gene annotation 
 print('Reading gene annotation file.')
@@ -259,20 +261,27 @@ def thread_process(num):
     Zscore.columns = [z_cols[i] for i in tuple(Zscore.columns)]
     Zscore = tg.optimize_cols(Zscore)
 
-    Zscore['IDorig'] = tg.get_snpIDs(Zscore)
-    Zscore['IDflip'] = tg.get_snpIDs(Zscore, flip=True)
+    # get snpIDs
+    Zscore['snpID'] = tg.get_snpIDs(Zscore)
+    Zscore['snpIDflip'] = tg.get_snpIDs(Zscore, flip = True)
 
-    # check for overlapping SNPs in Weight, Zscore data
-    snp_overlap_orig = np.intersect1d(Weight.snpID, Zscore.IDorig)
-    snp_overlap_flip = np.intersect1d(Weight.snpID, Zscore.IDflip)
-    snp_overlap = np.concatenate((snp_overlap_orig, snp_overlap_flip))
+    # if not in Weight.snpIDs, assumed flipped; if flipped, flip Zscore sign
+    flip_factor = np.where(Zscore.snpID.isin(Weight.snpID), 1, -1)
+    Zscore['snpID'] = np.where(flip_factor == 1, Zscore.snpID, Zscore.snpIDflip)
+    Zscore['Zscore'] = flip_factor * Zscore['Zscore']
+
+    # drop unneeded columns
+    Zscore = Zscore.drop(columns=['CHROM','POS','REF','ALT','snpIDflip'])
+
+    # filter remaining by snpIDs
+    snp_overlap = np.intersect1d(Weight.snpID, Zscore.snpID)
 
     if not snp_overlap.size:
         print('No overlapping test SNPs that have magnitude of cis-eQTL weights greater than threshold value and with GWAS Zscore for TargetID: ' + target + '\n')
         return None
 
-    # filter dataframes by overlapping SNPs
     Weight = Weight[Weight.snpID.isin(snp_overlap)]
+    
     Zscore = Zscore[Zscore.IDorig.isin(snp_overlap_orig) | Zscore.IDflip.isin(snp_overlap_flip)]
     Zscore = Zscore.drop(columns=['CHROM','POS','REF','ALT'])
 

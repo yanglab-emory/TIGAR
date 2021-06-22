@@ -45,6 +45,7 @@ do
         --window|-window) window=$2; shift 2;;
         --missing_rate|-missing_rate) missing_rate=$2; shift 2;;
         --maf_diff|-maf_diff) maf_diff=$2; shift 2;;
+        --sub_dir|-sub_dir) sub_dir=$2; shift 2;;
         --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
         --thread|-thread) thread=$2; shift 2;;
         --sub_dir|-sub_dir) sub_dir=$2; shift 2;;
@@ -134,8 +135,6 @@ python ${TIGAR_dir}/Model_Train_Pred/Prediction.py \
 --TIGAR_dir ${TIGAR_dir} \
 --out_dir ${out_sub_dir} \
 > ${out_dir}/logs/${log_file}
-
-    
 
 echo Completed prediction.
 

@@ -74,7 +74,6 @@ def cov_fmt(x): return ('%.4f' % x).rstrip('0').rstrip('.')
 # format each element in each row, join all together separated by comma
 def cov_str(cov_lst): return [','.join([cov_fmt(x) for x in row]) for row in [cov_lst[i][i:len(cov_lst)] for i in range(len(cov_lst))]]
 
-
 ###############################################################
 # check input arguments
 if args.genofile_type == 'vcf':
