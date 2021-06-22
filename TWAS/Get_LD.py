@@ -61,13 +61,11 @@ sys.path.append(args.TIGAR_dir)
 import TIGARutils as tg
 
 # limit to 4 decimal places max, strip trailing 0s
-def cov_print_frmt(x): return ('%.4f' % x).rstrip('0.')
+def cov_fmt(x): return ('%.4f' % x).rstrip('0').rstrip('.')
 
-# returns formatted covariance string from a row array, 
-# max_line_width=np.Inf prevents adding '\n'
-# np.array2string wraps values in '[]', also need to strip leading ,
-def cov_str(x): return np.array2string(x, max_line_width=np.Inf, separator=',', 
-    formatter={'float_kind': cov_print_frmt}).strip('[,]')
+# trim array by positionin matrix (length should be rownumber:total for each row);
+# format each element in each row, join all together separated by comma
+def cov_str(cov_lst): return [','.join([cov_fmt(x) for x in row]) for row in [cov_lst[i][i:len(cov_lst)] for i in range(len(cov_lst))]]
 
 ###############################################################
 # check input arguments
@@ -192,17 +190,17 @@ def thread_process(num):
         block_geno = tg.check_prep_vcf(block_geno, args.format, sampleID)
 
     # reformat sample values
-    block_geno[sampleID] = block_geno[sampleID].apply(lambda x:tg.reformat_sample_vals(x,args.format), axis=0)
+    block_geno = tg.reformat_sample_vals(block_geno, args.format, sampleID)
 
     # calculate, filter maf
     block_geno = tg.calc_maf(block_geno, sampleID, args.maf)
 
     # get upper covariance matrix
-    mcovar = np.triu(np.cov(block_geno[sampleID].values))
+    mcovar = np.triu(np.cov(block_geno[sampleID].values)).tolist()
 
     # output values
     block_geno = block_geno[['snpID', 'CHROM', 'POS']]
-    block_geno['COV'] = [cov_str(x) for x in mcovar]
+    block_geno['COV'] = cov_str(mcovar)
     block_geno.to_csv(
             out_ref_cov_path,
             sep='\t',
