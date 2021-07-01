@@ -93,6 +93,88 @@ def empty_df_handler(func):
     return wrapper
 
 
+
+
+# train startup
+def train_startup(geno_path, genofile_type, geneexp_path, sampleid_path, **kwargs):
+
+    print('Reading file headers.\n')
+
+    # expression file header
+    exp_cols = get_header(geneexp_path)
+    exp_sampleids = exp_cols[5:]
+
+    # genotype file header
+    try:
+        geno_cols = call_tabix_header(geno_path)
+    except: 
+        geno_cols = get_header(geno_path, zipped=True)
+
+    # get sampleids in the genotype file
+    geno_sampleids_strt_ind = {'dosage': 5, 'vcf': 9}[genofile_type]
+    geno_sampleids = geno_cols[geno_sampleids_strt_ind:]
+
+    ## read in sampleids file
+    print('Reading sampleID file.\n')
+    spec_sampleids = pd.read_csv(
+        sampleid_path,
+        sep='\t',
+        header=None)[0].drop_duplicates()
+
+    ## match sampleids between files
+    print('Matching sampleIDs.\n')
+    sampleID = functools.reduce(np.intersect1d, (exp_sampleids, geno_sampleids, spec_sampleids))
+
+    sample_size = sampleID.size
+
+    if not sample_size:
+        raise SystemExit('There are no overlapped sample IDs between the gene expression file, genotype file, and sampleID file.')
+
+    ## columns to read-in
+    exp_cols_info = exp_cols_dtype(exp_cols, sampleID)
+    geno_cols_info = genofile_cols_dtype(geno_cols, genofile_type, sampleID)
+
+    return sampleID, sample_size, exp_cols_info, geno_cols_info
+
+
+def read_genexp(geneexp_path, cols, col_inds, dtype, chr, **kwargs):
+    print('Reading gene expression data.\n')
+
+    try:
+        GeneExp_chunks = pd.read_csv(
+            geneexp_path, 
+            sep='\t', 
+            iterator=True, 
+            chunksize=10000,
+            usecols=col_inds,
+            dtype=dtype)
+
+        GeneExp = pd.concat([x[x['CHROM']==chr] for x in GeneExp_chunks]).reset_index(drop=True)
+
+    except:
+        GeneExp_chunks = pd.read_csv(
+            geneexp_path, 
+            sep='\t', 
+            iterator=True, 
+            header=None,
+            chunksize=10000,
+            usecols=col_inds)
+
+        GeneExp = pd.concat([x[x[0]==chr] for x in GeneExp_chunks]).reset_index(drop=True).astype(dtype)
+
+        GeneExp.columns = [exp_cols[i] for i in GeneExp.columns]
+
+    if GeneExp.empty:
+        raise SystemExit('There are no valid gene expression training data for chromosome ' + chr + '\n')
+
+    GeneExp = optimize_cols(GeneExp)
+
+    TargetID = GeneExp.TargetID
+    n_targets = TargetID.size
+
+    return GeneExp, TargetID, n_targets
+
+
 # divide range of positions into intervals of size n or less, convert to tabixable string
 def get_gt_regions_list(chrm, start, end, n):
     start = int(start)
@@ -160,7 +242,7 @@ def get_prep_gt_regions_data(regs_str, path, g_cols, g_cols_ind, g_dtype, genofi
     return regs_data
 
 # read in and prep genotype data
-def read_genotype(path, chr, start, end, g_cols, g_cols_ind, g_dtype, genofile_type, format, sampleID ):
+def read_genotype(path, chr, start, end, g_cols, g_cols_ind, g_dtype, genofile_type, format, sampleID):
 
     regs_args = [path, g_cols, g_cols_ind, g_dtype]
     prep_args = [genofile_type, format, sampleID]
@@ -190,10 +272,14 @@ def read_genotype(path, chr, start, end, g_cols, g_cols_ind, g_dtype, genofile_t
 
 
 # Call tabix, read in lines into byte array
-def call_tabix(path, chr, start, end):
+def call_tabix(path, chr, start, end, add_command_str = ''):
+
+    regs_str = chr + ':' + start + '-' + end
+
+    command_str = ' '.join(['tabix', path, regs_str, add_command_str])
 
     proc = subprocess.Popen(
-        ["tabix "+path+" "+chr+":"+start+"-"+end],
+        [command_str],
         shell=True,
         stdout=subprocess.PIPE,
         bufsize=1)
@@ -334,71 +420,41 @@ def get_vcf_header(path, out='tuple'):
 
     return header
 
+# determine indices of file cols to read in, dtype of each col
+def get_cols_dtype(file_cols, cols, sampleid=None, type=None, add_cols=[], drop_cols=[], get_id=False, ind_namekey=False, ret_dict=False, **kwargs):
 
-# determine indices of expression file cols to read in, dtype of each col
-def exp_cols_dtype(file_cols, sampleid):
-    # columns should be exp file columns and sampleids
-    cols = ['CHROM', 'GeneStart', 'GeneEnd', 'TargetID', 'GeneName'] + sampleid.tolist()
-    
-    # column types for all sample ids should be float64
+    # sampleid handling
+    if sampleid is not None:
+        cols = cols + sampleid.tolist()
+        sampleid_dtype = object if type == 'vcf' else np.float64
+        sampleid_dict = {x:sampleid_dtype for x in sampleid}
+    else:
+        sampleid_dict = {}
+
     dtype_dict = {
+        'ALT': object,
+        'b': np.float64,
+        'beta': np.float64,
+        'BETA': np.float64,
         'CHROM': object,
+        'COV': object,
+        'ES': np.float64,
+        'FORMAT': object,
         'GeneEnd': np.int64,
         'GeneName': object,
         'GeneStart': np.int64,
-        'TargetID': object,
-        **{x:np.float64 for x in sampleid}}
-
-    file_cols_ind = tuple([file_cols.index(x) for x in cols])
-    file_dtype = {file_cols.index(x):dtype_dict[x] for x in cols}
-
-    # return the indices of the columns, the dtype at each column
-    return file_cols_ind, file_dtype
-
-
-# determine indices of genofile cols to read in, dtype of each coL
-def genofile_cols_dtype(file_cols, type, sampleid):
-    cols = ['CHROM','POS','REF','ALT'] + sampleid.tolist()
-
-    # 'dosage' files should only have 'DS' format for each sample
-    sampleid_dtype = np.float64 if type == 'dosage' else object
-
-    dtype_dict = {
-        'CHROM': object,
-        'POS': np.int64,
-        'REF': object,
-        'ALT': object,
-        'FORMAT': object,
-        'snpID': object,
         'ID': object,
-         **{x:sampleid_dtype for x in sampleid}}
-
-    if type == 'vcf':
-        cols.append('FORMAT')
-
-    file_cols_ind = tuple([file_cols.index(x) for x in cols])
-    file_dtype = {file_cols.index(x):dtype_dict[x] for x in cols}
-    
-    # return the indices of the columns, the dtype at each column
-    return file_cols_ind, file_dtype
-
-
-# determine indices of weight file cols to read in, dtype of each col
-def weight_cols_dtype(file_cols, add_cols=[], drop_cols=[], get_id=True):
-    cols = ['CHROM','POS','REF','ALT','TargetID','ES'] + add_cols
-
-    dtype_dict = {
-        'CHROM': object,
-        'POS': np.int64,
-        'REF': object,
-        'ALT': object,
-        'TargetID': object,
-        'ES': np.float64,
         'MAF': np.float64,
+        'POS': np.int64,
+        'REF': object,
+        'SE': np.float64,
         'snpID': object,
-        'ID': object,
-        'beta': np.float64,
-        'b': np.float64}
+        'TargetID': object,
+        'Zscore': np.float64,
+        **sampleid_dict}
+    
+    # cols set up
+    cols = cols + add_cols
 
     if get_id:
         if ('snpID' in file_cols):
@@ -408,71 +464,59 @@ def weight_cols_dtype(file_cols, add_cols=[], drop_cols=[], get_id=True):
             cols.append('ID')
 
     cols = [x for x in cols if (x not in drop_cols)]
+
+    # create output
+    file_cols_ind = tuple(sorted([file_cols.index(x) for x in cols]))
+
+    if ind_namekey:
+        # return dict with keys as column names
+        out_dtype_dict = dtype_dict
+    else:
+        # return the indices of the columns, the dict with keys as column index    
+        ind_dtype_dict = {file_cols.index(x):dtype_dict[x] for x in cols}
+        out_dtype_dict = ind_dtype_dict
+
+    if ret_dict:
+        return {
+            'file_cols': file_cols,
+            'cols': [file_cols[i] for i in ind], 
+            'col_inds': file_cols_ind, 
+            'dtype': out_dtype_dict}
     
-    file_cols_ind = tuple([file_cols.index(x) for x in cols])
-    file_dtype = {file_cols.index(x):dtype_dict[x] for x in cols}
-
-    return file_cols_ind, file_dtype
+    return file_cols_ind, out_dtype_dict
 
 
-# determine indices of zscore file cols to read in, dtype of each col
-def zscore_cols_dtype(file_cols):
-    cols = ['CHROM','POS','REF','ALT','Zscore']
-    dtype_dict = {
-        'CHROM': object,
-        'POS': np.int64,
-        'REF': object,
-        'ALT': object,
-        'Zscore': np.float64}
+def exp_cols_dtype(file_cols, sampleid, **kwargs):
+    return get_cols_dtype(file_cols, 
+        cols=['CHROM', 'GeneStart', 'GeneEnd', 'TargetID', 'GeneName'], 
+        sampleid=sampleid, ret_dict=True)
 
-    file_cols_ind = tuple([file_cols.index(x) for x in cols])
-    file_dtype = {file_cols.index(x):dtype_dict[x] for x in cols}
+def genofile_cols_dtype(file_cols, type, sampleid, ind_namekey=True, **kwargs):
+    return get_cols_dtype(file_cols, 
+        cols=['CHROM','POS','REF','ALT'],
+        sampleid=sampleid, type=type, 
+        ind_namekey=ind_namekey, ret_dict=True)
 
-    return file_cols_ind, file_dtype
+def weight_cols_dtype(file_cols, add_cols=[], drop_cols=[], get_id=True, **kwargs):
+    return get_cols_dtype(file_cols, 
+        cols=['CHROM','POS','REF','ALT','TargetID','ES'], 
+        type=type, 
+        add_cols=add_cols, drop_cols=drop_cols, 
+        get_id=get_id)
 
+def zscore_cols_dtype(file_cols, **kwargs):
+    return get_cols_dtype(file_cols, 
+        cols=['CHROM','POS','REF','ALT','Zscore'])
 
-# determine indices of gwas file cols to read in, dtype of each col
-def gwas_cols_dtype(file_cols):
-    cols = ['CHROM','POS','REF','ALT','BETA','SE']
-    dtype_dict = {
-        'CHROM': object,
-        'POS': np.int64,
-        'REF': object,
-        'ALT': object,
-        'BETA': np.float64,
-        'SE': np.float64}
+def gwas_cols_dtype(file_cols, **kwargs):
+    return get_cols_dtype(file_cols, 
+        cols=['CHROM','POS','REF','ALT','BETA','SE'])
 
-    file_cols_ind = tuple([file_cols.index(x) for x in cols])
-    file_dtype = {file_cols.index(x):dtype_dict[x] for x in cols}
-
-    return file_cols_ind, file_dtype
-
-
-# used to determine indices of mcov file cols to read in, dtype of each col
-def MCOV_cols_dtype(file_cols, add_cols=[], drop_cols=[], get_id=True):
-    cols = ['CHROM','POS','REF','ALT','COV'] + add_cols
-    dtype_dict = {
-        'CHROM': object,
-        'POS': np.int64,
-        'REF': object,
-        'ALT': object,
-        'COV': object,
-        'snpID': object,
-        'ID': object}
-
-    if get_id:
-        if ('snpID' in file_cols):
-            cols.append('snpID')
-
-        elif ('ID' in file_cols):
-            cols.append('ID')
-
-    cols = [x for x in cols if (x not in drop_cols)]
-    
-    file_cols_ind = tuple([file_cols.index(x) for x in cols])
-    file_dtype = {file_cols.index(x):dtype_dict[x] for x in cols}
-
-    return file_cols_ind, file_dtype
+def MCOV_cols_dtype(file_cols, add_cols=[], drop_cols=[], get_id=True, **kwargs):
+    return get_cols_dtype(file_cols, 
+        cols=['CHROM','POS','REF','ALT','COV'], 
+        add_cols=add_cols, drop_cols=drop_cols, 
+        get_id=get_id)
 
 
 # get header of ld file, get indices of columns to read in

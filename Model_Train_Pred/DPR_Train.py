@@ -321,6 +321,7 @@ Output training info file: {out_info}
     out_weight = out_train_weight_path,
     out_info = out_train_info_path))
 
+tg.print_args(args)
 #############################################################
 # Prepare DPR input
 
@@ -332,6 +333,7 @@ Output training info file: {out_info}
 ### 4.TargetID (i.e.GeneID, treated as unique annotation for each gene)
 ### 5.Gene Name
 
+##########
 # gene Expression header, sampleIDs
 print('Reading genotype, expression file headers.\n')
 exp_cols = tg.get_header(args.geneexp_path)
@@ -370,6 +372,11 @@ if not sample_size:
 g_cols_ind, g_dtype = tg.genofile_cols_dtype(g_cols, args.genofile_type, sampleID)
 e_cols_ind, e_dtype = tg.exp_cols_dtype(exp_cols, sampleID)
 
+#####
+# sampleID, sample_size, exp_cols_info, geno_cols_info = tg.train_startup(**args.__dict__)
+#####
+
+##########
 # extract expression level for chromosome
 print('Reading gene expression data.\n')
 try:
@@ -403,6 +410,10 @@ GeneExp = tg.optimize_cols(GeneExp)
 
 TargetID = GeneExp.TargetID
 n_targets = TargetID.size
+
+#####
+# GeneExp, TargetID, n_targets = tg.read_genexp(**args.__dict__, **exp_cols_info)
+#####
 
 # PREP CROSS VALIDATION SAMPLES - Split sampleIDs for cross validation
 if args.cvR2:
