@@ -456,6 +456,9 @@ def get_cols_dtype(file_cols, cols, sampleid=None, type=None, add_cols=[], drop_
     # cols set up
     cols = cols + add_cols
 
+    # if type == 'vcf':
+    #     cols.insert(4, 'snpID')
+
     if get_id:
         if ('snpID' in file_cols):
             cols.append('snpID')
@@ -466,21 +469,21 @@ def get_cols_dtype(file_cols, cols, sampleid=None, type=None, add_cols=[], drop_
     cols = [x for x in cols if (x not in drop_cols)]
 
     # create output
-    file_cols_ind = tuple(sorted([file_cols.index(x) for x in cols]))
+    col_inds = tuple(sorted([file_cols.index(x) for x in cols]))
 
     if ind_namekey:
-        # return dict with keys as column names
+        # return dtype dict with keys as column names
         out_dtype_dict = dtype_dict
     else:
-        # return the indices of the columns, the dict with keys as column index    
+        # return dtype dict with keys as column index
         ind_dtype_dict = {file_cols.index(x):dtype_dict[x] for x in cols}
         out_dtype_dict = ind_dtype_dict
 
     if ret_dict:
         return {
             'file_cols': file_cols,
-            'cols': [file_cols[i] for i in ind], 
-            'col_inds': file_cols_ind, 
+            'cols': [file_cols[i] for i in col_inds], 
+            'col_inds': col_inds, 
             'dtype': out_dtype_dict}
     
     return file_cols_ind, out_dtype_dict
