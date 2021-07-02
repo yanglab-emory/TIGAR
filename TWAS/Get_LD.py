@@ -32,7 +32,7 @@ parser.add_argument('--genome_block', type=str, dest='block_path')
 parser.add_argument('--sampleID', type=str, dest='sampleid_path')
 
 # chromosome number
-parser.add_argument('--chr', type=str)
+parser.add_argument('--chr', type=str, dest='chrm')
 
 # genotype file path
 parser.add_argument('--genofile', type=str, dest='geno_path')
@@ -41,7 +41,7 @@ parser.add_argument('--genofile', type=str, dest='geno_path')
 parser.add_argument('--genofile_type', type=str)
 
 # 'DS' or 'GT'
-parser.add_argument('--format', type=str)
+parser.add_argument('--format', type=str, dest='data_format')
 
 # maf threshold for seleting genotype data to calculate covariance matrix
 parser.add_argument('--maf', type=float)
@@ -79,17 +79,17 @@ def cov_str(cov_lst): return [','.join([cov_fmt(x) for x in row]) for row in [co
 if args.genofile_type == 'vcf':
 	gcol_sampleids_strt_ind = 9
 
-	if (args.format != 'GT') and (args.format != 'DS'):
+	if (args.data_format != 'GT') and (args.data_format != 'DS'):
 		raise SystemExit('Please specify the genotype data format used by the vcf file (--format ) as either "GT" or "DS".\n')
 		
 elif args.genofile_type == 'dosage':
 	gcol_sampleids_strt_ind = 5
-	args.format = 'DS'
+	args.data_format = 'DS'
 
 else:
 	raise SystemExit('Please specify the type input genotype file type (--genofile_type) as either "vcf" or "dosage".\n')
 	
-out_ref_cov_path = args.out_dir + '/CHR' + args.chr + '_reference_cov.txt'
+out_ref_cov_path = args.out_dir + '/CHR' + args.chrm + '_reference_cov.txt'
 
 ###############################################################
 # Print input arguments
@@ -98,10 +98,10 @@ print(
 Input Arguments
 Genome block annotation (based on LD structure) file: {block_path}
 SampleID file: {sampleid_path}
-Chromosome: {chr}
+Chromosome: {chrm}
 Reference genotype file: {geno_path}
 Genotype file used is type: {genofile_type}
-Genotype data format: {format}
+Genotype data format: {data_format}
 MAF threshold for SNP inclusion: {maf}
 Number of threads: {thread}
 Output directory: {out_dir}
@@ -110,7 +110,7 @@ Output reference covariance results file: {out_rc}
 	**args.__dict__,
 	out_rc = out_ref_cov_path))
 
-tg.print_args(args)
+# tg.print_args(args)
 
 ###############################################################
 # Read in block information
@@ -120,7 +120,7 @@ chr_blocks = pd.read_csv(
 	sep='\t',
 	usecols=['CHROM', 'Start', 'End'],
 	dtype={'CHROM':object, 'Start':object, 'End':object})
-chr_blocks = chr_blocks[chr_blocks['CHROM'] == args.chr].reset_index(drop=True)
+chr_blocks = chr_blocks[chr_blocks['CHROM'] == args.chrm].reset_index(drop=True)
 chr_blocks = tg.optimize_cols(chr_blocks)
 
 n_blocks = len(chr_blocks)
@@ -164,7 +164,7 @@ def thread_process(num):
 	print('num=' + str(num))
 	
 	print('Reading genotype data.')
-	g_proc_out = tg.call_tabix(args.geno_path, args.chr, block.Start, block.End)
+	g_proc_out = tg.call_tabix(args.geno_path, args.chrm, block.Start, block.End)
 
 	if not g_proc_out:
 		print('There is no genotype data in this block.\n')
@@ -186,10 +186,10 @@ def thread_process(num):
 
 	# prep vcf file
 	if args.genofile_type=='vcf':
-		block_geno = tg.check_prep_vcf(block_geno, args.format, sampleID)
+		block_geno = tg.check_prep_vcf(block_geno, args.data_format, sampleID)
 
 	# reformat sample values
-	block_geno = tg.reformat_sample_vals(block_geno, args.format, sampleID)
+	block_geno = tg.reformat_sample_vals(block_geno, args.data_format, sampleID)
 
 	# calculate, filter maf
 	block_geno = tg.calc_maf(block_geno, sampleID, args.maf)
