@@ -75,10 +75,10 @@ def get_abs_path(x): return os.path.abspath(os.path.expanduser(os.path.expandvar
 
 
 # Call tabix, read in lines into byte array
-def call_tabix(path, chr, start, end):
+def call_tabix(path, chrm, start, end):
 
     proc = subprocess.Popen(
-        ["tabix "+path+" "+chr+":"+start+"-"+end],
+        ["tabix "+path+" "+chrm+":"+start+"-"+end],
         shell=True,
         stdout=subprocess.PIPE,
         bufsize=1)
@@ -392,7 +392,7 @@ def get_regions_list(snp_ids):
     for x, y in groupby(enumerate(pos_vals), lambda p: p[1]-p[0]):
         y = list(y)
 
-        # chr:start-end
+        # chrm:start-end
         yield chrm + str(y[0][1]) + '-' + str(y[-1][1])
 
 
@@ -449,7 +449,7 @@ def get_ld_data(path, snp_ids):
     # get columns names, indices for ld file
     ld_cols, ld_cols_ind = get_ld_cols(path)
 
-    # format tabix regions from snp_ids; 'chr:start-end'
+    # format tabix regions from snp_ids; 'chrm:start-end'
     regs_lst = list(get_regions_list(snp_ids))
     N = len(regs_lst)
 
@@ -503,14 +503,14 @@ def get_ld_matrix(MCOV):
 
 # return snp ids; join CHROM, POS, REF, ALT columns into : separated string
 def get_snpIDs(df: pd.DataFrame, flip=False):
-    chroms = df['CHROM'].astype('str').values
+    chrms = df['CHROM'].astype('str').values
     pos = df['POS'].astype('str').values
     ref = df['REF'].values
     alt = df['ALT'].values
     if flip:
-        return [':'.join(i) for i in zip(chroms,pos,alt,ref)]
+        return [':'.join(i) for i in zip(chrms,pos,alt,ref)]
     else:
-        return [':'.join(i) for i in zip(chroms,pos,ref,alt)]  
+        return [':'.join(i) for i in zip(chrms,pos,ref,alt)]  
 
 
 # Decrease memory by downcasting 'CHROM' column to integer, integer and float columns to minimum size that will not lose info
