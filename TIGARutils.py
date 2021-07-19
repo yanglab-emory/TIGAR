@@ -720,22 +720,27 @@ def reformat_sample_vals(df: pd.DataFrame, data_format, sampleID):
 	return df
 
 
-# reformats a vcf dataframe
-def reformat_vcf(df: pd.DataFrame, data_format, sampleID, uniqfrmts, singleformat=True):
-	# df = df.copy()
-	if singleformat:
-		val_ind = uniqfrmts[0].split(':').index(data_format)
-		df[sampleID]=df[sampleID].applymap(lambda x: x.split(':')[val_ind])
-	else:
-		# reformats sample values in row to include only specified format
-		def vals_by_format(row):
-			val_ind = row.FORMAT.split(':').index(data_format)
-			return row[sampleID].apply(lambda y: y.split(':')[val_ind])
+# # reformats a vcf dataframe
+# def reformat_vcf(df: pd.DataFrame, data_format, sampleID, uniqfrmts, singleformat=True):
+# 	# df = df.copy()
+# 	if singleformat:
+# 		frmt_ind = uniqfrmts[0].split(':').index(data_format)
+# 		df[sampleID]=df[sampleID].applymap(lambda x: x.split(':')[frmt_ind])
+# 	else:
+# 		# reformats sample values in row to include only specified format
+# 		def vals_by_format(row):
+# 			frmt_ind = row.FORMAT.split(':').index(data_format)
+# 			return row[sampleID].apply(lambda y: y.split(':')[frmt_ind])
 
-		# apply to each row        
-		df[sampleID] = df.apply(lambda x: vals_by_format(x), axis=1)
+# 		# apply to each row        
+# 		df[sampleID] = df.apply(lambda x: vals_by_format(x), axis=1)
 
-	return df
+# 	return df
+
+# reformats sample values in row to include only specified format
+def vals_by_format(row):
+	frmt_ind = row.FORMAT.split(':').index(data_format)
+	return row[sampleID].apply(lambda y: y.split(':')[frmt_ind])
 
 @empty_df_handler
 def check_prep_vcf(df: pd.DataFrame, data_format, sampleID):
@@ -749,12 +754,14 @@ def check_prep_vcf(df: pd.DataFrame, data_format, sampleID):
 		raise Exception("Exception in check_prep_vcf(): Specified genotype format, format=" + data_format + ", does not exist in all rows of the FORMAT column for this section of the input VCF file.")
 
 	if rowfrmts.size > 1:
-		#reformat multi
-		df = reformat_vcf(df, data_format, sampleID, rowfrmts, singleformat=False)
-	# else assume rowfrmts.size == 1
+		df[sampleID] = df.apply(lambda x: vals_by_format(x), axis=1)
+		
+	# else assume rowfrmts.size == 1 
 	# if contains ':', needs to be reformatted
 	elif (':' in rowfrmts[0]): 
-		df = reformat_vcf(df, data_format, sampleID, rowfrmts)
+		frmt_ind = rowfrmts[0].split(':').index(data_format)
+		df[sampleID] = df[sampleID].applymap(lambda x: x.split(':')[frmt_ind])
+
 	# if doesnt contain ':' but isn't equivalent to data_format then something's very wrong
 	elif (rowfrmts[0] != data_format):
 		raise Exception('Exception in check_prep_vcf(): There is only one format in the FORMAT column for this section of the input VCF file, format_in_vcf='+str(rowfrmts[0]) +', which contains the specified genotype format, format=' + data_format + ', but it cannot be parsed. ')
@@ -831,7 +838,7 @@ def calc_maf(df: pd.DataFrame, sampleID, maf, filter=True, op=operator.gt):
 	df = df.copy()
 
 	# calculate MAF
-	df['MAF'] = df[sampleID].apply(lambda x:np.sum(x)/(2 * count_notnan(x)), axis=1)
+	df['MAF'] = df[sampleID].apply(lambda x:np.nansum(x)/(2 * count_notnan(x)), axis=1)
 
 	### Dealing with NaN - impute missing with mean
 	samp_maf_cols = np.append(sampleID,'MAF')
@@ -865,9 +872,9 @@ def p_HWE(sample_row):
 	if not vals.size:
 		p_hwe = np.nan
 	else:
-		N_hets = vals[(vals>=0.5)&(vals<1.5)].size
-		N_aa = vals[(vals>=0)&(vals<0.5)].size
-		N_AA = vals[(vals>=1.5)&(vals<=2)].size
+		N_hets = vals[(vals >= 0.5) & (vals < 1.5)].size
+		N_aa = vals[(vals >= 0) & (vals < 0.5)].size
+		N_AA = vals[(vals >= 1.5) & (vals <= 2)].size
 
 		p_hwe = calc_HWE(N_hets, N_AA, N_aa)
 
