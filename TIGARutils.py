@@ -137,7 +137,7 @@ def train_startup(geno_path, genofile_type, geneexp_path, sampleid_path, **kwarg
 	return sampleID, sample_size, exp_cols_info, geno_cols_info
 
 
-def read_genexp(geneexp_path, cols, col_inds, dtype, chr, **kwargs):
+def read_genexp(geneexp_path, cols, col_inds, dtype, chrm, **kwargs):
 	print('Reading gene expression data.\n')
 
 	try:
@@ -149,7 +149,7 @@ def read_genexp(geneexp_path, cols, col_inds, dtype, chr, **kwargs):
 			usecols=col_inds,
 			dtype=dtype)
 
-		GeneExp = pd.concat([x[x['CHROM']==chr] for x in GeneExp_chunks]).reset_index(drop=True)
+		GeneExp = pd.concat([x[x['CHROM']==chrm] for x in GeneExp_chunks]).reset_index(drop=True)
 
 	except:
 		GeneExp_chunks = pd.read_csv(
@@ -160,12 +160,12 @@ def read_genexp(geneexp_path, cols, col_inds, dtype, chr, **kwargs):
 			chunksize=10000,
 			usecols=col_inds)
 
-		GeneExp = pd.concat([x[x[0]==chr] for x in GeneExp_chunks]).reset_index(drop=True).astype(dtype)
+		GeneExp = pd.concat([x[x[0]==chrm] for x in GeneExp_chunks]).reset_index(drop=True).astype(dtype)
 
 		GeneExp.columns = [exp_cols[i] for i in GeneExp.columns]
 
 	if GeneExp.empty:
-		raise SystemExit('There are no valid gene expression training data for chromosome ' + chr + '\n')
+		raise SystemExit('There are no valid gene expression training data for chromosome ' + chrm + '\n')
 
 	GeneExp = optimize_cols(GeneExp)
 
@@ -221,34 +221,34 @@ def get_gt_regions_data(regs_str, path, g_cols, g_cols_ind, g_dtype):
 
 # get genotype data in format needed
 @empty_df_handler
-def prep_gt_regions_data(regs_data, genofile_type, format, sampleID): 
+def prep_gt_regions_data(regs_data, genofile_type, data_format, sampleID): 
 	# prep vcf file
 	if genofile_type == 'vcf':
-		regs_data = check_prep_vcf(regs_data, format, sampleID)
+		regs_data = check_prep_vcf(regs_data, data_format, sampleID)
 
 	# reformat sample values
-	regs_data = reformat_sample_vals(regs_data, format, sampleID)
+	regs_data = reformat_sample_vals(regs_data, data_format, sampleID)
 	
 	return regs_data
 
 # get proc_out from function and parse data for regions, then prep
 @empty_df_handler
-def get_prep_gt_regions_data(regs_str, path, g_cols, g_cols_ind, g_dtype, genofile_type, format, sampleID):
+def get_prep_gt_regions_data(regs_str, path, g_cols, g_cols_ind, g_dtype, genofile_type, data_format, sampleID):
 
 	regs_data = get_gt_regions_data(regs_str, path, g_cols, g_cols_ind, g_dtype)
 
-	regs_data = prep_gt_regions_data(regs_data, genofile_type, format, sampleID)
+	regs_data = prep_gt_regions_data(regs_data, genofile_type, data_format, sampleID)
 
 	return regs_data
 
 # read in and prep genotype data
-def read_genotype(path, chr, start, end, g_cols, g_cols_ind, g_dtype, genofile_type, format, sampleID):
+def read_genotype(path, chrm, start, end, g_cols, g_cols_ind, g_dtype, genofile_type, data_format, sampleID):
 
 	regs_args = [path, g_cols, g_cols_ind, g_dtype]
-	prep_args = [genofile_type, format, sampleID]
+	prep_args = [genofile_type, data_format, sampleID]
 
 	try:
-		regs_str = chr + ':' + start + '-' + end
+		regs_str = chrm + ':' + start + '-' + end
 		gt_data = get_prep_gt_regions_data(regs_str, *regs_args, *prep_args)
 	except (MemoryError, pd.errors.ParserError):
 		# data may be too large; if so try subset instead of getting all SNPs at once
@@ -256,7 +256,7 @@ def read_genotype(path, chr, start, end, g_cols, g_cols_ind, g_dtype, genofile_t
 		# *** DECREASE THIS
 		while n:
 			try: 
-				regs_str_lst = get_gt_regions_list(chr, start, end, n)
+				regs_str_lst = get_gt_regions_list(chrm, start, end, n)
 				gt_data = pd.concat([get_prep_gt_regions_data(regs_str, *regs_args, *prep_args) for regs_str in regs_str_lst])
 			except (MemoryError, pd.errors.ParserError):
 				if (n > 10000):
@@ -272,11 +272,12 @@ def read_genotype(path, chr, start, end, g_cols, g_cols_ind, g_dtype, genofile_t
 
 
 # Call tabix, read in lines into byte array
-def call_tabix(path, chr, start, end, add_command_str = ''):
+def call_tabix(path, chrm, start, end, add_command_str = ''):
 
-	regs_str = chr + ':' + start + '-' + end
+	regs_str = chrm + ':' + start + '-' + end
 
 	command_str = ' '.join(['tabix', path, regs_str, add_command_str])
+	# ["tabix " + path + " " + chrm + ":" + start + "-" + end]
 
 	proc = subprocess.Popen(
 		[command_str],
@@ -488,7 +489,6 @@ def get_cols_dtype(file_cols, cols, sampleid=None, genofile_type=None, add_cols=
 	
 	return file_cols_ind, out_dtype_dict
 
-
 def exp_cols_dtype(file_cols, sampleid, **kwargs):
 	return get_cols_dtype(file_cols, 
 		cols=['CHROM', 'GeneStart', 'GeneEnd', 'TargetID', 'GeneName'], 
@@ -553,7 +553,7 @@ def get_ld_regions_list(snp_ids):
 	for x, y in groupby(enumerate(pos_vals), lambda p: p[1]-p[0]):
 		y = list(y)
 
-		# chr:start-end
+		# chrm:start-end
 		yield chrm + str(y[0][1]) + '-' + str(y[-1][1])
 
 
@@ -610,7 +610,7 @@ def get_ld_data(path, snp_ids):
 	# get columns names, indices for ld file
 	ld_cols, ld_cols_ind = get_ld_cols(path)
 
-	# format tabix regions from snp_ids; 'chr:start-end'
+	# format tabix regions from snp_ids; 'chrm:start-end'
 	regs_lst = list(get_ld_regions_list(snp_ids))
 	N = len(regs_lst)
 
@@ -619,6 +619,7 @@ def get_ld_data(path, snp_ids):
 	try:
 		regs_str = ' '.join(regs_lst)
 		cov_data = get_ld_regions_data(regs_str, *regs_args)
+
 	except OSError:
 		# argument may be too long for OS; if so try subset instead of getting all regions at once
 		# print('Subseting regions to tabix.')
@@ -664,15 +665,14 @@ def get_ld_matrix(MCOV):
 
 # return snp ids; join CHROM, POS, REF, ALT columns into : separated string
 def get_snpIDs(df: pd.DataFrame, flip=False):
-	chroms = df['CHROM'].astype('str').values
+	chrom = df['CHROM'].astype('str').values
 	pos = df['POS'].astype('str').values
 	ref = df['REF'].values
 	alt = df['ALT'].values
 	if flip:
-		return [':'.join(i) for i in zip(chroms,pos,alt,ref)]
+		return [':'.join(i) for i in zip(chrom,pos,alt,ref)]
 	else:
-		return [':'.join(i) for i in zip(chroms,pos,ref,alt)]  
-
+		return [':'.join(i) for i in zip(chrom,pos,ref,alt)]
 
 # Decrease memory by downcasting 'CHROM' column to integer, integer and float columns to minimum size that will not lose info
 def optimize_cols(df: pd.DataFrame):
@@ -697,23 +697,23 @@ def optimize_cols(df: pd.DataFrame):
 
 # Reform vcf file
 ### input each sample genotype
-### For GT Format:
+### For GT data_format:
 ###  code '0|0' or '0/0' as 0
 ###  code ('0|1' or '1|0')  or ('0/1' or '1/0') as 1
 ###  code '1|1' or '1/1' as 2
 ###  code '.|.' or './.' as nan(missing)
 
-### For DS Format:
+### For DS data_format:
 ### code '.' as nan(missing)
-def reformat_sample_vals(df: pd.DataFrame, Format, sampleID):
+def reformat_sample_vals(df: pd.DataFrame, data_format, sampleID):
 	df = df.reset_index(drop=True).copy()
 	vals = df[sampleID].values
-	if Format=='GT':
+	if data_format=='GT':
 		vals[(vals=='0|0')|(vals=='0/0')] = 0
 		vals[(vals=='1|0')|(vals=='1/0')|(vals=='0|1')|(vals=='0/1')] = 1
 		vals[(vals=='1|1')|(vals=='1/1')] = 2
 		vals[(vals=='.|.')|(vals=='./.')] = np.nan
-	elif Format=='DS':
+	elif data_format=='DS':
 		vals[(vals=='.')] = np.nan
 	vals = vals.astype(np.float32)
 	df = pd.concat([df.drop(columns=sampleID), pd.DataFrame(vals, columns=sampleID)], axis=1)
@@ -721,15 +721,15 @@ def reformat_sample_vals(df: pd.DataFrame, Format, sampleID):
 
 
 # reformats a vcf dataframe
-def reformat_vcf(df: pd.DataFrame, Format, sampleID, uniqfrmts, singleformat=True):
+def reformat_vcf(df: pd.DataFrame, data_format, sampleID, uniqfrmts, singleformat=True):
 	# df = df.copy()
 	if singleformat:
-		val_ind = uniqfrmts[0].split(':').index(Format)
+		val_ind = uniqfrmts[0].split(':').index(data_format)
 		df[sampleID]=df[sampleID].applymap(lambda x: x.split(':')[val_ind])
 	else:
 		# reformats sample values in row to include only specified format
 		def vals_by_format(row):
-			val_ind = row.FORMAT.split(':').index(Format)
+			val_ind = row.FORMAT.split(':').index(data_format)
 			return row[sampleID].apply(lambda y: y.split(':')[val_ind])
 
 		# apply to each row        
@@ -738,35 +738,34 @@ def reformat_vcf(df: pd.DataFrame, Format, sampleID, uniqfrmts, singleformat=Tru
 	return df
 
 @empty_df_handler
-def check_prep_vcf(df: pd.DataFrame, Format, sampleID):
+def check_prep_vcf(df: pd.DataFrame, data_format, sampleID):
 	# df = df.copy()
 
 	# check that all rows include data in the args.format format
 	rowfrmts = np.unique(df.FORMAT.values)
-	frmt_in_all = np.all(substr_in_strarray(Format,rowfrmts))
+	frmt_in_all = np.all(substr_in_strarray(data_format,rowfrmts))
 
 	if not frmt_in_all:
-		raise Exception("Exception in check_prep_vcf(): Specified genotype format, format=" + Format + ", does not exist in all rows of the FORMAT column for this section of the input VCF file.")
+		raise Exception("Exception in check_prep_vcf(): Specified genotype format, format=" + data_format + ", does not exist in all rows of the FORMAT column for this section of the input VCF file.")
 
 	if rowfrmts.size > 1:
 		#reformat multi
-		df = reformat_vcf(df, Format, sampleID, rowfrmts, singleformat=False)
+		df = reformat_vcf(df, data_format, sampleID, rowfrmts, singleformat=False)
 	# else assume rowfrmts.size == 1
 	# if contains ':', needs to be reformatted
 	elif (':' in rowfrmts[0]): 
-		df = reformat_vcf(df, Format, sampleID, rowfrmts)
-	# if doesnt contain ':' but isn't equivalent to Format then something's very wrong
-	elif (rowfrmts[0] != Format):
-		raise Exception('Exception in check_prep_vcf(): There is only one format in the FORMAT column for this section of the input VCF file, format_in_vcf='+str(rowfrmts[0]) +', which contains the specified genotype format, format=' + Format + ', but it cannot be parsed. ')
+		df = reformat_vcf(df, data_format, sampleID, rowfrmts)
+	# if doesnt contain ':' but isn't equivalent to data_format then something's very wrong
+	elif (rowfrmts[0] != data_format):
+		raise Exception('Exception in check_prep_vcf(): There is only one format in the FORMAT column for this section of the input VCF file, format_in_vcf='+str(rowfrmts[0]) +', which contains the specified genotype format, format=' + data_format + ', but it cannot be parsed. ')
 
 	df = df.drop(columns=['FORMAT'])
 
 	# handle multi-allelic
-	if Format == 'GT':
+	if data_format == 'GT':
 		df = handle_multi_allele(df, sampleID)
 
 	return df
-
 
 # TIGAR currently only works with bi-allelic GT data
 @empty_df_handler
@@ -794,7 +793,6 @@ def handle_multi_allele(df: pd.DataFrame, sampleID):
 	df[['snpID','ALT']] = df[['snpID','ALT']].applymap(lambda x: x.split(',')[0])
 
 	return df
-
 
 
 # returns a boolean array; whether substring is in a np object array

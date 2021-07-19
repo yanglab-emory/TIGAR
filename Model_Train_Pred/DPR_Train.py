@@ -37,7 +37,7 @@ parser.add_argument('--gene_exp', type=str, dest='geneexp_path')
 parser.add_argument('--train_sampleID', type=str, dest='sampleid_path')
 
 # specified chromosome number
-parser.add_argument('--chr', type=str)
+parser.add_argument('--chr', type=str, dest='chrm')
 
 # Genotype file path
 parser.add_argument('--genofile', type=str, dest='geno_path')
@@ -46,7 +46,7 @@ parser.add_argument('--genofile', type=str, dest='geno_path')
 parser.add_argument('--genofile_type', type=str)
 
 # format of genotype data 'DS' or 'GT'
-parser.add_argument('--format', type=str)
+parser.add_argument('--format', type=str, dest='data_format')
 
 # window
 parser.add_argument('--window', type=int)
@@ -262,12 +262,13 @@ abs_out_dir = tg.get_abs_path(args.out_dir)
 if args.genofile_type == 'vcf':
 	gcol_sampleids_strt_ind = 9
 
-	if (args.format != 'GT') and (args.format != 'DS'):
+
+	if (args.data_format != 'GT') and (args.data_format != 'DS'):
 		raise SystemExit('Please specify the genotype data format used by the vcf file (--format ) as either "GT" or "DS".\n')
 		
 elif args.genofile_type == 'dosage':
 	gcol_sampleids_strt_ind = 5
-	args.format = 'DS'
+	args.data_format = 'DS'
 
 else:
 	raise SystemExit('Please specify the type input genotype file type (--genofile_type) as either "vcf" or "dosage".\n')
@@ -284,13 +285,13 @@ Gene Annotation and Expression file: {geneexp_path}
 
 Training sampleID file: {sampleid_path}
 
-Chromosome: {chr}
+Chromosome: {chrm}
 
 Training genotype file: {geno_path}
 
 Genotype file used for training is type: {genofile_type}
 
-Genotype data format: {format}
+Genotype data format: {data_format}
 
 Gene training region SNP inclusion window: +-{window}
 
@@ -321,7 +322,8 @@ Output training info file: {out_info}
 	out_weight = out_train_weight_path,
 	out_info = out_train_info_path))
 
-tg.print_args(args)
+# tg.print_args(args)
+
 #############################################################
 # Prepare DPR input
 
@@ -388,7 +390,7 @@ try:
 		usecols=e_cols_ind,
 		dtype=e_dtype)
 
-	GeneExp = pd.concat([x[x['CHROM']==args.chr] for x in GeneExp_chunks]).reset_index(drop=True)
+	GeneExp = pd.concat([x[x['CHROM']==args.chrm] for x in GeneExp_chunks]).reset_index(drop=True)
 
 except:
 	GeneExp_chunks = pd.read_csv(
@@ -399,12 +401,12 @@ except:
 		chunksize=10000,
 		usecols=e_cols_ind)
 
-	GeneExp = pd.concat([x[x[0]==args.chr] for x in GeneExp_chunks]).reset_index(drop=True).astype(e_dtype)
+	GeneExp = pd.concat([x[x[0]==args.chrm] for x in GeneExp_chunks]).reset_index(drop=True).astype(e_dtype)
 
 	GeneExp.columns = [exp_cols[i] for i in GeneExp.columns]
 
 if GeneExp.empty:
-	raise SystemExit('There are no valid gene expression training data for chromosome ' + args.chr + '\n')
+	raise SystemExit('There are no valid gene expression training data for chromosome ' + args.chrm + '\n')
 
 GeneExp = tg.optimize_cols(GeneExp)
 
@@ -459,11 +461,11 @@ def thread_process(num):
 	end = str(int(target_exp.GeneEnd) + args.window)
 
 	# READ IN AND PROCESS GENOTYPE DATA 
-	target_geno = tg.read_genotype(args.geno_path, args.chr, start, end, g_cols, g_cols_ind, g_dtype, args.genofile_type, args.format, sampleID)
+	target_geno = tg.read_genotype(args.geno_path, args.chrm, start, end, g_cols, g_cols_ind, g_dtype, args.genofile_type, args.data_format, sampleID)
 	# # Requirement for input vcf file: Must be bgzip and tabix
 	# ### select corresponding vcf file by tabix
 	# print('Reading genotype data.')
-	# g_proc_out = tg.call_tabix(args.geno_path, args.chr, start, end)
+	# g_proc_out = tg.call_tabix(args.geno_path, args.chrm, start, end)
 
 	# if not g_proc_out:
 	#     print('There is no genotype data for TargetID: ' + target + '\n')
@@ -486,10 +488,42 @@ def thread_process(num):
 
 	# # prep vcf file
 	# if args.genofile_type == 'vcf':
-	#     target_geno = tg.check_prep_vcf(target_geno, args.format, sampleID)
+	#     target_geno = tg.check_prep_vcf(target_geno, args.data_format, sampleID)
 
 	# # reformat sample values
-	# target_geno = tg.reformat_sample_vals(target_geno, args.format, sampleID)
+	# target_geno = tg.reformat_sample_vals(target_geno, args.data_format, sampleID)
+
+	################# OLD
+	# # Requirement for input vcf file: Must be bgzip and tabix
+	# ### select corresponding vcf file by tabix
+	# print('Reading genotype data.')
+	# g_proc_out = tg.call_tabix(args.geno_path, args.chrm, start, end)
+
+	# if not g_proc_out:
+	# 	print('There is no genotype data for TargetID: ' + target + '\n')
+	# 	return None
+
+	# print('Preparing DPR input.')
+	# target_geno = pd.read_csv(StringIO(g_proc_out.decode('utf-8')),
+	# 		sep='\t',
+	# 		low_memory=False,
+	# 		header=None,
+	# 		usecols=g_cols_ind,
+	# 		dtype=g_dtype,
+	# 		na_values=['.', '.|.', './.'])
+	# target_geno.columns = [g_cols[i] for i in target_geno.columns]
+	# target_geno = tg.optimize_cols(target_geno)
+
+	# # get snpIDs
+	# target_geno['snpID'] = tg.get_snpIDs(target_geno)
+	# target_geno = target_geno.drop_duplicates(['snpID'],keep='first').reset_index(drop=True)
+
+	# # prep vcf file
+	# if args.genofile_type == 'vcf':
+	# 	target_geno = tg.check_prep_vcf(target_geno, args.data_format, sampleID)
+
+	# # reformat sample values
+	# target_geno = tg.reformat_sample_vals(target_geno, args.data_format, sampleID)
 	
 	# filter out variants that exceed missing rate threshold
 	target_geno = tg.handle_missing(target_geno, sampleID, args.missing_rate)
