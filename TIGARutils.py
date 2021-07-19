@@ -585,7 +585,7 @@ def calc_maf(df: pd.DataFrame, sampleID, maf, filter=True, op=operator.gt):
 	df = df.copy()
 
 	# calculate MAF
-	df['MAF'] = df[sampleID].apply(lambda x:np.sum(x)/(2 * count_notnan(x)), axis=1)
+	df['MAF'] = df[sampleID].apply(lambda x:np.nansum(x)/(2 * count_notnan(x)), axis=1)
 
 	### Dealing with NaN - impute missing with mean
 	samp_maf_cols = np.append(sampleID,'MAF')
