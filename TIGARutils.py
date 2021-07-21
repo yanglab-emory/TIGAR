@@ -241,34 +241,131 @@ def get_prep_gt_regions_data(regs_str, path, g_cols, g_cols_ind, g_dtype, genofi
 
 	return regs_data
 
-# read in and prep genotype data
-def read_genotype(path, chrm, start, end, g_cols, g_cols_ind, g_dtype, genofile_type, data_format, sampleID):
+# # read in and prep genotype data
+# def read_genotype(path, chrm, start, end, g_cols, g_cols_ind, g_dtype, genofile_type, data_format, sampleID):
 
-	regs_args = [path, g_cols, g_cols_ind, g_dtype]
-	prep_args = [genofile_type, data_format, sampleID]
+# 	regs_args = [path, g_cols, g_cols_ind, g_dtype]
+# 	prep_args = [genofile_type, data_format, sampleID]
 
-	try:
-		regs_str = chrm + ':' + start + '-' + end
-		gt_data = get_prep_gt_regions_data(regs_str, *regs_args, *prep_args)
-	except (MemoryError, pd.errors.ParserError):
-		# data may be too large; if so try subset instead of getting all SNPs at once
-		n = 25000
-		# *** DECREASE THIS
-		while n:
-			try: 
-				regs_str_lst = get_gt_regions_list(chrm, start, end, n)
-				gt_data = pd.concat([get_prep_gt_regions_data(regs_str, *regs_args, *prep_args) for regs_str in regs_str_lst])
-			except (MemoryError, pd.errors.ParserError):
-				if (n > 10000):
-					n -= 10000
-				elif (n > 3000):
-					n -= 1000
-				else:
-					n -= 500
-				pass
-			else:
-				n = 0
-	return gt_data
+# 	try:
+# 		regs_str = chrm + ':' + start + '-' + end
+# 		gt_data = get_prep_gt_regions_data(regs_str, *regs_args, *prep_args)
+# 	except (MemoryError, pd.errors.ParserError):
+# 		# data may be too large; if so try subset instead of getting all SNPs at once
+# 		n = 25000
+# 		# *** DECREASE THIS
+# 		while n:
+# 			try: 
+# 				regs_str_lst = get_gt_regions_list(chrm, start, end, n)
+# 				gt_data = pd.concat([get_prep_gt_regions_data(regs_str, *regs_args, *prep_args) for regs_str in regs_str_lst])
+# 			except (MemoryError, pd.errors.ParserError):
+# 				if (n > 10000):
+# 					n -= 10000
+# 				elif (n > 3000):
+# 					n -= 1000
+# 				else:
+# 					n -= 500
+# 				pass
+# 			else:
+# 				n = 0
+# 	return gt_data
+
+
+def filter_vcf_line(line: bytes, data_format, col_inds, split_multi = True):
+	# split line into list
+	row = line.split(b'\t')
+
+	# convert data_format to byte
+	bformat = str.encode(data_format)
+
+	# get index of data format
+	data_ind = row[8].split(b':').index(bformat)
+	row[8] = bformat
+
+	# may be multiallelic; only first alt allele will be used unless split_multi; later data with bad values will be filtered out
+	alt_alleles = row[4].split(b',')
+	row[4] = alt_alleles[0]
+
+	# filter sample columns to include only data in desired format; sampleIDs start at file column index 9; in new row sampleIDs now start at 4, ALT is column 3
+	row = [row[x] if x <= 8 else row[x].split(b':')[data_ind] for x in col_inds]
+
+	# turn multi-allelic lines into multiple biallelic lines
+	if split_multi & (len(alt_alleles) > 1):
+		sample_str = b'\t'.join(row[4:])
+		line = bytearray()
+		for j in range(1, len(alt_alleles) + 1):
+			str_j = sample_str
+			for k in range(1, len(alt_alleles) + 1):
+				# substitute alt alleles besides the jth one with missing
+				str_j = re.sub(str(k).encode(), b'.', str_j) if (k != j) else str_j
+			# set jth alt allele to 1
+			str_j = re.sub(str(j).encode(), b'1', str_j)
+			# join row info information
+			line_j = b'\t'.join([*row[0:3], alt_alleles[j-1], str_j])
+			# append linebreak if needed
+			line_j = line_j if line_j.endswith(b'\n') else line_j + b'\n'
+			line += line_j
+
+	else:
+		# row to bytestring
+		line = b'\t'.join(row)
+
+		# append linebreak if needed
+		line = line if line.endswith(b'\n') else line + b'\n'
+
+	return line
+
+def read_genotype(start, end, sampleID, geno_cols_info, chrm, geno_path, genofile_type, data_format, **kwargs):
+
+	# subprocess command
+	command_str = ' '.join(['tabix', path, chrm + ':' + start + '-' + end])
+
+	proc = subprocess.Popen(
+		[command_str],
+		shell=True,
+		stdout=subprocess.PIPE,
+		bufsize=1)
+
+	# initialize bytearray
+	proc_out = bytearray()
+
+	# while subprocesses running, read lines into byte array
+	while proc.poll() is None:
+		line = proc.stdout.readline()
+		if len(line) == 0:
+			break
+		if genofile_type == 'vcf':
+			line = filter_vcf_line(line, data_format, col_inds)
+		proc_out += line
+
+	# read in lines still remaining after subprocess completes
+	for line in proc.stdout:
+		if genofile_type == 'vcf':
+			line = filter_vcf_line(line, data_format, col_inds)
+		proc_out += line
+
+	# read data into dataframe
+	geno_data = pd.read_csv(
+		StringIO(proc_out.decode('utf-8')),
+		sep='\t',
+		low_memory=False,
+		header=None,
+		names=geno_cols_info['cols'],
+		dtype=geno_cols_info['dtype'])
+
+	geno_data = optimize_cols(geno_data)
+
+	# get snpID, filter out duplicates
+	geno_data['snpID'] = get_snpIDs(geno_data)
+	geno_data = geno_data.drop_duplicates(['snpID'], keep='first').reset_index(drop=True)
+
+	# remove non-valid GT values; ie those from multiallelic rows
+	if data_format == 'GT':
+		valid_GT = ['.|.', '0|0', '0|1', '1|0', '1|1', 
+		'./.', '0/0', '0/1', '1/0', '1/1']
+		geno_data = geno_data[np.all(geno_data[sampleID].isin(valid_GT), axis=1)].reset_index(drop=True)
+
+	return geno_data
 
 
 # Call tabix, read in lines into byte array
@@ -440,13 +537,16 @@ def get_cols_dtype(file_cols, cols, sampleid=None, genofile_type=None, add_cols=
 		'CHROM': object,
 		'COV': object,
 		'ES': np.float64,
+		'FILTER': object,
 		'FORMAT': object,
+		'INFO': object,
 		'GeneEnd': np.int64,
 		'GeneName': object,
 		'GeneStart': np.int64,
 		'ID': object,
 		'MAF': np.float64,
 		'POS': np.int64,
+		'QUAL': object,
 		'REF': object,
 		'SE': np.float64,
 		'snpID': object,
@@ -738,9 +838,6 @@ def reformat_sample_vals(df: pd.DataFrame, data_format, sampleID):
 # 	return df
 
 # reformats sample values in row to include only specified format
-def vals_by_format(row):
-	frmt_ind = row.FORMAT.split(':').index(data_format)
-	return row[sampleID].apply(lambda y: y.split(':')[frmt_ind])
 
 @empty_df_handler
 def check_prep_vcf(df: pd.DataFrame, data_format, sampleID):
@@ -754,6 +851,10 @@ def check_prep_vcf(df: pd.DataFrame, data_format, sampleID):
 		raise Exception("Exception in check_prep_vcf(): Specified genotype format, format=" + data_format + ", does not exist in all rows of the FORMAT column for this section of the input VCF file.")
 
 	if rowfrmts.size > 1:
+		def vals_by_format(row):
+			frmt_ind = row.FORMAT.split(':').index(data_format)
+			return row[sampleID].apply(lambda y: y.split(':')[frmt_ind])
+
 		df[sampleID] = df.apply(lambda x: vals_by_format(x), axis=1)
 		
 	# else assume rowfrmts.size == 1 
