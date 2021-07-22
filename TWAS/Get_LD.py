@@ -64,12 +64,6 @@ import TIGARutils as tg
 # def cov_print_frmt(x): return ('%.4f' % x).rstrip('0').rstrip('.')
 def cov_fmt(x): return ('%.4f' % x).rstrip('0').rstrip('.')
 
-# # returns formatted covariance string from a row array, 
-# # max_line_width=np.Inf prevents adding '\n'
-# # np.array2string wraps values in '[]', also need to strip leading ,
-# def cov_str(x): return np.array2string(x, threshold=np.inf, max_line_width=np.inf, separator=',', 
-#     formatter={'float_kind': cov_print_frmt}).strip('[,]')
-
 # trim array by positionin matrix (length should be rownumber:total for each row);
 # format each element in each row, join all together separated by comma
 def cov_str(cov_lst): return [','.join([cov_fmt(x) for x in row]) for row in [cov_lst[i][i:len(cov_lst)] for i in range(len(cov_lst))]]
@@ -77,13 +71,10 @@ def cov_str(cov_lst): return [','.join([cov_fmt(x) for x in row]) for row in [co
 ###############################################################
 # check input arguments
 if args.genofile_type == 'vcf':
-	gcol_sampleids_strt_ind = 9
-
 	if (args.data_format != 'GT') and (args.data_format != 'DS'):
 		raise SystemExit('Please specify the genotype data format used by the vcf file (--format ) as either "GT" or "DS".\n')
 		
 elif args.genofile_type == 'dosage':
-	gcol_sampleids_strt_ind = 5
 	args.data_format = 'DS'
 
 else:
@@ -110,42 +101,10 @@ Output reference covariance results file: {out_rc}
 	**args.__dict__,
 	out_rc = out_ref_cov_path))
 
-# tg.print_args(args)
-
-tg.print_args(args)
-
 ###############################################################
 # Read in block information
-print('Reading block annotation file.')
-chr_blocks = pd.read_csv(
-	args.block_path,
-	sep='\t',
-	usecols=['CHROM', 'Start', 'End'],
-	dtype={'CHROM':object, 'Start':object, 'End':object})
-chr_blocks = chr_blocks[chr_blocks['CHROM'] == args.chrm].reset_index(drop=True)
-chr_blocks = tg.optimize_cols(chr_blocks)
-
-n_blocks = len(chr_blocks)
-
-print('Reading genotype file header.\n')
-g_cols = tg.call_tabix_header(args.geno_path)
-gcol_sampleids = g_cols[gcol_sampleids_strt_ind:]
-
-# get sampleIDs
-print('Reading sampleID file.\n')
-spec_sampleids = pd.read_csv(
-	args.sampleid_path,
-	sep='\t',
-	header=None)[0].drop_duplicates()
-
-print('Matching sampleIDs.\n')
-sampleID = np.intersect1d(gcol_sampleids, spec_sampleids)
-
-if not sampleID.size:
-	raise SystemExit('There are no sampleID in both the genotype data and the specified sampleID file.')
-
-# get the indices and dtypes for reading files into pandas
-g_cols_ind, g_dtype = tg.genofile_cols_dtype(g_cols, args.genofile_type, sampleID)
+# Startup for get LD job: get chr_blocks, column header info, sampleIDs
+chr_blocks, n_blocks, sampleID, geno_cols_info = tg.refcovld_startup(**args.__dict__)
 
 # write columns out to file
 print('Creating file: ' + out_ref_cov_path + '\n')
@@ -165,33 +124,9 @@ def thread_process(num):
 	block = chr_blocks.loc[num]
 	print('num=' + str(num))
 	
-	print('Reading genotype data.')
-	g_proc_out = tg.call_tabix(args.geno_path, args.chrm, block.Start, block.End)
-
-	if not g_proc_out:
-		print('There is no genotype data in this block.\n')
-		return None
-
-	block_geno = pd.read_csv(StringIO(g_proc_out.decode('utf-8')),
-		sep='\t',
-		low_memory=False,
-		header=None,
-		usecols=g_cols_ind,
-		dtype=g_dtype)
-
-	block_geno.columns = [g_cols[i] for i in block_geno.columns]
-	block_geno = tg.optimize_cols(block_geno)
-
-	# get snpIDs
-	block_geno['snpID'] = tg.get_snpIDs(block_geno)
-	block_geno = block_geno.drop_duplicates(['snpID'], keep='first').reset_index(drop=True)
-
-	# prep vcf file
-	if args.genofile_type=='vcf':
-		block_geno = tg.check_prep_vcf(block_geno, args.data_format, sampleID)
-
-	# reformat sample values
-	block_geno = tg.reformat_sample_vals(block_geno, args.data_format, sampleID)
+	# read in and process genotype data
+	# file must be bgzipped and tabix
+	block_geno = tg.read_genotype(block.Start, block.End, sampleID, **geno_cols_info, **args.__dict__)
 
 	# calculate, filter maf
 	block_geno = tg.calc_maf(block_geno, sampleID, args.maf)

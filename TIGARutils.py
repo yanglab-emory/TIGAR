@@ -93,8 +93,6 @@ def empty_df_handler(func):
 	return wrapper
 
 
-
-
 # train startup
 def train_startup(geno_path, genofile_type, geneexp_path, sampleid_path, **kwargs):
 
@@ -135,6 +133,53 @@ def train_startup(geno_path, genofile_type, geneexp_path, sampleid_path, **kwarg
 	geno_cols_info = genofile_cols_dtype(geno_cols, genofile_type, sampleID)
 
 	return sampleID, sample_size, exp_cols_info, geno_cols_info
+
+# train startup
+def refcovld_startup(chrm, block_path, geno_path, genofile_type, sampleid_path, **kwargs):
+
+	print('Reading block annotation file.')
+	# read in block file
+	chr_blocks = pd.read_csv(
+		block_path,
+		sep='\t',
+		usecols=['CHROM', 'Start', 'End'],
+		dtype={'CHROM':object, 'Start':object, 'End':object})
+	chr_blocks = chr_blocks[chr_blocks['CHROM'] == chrm].reset_index(drop=True)
+	chr_blocks = optimize_cols(chr_blocks)
+
+	n_blocks = len(chr_blocks)
+
+	print('Reading file headers.\n')
+	# genotype file header
+	try:
+		geno_cols = call_tabix_header(geno_path)
+	except: 
+		geno_cols = get_header(geno_path, zipped=True)
+
+	# get sampleids in the genotype file
+	geno_sampleids_strt_ind = {'dosage': 5, 'vcf': 9}[genofile_type]
+	geno_sampleids = geno_cols[geno_sampleids_strt_ind:]
+
+	## read in sampleids file
+	print('Reading sampleID file.\n')
+	spec_sampleids = pd.read_csv(
+		sampleid_path,
+		sep='\t',
+		header=None)[0].drop_duplicates()
+
+	## match sampleids between files
+	print('Matching sampleIDs.\n')
+	sampleID = np.intersect1d(geno_sampleids, spec_sampleids)
+
+	sample_size = sampleID.size
+
+	if not sample_size:
+		raise SystemExit('There are no overlapped sample IDs between the genotype file and sampleID file.')
+
+	## columns to read-in
+	geno_cols_info = genofile_cols_dtype(geno_cols, genofile_type, sampleID)
+
+	return chr_blocks, n_blocks, sampleID, geno_cols_info
 
 
 def read_genexp(geneexp_path, cols, col_inds, dtype, chrm, **kwargs):
