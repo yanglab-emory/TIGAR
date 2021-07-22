@@ -329,20 +329,29 @@ def read_genotype(start, end, sampleID, col_inds, cols, dtype, chrm, geno_path, 
 	# initialize bytearray
 	proc_out = bytearray()
 
-	# while subprocesses running, read lines into byte array
-	while proc.poll() is None:
-		line = proc.stdout.readline()
-		if len(line) == 0:
-			break
-		if genofile_type == 'vcf':
+	# do line filtering step for VCF files only
+	if genofile_type == 'vcf':
+		# while subprocesses running, read lines into byte array
+		while proc.poll() is None:
+			line = proc.stdout.readline()
+			if len(line) == 0:
+				break
 			line = filter_vcf_line(line, data_format, col_inds)
-		proc_out += line
-
-	# read in lines still remaining after subprocess completes
-	for line in proc.stdout:
-		if genofile_type == 'vcf':
+			proc_out += line
+		# read in lines still remaining after subprocess completes
+		for line in proc.stdout:
 			line = filter_vcf_line(line, data_format, col_inds)
-		proc_out += line
+			proc_out += line
+	else: 
+		# while subprocesses running, read lines into byte array
+		while proc.poll() is None:
+			line = proc.stdout.readline()
+			if len(line) == 0:
+				break
+			proc_out += line
+		# read in lines still remaining after subprocess completes
+		for line in proc.stdout:
+			proc_out += line
 
 	if not proc_out:
 		raise Exception('No genotype data for target.')
