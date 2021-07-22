@@ -315,7 +315,7 @@ def filter_vcf_line(line: bytes, data_format, col_inds, split_multi = True):
 
 	return line
 
-def read_genotype(start, end, sampleID, col_inds, cols, dtype, chrm, geno_path, genofile_type, data_format, **kwargs):
+def read_genotype(start, end, sampleID, file_cols, col_inds, cols, dtype, chrm, geno_path, genofile_type, data_format, **kwargs):
 
 	# subprocess command
 	command_str = ' '.join(['tabix', geno_path, chrm + ':' + start + '-' + end])
@@ -357,14 +357,23 @@ def read_genotype(start, end, sampleID, col_inds, cols, dtype, chrm, geno_path, 
 		raise Exception('No genotype data for target.')
 
 	# read data into dataframe
-	geno_data = pd.read_csv(
-		StringIO(proc_out.decode('utf-8')),
-		sep='\t',
-		low_memory=False,
-		header=None,
-		names=cols,
-		dtype=dtype
-		)
+	if genofile_type == 'vcf':
+		geno_data = pd.read_csv(
+			StringIO(proc_out.decode('utf-8')),
+			sep='\t',
+			low_memory=False,
+			header=None,
+			names=cols,
+			dtype=dtype)
+	else:
+		geno_data = pd.read_csv(
+			StringIO(proc_out.decode('utf-8')),
+			sep='\t',
+			low_memory=False,
+			header=None,
+			names=file_cols,
+			usecols=col_inds,
+			dtype=dtype)
 
 	geno_data = optimize_cols(geno_data)
 
