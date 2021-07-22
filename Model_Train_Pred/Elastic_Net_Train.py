@@ -173,13 +173,10 @@ def do_cv(i, target_geno_exp_df, cv_trainID, cv_testID):
 ###############################################################
 # check input arguments
 if args.genofile_type == 'vcf':
-	gcol_sampleids_strt_ind = 9
-
 	if (args.data_format != 'GT') and (args.data_format != 'DS'):
 		raise SystemExit('Please specify the genotype data format used by the vcf file (--format ) as either "GT" or "DS".\n')
 		
 elif args.genofile_type == 'dosage':
-	gcol_sampleids_strt_ind = 5
 	args.data_format = 'DS'
 
 else:
@@ -244,68 +241,17 @@ Output training info file: {out_info}
 ### 4.TargetID (i.e.GeneID, treated as unique annotation for each gene)
 ### 5.Gene Name
 
-# Gene Expression header, sampleIDs
-print('Reading genotype, expression file headers.\n')
-exp_cols = tg.get_header(args.geneexp_path)
-exp_sampleids = exp_cols[5:]
+# Startup for training jobs: get column header info, sampleIDs
+print('Reading genotype, expression file headers, sample IDs.\n')
+sampleID, sample_size, exp_cols_info, geno_cols_info = tg.train_startup(**args.__dict__)
 
-# genofile header, sampleIDs
-try:
-	g_cols = tg.call_tabix_header(args.geno_path)
-except: 
-	g_cols = tg.get_header(args.geno_path, zipped=True)
-
-gcol_sampleids = g_cols[gcol_sampleids_strt_ind:]
-
-# geno, exp overlapping sampleIDs
-gcol_exp_sampleids = np.intersect1d(gcol_sampleids, exp_sampleids)
-
-if not gcol_exp_sampleids.size:
-	raise SystemExit('The gene expression file and genotype file have no sampleIDs in common.')
-
-# get sampleIDs
-print('Reading sampleID file.\n')
-spec_sampleids = pd.read_csv(
-	args.sampleid_path,
-	sep='\t',
-	header=None)[0].drop_duplicates()
-
-print('Matching sampleIDs.\n')
-sampleID = np.intersect1d(spec_sampleids, gcol_exp_sampleids)
-
-sample_size = sampleID.size
-
-if not sample_size:
-	raise SystemExit('There is no overlapped sample IDs between gene expression file, genotype file, and sampleID file.')
-
-# get columns to read in
-g_cols_ind, g_dtype = tg.genofile_cols_dtype(g_cols, args.genofile_type, sampleID)
-e_cols_ind, e_dtype = tg.exp_cols_dtype(exp_cols, sampleID)
-
-# EXPRESSION FILE - Extract expression level by chromosome
+# Read in gene expression info
 print('Reading gene expression data.\n')
-GeneExp_chunks = pd.read_csv(
-	args.geneexp_path, 
-	sep='\t', 
-	iterator=True, 
-	chunksize=10000,
-	usecols=e_cols_ind,
-	dtype=e_dtype)
-
-GeneExp = pd.concat([x[x['CHROM']==args.chrm] for x in GeneExp_chunks]).reset_index(drop=True)
-
-if GeneExp.empty:
-	raise SystemExit('There are no valid gene expression training data for chromosome ' + args.chrm+ '\n')
-
-GeneExp = tg.optimize_cols(GeneExp)
-
-TargetID = GeneExp.TargetID.values
-n_targets = TargetID.size
+GeneExp, TargetID, n_targets = tg.read_genexp(**args.__dict__, **exp_cols_info)
 
 # PREP CROSS VALIDATION SAMPLES - Split sampleIDs for cross validation
 if args.cvR2:
 	print('Splitting sample IDs randomly for 5-fold cross validation by average R2...\n')
-
 	kf = KFold(n_splits=5)
 	kf_splits = [(sampleID[x], sampleID[y]) for x,y in kf.split(sampleID)]
 	CV_trainID, CV_testID = zip(*kf_splits)
@@ -341,40 +287,13 @@ def thread_process(num):
 	target = TargetID[num]
 	print('num=' + str(num) + '\nTargetID=' + target)
 	target_exp = GeneExp.iloc[[num]]
+
 	start = str(max(int(target_exp.GeneStart) - args.window,0))
 	end = str(int(target_exp.GeneEnd) + args.window)
 
-	# select corresponding vcf file by tabix
-	print('Reading genotype data.')
-	g_proc_out = tg.call_tabix(args.geno_path, args.chrm, start, end)
-
-	if not g_proc_out:
-		print('There is no genotype data for TargetID: ' + target + '\n') 
-		return None
-	  
-	# Recode subprocess output in 'utf-8'
-	print('Preparing Elastic-Net input.')
-	target_geno = pd.read_csv(StringIO(g_proc_out.decode('utf-8')),
-		sep='\t',
-		low_memory=False,
-		header=None,
-		usecols=g_cols_ind,
-		dtype=g_dtype)
-	target_geno.columns = [g_cols[i] for i in target_geno.columns]
-	target_geno = tg.optimize_cols(target_geno)
-
-	# get snpIDs
-	target_geno['snpID'] = tg.get_snpIDs(target_geno)
-	target_geno = target_geno.drop_duplicates(['snpID'], keep='first').reset_index(drop=True)
-
-	n_snp = target_geno['snpID'].size
-
-	# prep vcf file
-	if args.genofile_type=='vcf':
-		target_geno = tg.check_prep_vcf(target_geno, args.data_format, sampleID)
-
-	# reformat sample values
-	target_geno = tg.reformat_sample_vals(target_geno, args.data_format, sampleID)
+	# READ IN AND PROCESS GENOTYPE DATA 
+	# file must be bgzipped and tabix
+	target_geno = tg.read_genotype(start, end, sampleID, **geno_cols_info, **args.__dict__)
 
 	# filter out variants that exceed missing rate threshold
 	target_geno = tg.handle_missing(target_geno, sampleID, args.missing_rate)
@@ -384,6 +303,8 @@ def thread_process(num):
 
 	# get, filter p_HWE
 	target_geno = tg.calc_p_hwe(target_geno, sampleID, args.hwe, op=operator.ge)
+
+	n_snp = target_geno['snpID'].size
 
 	# center data
 	target_geno = tg.center(target_geno, sampleID)
@@ -410,6 +331,7 @@ def thread_process(num):
 		if avg_r2_cv < args.cvR2_threshold:
 			print('Average R2 < ' + str(args.cvR2_threshold) + '; Skipping Elastic-Net training for TargetID: ' + target + '\n')
 			return None
+
 	else:
 		avg_r2_cv = 0
 		print('Skipping evaluation by 5-fold CV average R2...')
@@ -450,7 +372,7 @@ def thread_process(num):
 	train_info['alpha'] = Alpha
 	train_info['lambda'] = Lambda
 	train_info['cvm'] = cvm
-	train_info['CVR2_threshold'] = args.cvR2_threshold
+	train_info['CVR2_threshold'] = args.cvR2_threshold if args.cvR2 else 0
 
 	train_info.to_csv(
 		out_train_info_path,

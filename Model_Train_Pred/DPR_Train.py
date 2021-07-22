@@ -99,6 +99,12 @@ sys.path.append(args.TIGAR_dir)
 # DEFINE, IMPORT FUNCTIONS
 import TIGARutils as tg
 
+# directory for temporary output files; need to be defined here for some functions
+abs_out_dir = tg.get_abs_path(args.out_dir)
+dpr_file_dir = abs_out_dir + '/DPR_Files' + args.job_suf + '/'
+dpr_file_dir_cv = abs_out_dir + '/CV_Files' + args.job_suf + '/'
+
+
 # preps dpr input files, runs DPR, reads in dpr output
 def prep_call_dpr(bimbam_df, pheno_df, snpannot_df, dpr_file_dir, targetid):
 	## PATHS FOR DPR INPUT
@@ -215,14 +221,13 @@ def calc_r2(out_weights_df, bimbam_test_df, pheno_test_df, cv=False):
 
 
 # function to do the ith cross validation step
-def do_cv(i, target, target_geno_df, target_exp_df, snp_annot_df, cv_trainID, cv_testID, ):
-	dpr_file_dir_cv = abs_out_dir + '/CV_Files' + args.job_suf + '/'
+def do_cv(i, target, target_geno_df, target_exp_df, snp_annot_df, cv_trainID, cv_testID):
 	target_cv = target + '_CV' + str(i+1)
 
 	trainID = cv_trainID[i]
 	testID = cv_testID[i]
 
-	bimbam_train = target_geno_df[np.concatenate((['snpID','REF','ALT'],trainID))]
+	bimbam_train = target_geno_df[['snpID','REF','ALT', *trainID]]
 
 	pheno_train = target_exp_df[trainID].T
 
@@ -256,18 +261,13 @@ def do_cv(i, target, target_geno_df, target_exp_df, snp_annot_df, cv_trainID, cv
 #############################################################
 # set absolute paths
 DPR_path = tg.get_abs_path(args.TIGAR_dir) + '/Model_Train_Pred/DPR'
-abs_out_dir = tg.get_abs_path(args.out_dir)
 
 # check input arguments
 if args.genofile_type == 'vcf':
-	gcol_sampleids_strt_ind = 9
-
-
 	if (args.data_format != 'GT') and (args.data_format != 'DS'):
 		raise SystemExit('Please specify the genotype data format used by the vcf file (--format ) as either "GT" or "DS".\n')
-		
+
 elif args.genofile_type == 'dosage':
-	gcol_sampleids_strt_ind = 5
 	args.data_format = 'DS'
 
 else:
@@ -275,6 +275,7 @@ else:
 
 out_train_weight_path = args.out_dir + '/temp_' + args.out_weight_file
 out_train_info_path = args.out_dir + '/' +  args.out_info_file
+
 #############################################################
 # Print input arguments to log
 print(
@@ -327,104 +328,28 @@ Output training info file: {out_info}
 #############################################################
 # Prepare DPR input
 
-### Read in Gene annotation and Expression level file (text file)
+### Read in Gene Expression/Annotation file
 ### First five columns should be fixed:
-### 1.Chrmosome Number
-### 2.GeneStart Posistion
-### 3.GeneEnd Position
-### 4.TargetID (i.e.GeneID, treated as unique annotation for each gene)
-### 5.Gene Name
+### 1.CHROM
+### 2.GeneStart
+### 3.GeneEnd
+### 4.TargetID [i.e.GeneID, treated as unique annotation for each gene]
+### 5.GeneName
 
-##########
-# gene Expression header, sampleIDs
-print('Reading genotype, expression file headers.\n')
-exp_cols = tg.get_header(args.geneexp_path)
-exp_sampleids = exp_cols[5:]
+# Startup for training jobs: get column header info, sampleIDs
+print('Reading genotype, expression file headers, sample IDs.\n')
+sampleID, sample_size, exp_cols_info, geno_cols_info = tg.train_startup(**args.__dict__)
 
-# genofile header, sampleIDs
-try:
-	g_cols = tg.call_tabix_header(args.geno_path)
-except: 
-	g_cols = tg.get_header(args.geno_path, zipped=True)
-
-gcol_sampleids = g_cols[gcol_sampleids_strt_ind:]
-
-# geno, exp overlapping sampleIDs
-gcol_exp_sampleids = np.intersect1d(gcol_sampleids, exp_sampleids)
-
-if not gcol_exp_sampleids.size:
-	raise SystemExit('The gene expression file and genotype file have no sampleIDs in common.')
-
-# get sampleIDs
-print('Reading sampleID file.\n')
-spec_sampleids = pd.read_csv(
-	args.sampleid_path,
-	sep='\t',
-	header=None)[0].drop_duplicates()
-
-print('Matching sampleIDs.\n')
-sampleID = np.intersect1d(spec_sampleids, gcol_exp_sampleids)
-
-sample_size = sampleID.size
-
-if not sample_size:
-	raise SystemExit('There are no overlapped sample IDs between the gene expression file, genotype file, and sampleID file.')
-
-# get columns to read in
-g_cols_ind, g_dtype = tg.genofile_cols_dtype(g_cols, args.genofile_type, sampleID)
-e_cols_ind, e_dtype = tg.exp_cols_dtype(exp_cols, sampleID)
-
-#####
-# sampleID, sample_size, exp_cols_info, geno_cols_info = tg.train_startup(**args.__dict__)
-#####
-
-##########
-# extract expression level for chromosome
+# Read in gene expression info
 print('Reading gene expression data.\n')
-try:
-	GeneExp_chunks = pd.read_csv(
-		args.geneexp_path, 
-		sep='\t', 
-		iterator=True, 
-		chunksize=10000,
-		usecols=e_cols_ind,
-		dtype=e_dtype)
-
-	GeneExp = pd.concat([x[x['CHROM']==args.chrm] for x in GeneExp_chunks]).reset_index(drop=True)
-
-except:
-	GeneExp_chunks = pd.read_csv(
-		args.geneexp_path, 
-		sep='\t', 
-		iterator=True, 
-		header=None,
-		chunksize=10000,
-		usecols=e_cols_ind)
-
-	GeneExp = pd.concat([x[x[0]==args.chrm] for x in GeneExp_chunks]).reset_index(drop=True).astype(e_dtype)
-
-	GeneExp.columns = [exp_cols[i] for i in GeneExp.columns]
-
-if GeneExp.empty:
-	raise SystemExit('There are no valid gene expression training data for chromosome ' + args.chrm + '\n')
-
-GeneExp = tg.optimize_cols(GeneExp)
-
-TargetID = GeneExp.TargetID
-n_targets = TargetID.size
-
-#####
-# GeneExp, TargetID, n_targets = tg.read_genexp(**args.__dict__, **exp_cols_info)
-#####
+GeneExp, TargetID, n_targets = tg.read_genexp(**args.__dict__, **exp_cols_info)
 
 # PREP CROSS VALIDATION SAMPLES - Split sampleIDs for cross validation
 if args.cvR2:
 	print('Splitting sample IDs randomly for 5-fold cross validation by average R2...\n')
-
 	kf = KFold(n_splits=5)
 	kf_splits = [(sampleID[x], sampleID[y]) for x,y in kf.split(sampleID)]
 	CV_trainID, CV_testID = zip(*kf_splits)
-
 else:
 	print('Skipping splitting samples for 5-fold cross validation...\n')
 
@@ -461,69 +386,8 @@ def thread_process(num):
 	end = str(int(target_exp.GeneEnd) + args.window)
 
 	# READ IN AND PROCESS GENOTYPE DATA 
-	target_geno = tg.read_genotype(args.geno_path, args.chrm, start, end, g_cols, g_cols_ind, g_dtype, args.genofile_type, args.data_format, sampleID)
-	# # Requirement for input vcf file: Must be bgzip and tabix
-	# ### select corresponding vcf file by tabix
-	# print('Reading genotype data.')
-	# g_proc_out = tg.call_tabix(args.geno_path, args.chrm, start, end)
-
-	# if not g_proc_out:
-	#     print('There is no genotype data for TargetID: ' + target + '\n')
-	#     return None
-
-	# print('Preparing DPR input.')
-	# target_geno = pd.read_csv(StringIO(g_proc_out.decode('utf-8')),
-	#         sep='\t',
-	#         low_memory=False,
-	#         header=None,
-	#         usecols=g_cols_ind,
-	#         dtype=g_dtype,
-	#         na_values=['.', '.|.', './.'])
-	# target_geno.columns = [g_cols[i] for i in target_geno.columns]
-	# target_geno = tg.optimize_cols(target_geno)
-
-	# # get snpIDs
-	# target_geno['snpID'] = tg.get_snpIDs(target_geno)
-	# target_geno = target_geno.drop_duplicates(['snpID'],keep='first').reset_index(drop=True)
-
-	# # prep vcf file
-	# if args.genofile_type == 'vcf':
-	#     target_geno = tg.check_prep_vcf(target_geno, args.data_format, sampleID)
-
-	# # reformat sample values
-	# target_geno = tg.reformat_sample_vals(target_geno, args.data_format, sampleID)
-
-	################# OLD
-	# # Requirement for input vcf file: Must be bgzip and tabix
-	# ### select corresponding vcf file by tabix
-	# print('Reading genotype data.')
-	# g_proc_out = tg.call_tabix(args.geno_path, args.chrm, start, end)
-
-	# if not g_proc_out:
-	# 	print('There is no genotype data for TargetID: ' + target + '\n')
-	# 	return None
-
-	# print('Preparing DPR input.')
-	# target_geno = pd.read_csv(StringIO(g_proc_out.decode('utf-8')),
-	# 		sep='\t',
-	# 		low_memory=False,
-	# 		header=None,
-	# 		usecols=g_cols_ind,
-	# 		dtype=g_dtype,
-	# 		na_values=['.', '.|.', './.'])
-	# target_geno.columns = [g_cols[i] for i in target_geno.columns]
-	# target_geno = tg.optimize_cols(target_geno)
-
-	# # get snpIDs
-	# target_geno['snpID'] = tg.get_snpIDs(target_geno)
-	# target_geno = target_geno.drop_duplicates(['snpID'],keep='first').reset_index(drop=True)
-
-	# # prep vcf file
-	# if args.genofile_type == 'vcf':
-	# 	target_geno = tg.check_prep_vcf(target_geno, args.data_format, sampleID)
-
-	# # reformat sample values
-	# target_geno = tg.reformat_sample_vals(target_geno, args.data_format, sampleID)
+	# file must be bgzipped and tabix
+	target_geno = tg.read_genotype(start, end, sampleID, **geno_cols_info, **args.__dict__)
 	
 	# filter out variants that exceed missing rate threshold
 	target_geno = tg.handle_missing(target_geno, sampleID, args.missing_rate)
@@ -533,6 +397,10 @@ def thread_process(num):
 
 	# get, filter p_HWE
 	target_geno = tg.calc_p_hwe(target_geno, sampleID, args.hwe)
+
+	if target_geno.empty:
+		print('No valid data for target.')
+		return None
 
 	# target_geno, target_expr not centered since 
 	## 1) DPR script centers input 
@@ -562,13 +430,11 @@ def thread_process(num):
 
 	# FINAL MODEL TRAINING
 	print('Running DPR training.')
-	dpr_file_dir = abs_out_dir + '/DPR_Files' + args.job_suf + '/'
-	
-	bimbam = target_geno[np.concatenate((['snpID','REF','ALT'],sampleID))]
-
-	pheno = target_exp[sampleID].T
 
 	# PREP INPUT FILES, CALL DPR, READ IN DPR OUTPUT
+	bimbam = target_geno[['snpID','REF','ALT', *sampleID]]
+	pheno = target_exp[sampleID].T
+
 	try:
 		dpr_out = prep_call_dpr(bimbam, pheno, snp_annot, dpr_file_dir, target)
 
@@ -579,7 +445,7 @@ def thread_process(num):
 	# FILTER FOR SNPS WITH ES!=0
 	n_snp = dpr_out.ES.size
 
-	dpr_out = dpr_out[dpr_out.ES!=0]
+	dpr_out = dpr_out[dpr_out.ES != 0]
 
 	n_effect_snp = dpr_out.ES.size
 
@@ -608,7 +474,7 @@ def thread_process(num):
 		sep='\t',
 		header=None,
 		index=None,
-		mode='a')        
+		mode='a')
 
 	# OUTPUT TARGET TRAINING INFO TO FILE
 	# initialize dataframe for storing training info
@@ -620,7 +486,7 @@ def thread_process(num):
 	train_info['CVR2'] = avg_r2_cv
 	train_info['TrainPVALUE'] = train_pvalue
 	train_info['TrainR2'] = train_rsquared
-	train_info['CVR2_threshold'] = args.cvR2_threshold
+	train_info['CVR2_threshold'] = args.cvR2_threshold if args.cvR2 else 0
 
 	# output training info
 	train_info.to_csv(

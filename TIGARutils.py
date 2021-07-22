@@ -315,10 +315,10 @@ def filter_vcf_line(line: bytes, data_format, col_inds, split_multi = True):
 
 	return line
 
-def read_genotype(start, end, sampleID, geno_cols_info, chrm, geno_path, genofile_type, data_format, **kwargs):
+def read_genotype(start, end, sampleID, col_inds, cols, dtype, chrm, geno_path, genofile_type, data_format, **kwargs):
 
 	# subprocess command
-	command_str = ' '.join(['tabix', path, chrm + ':' + start + '-' + end])
+	command_str = ' '.join(['tabix', geno_path, chrm + ':' + start + '-' + end])
 
 	proc = subprocess.Popen(
 		[command_str],
@@ -344,14 +344,18 @@ def read_genotype(start, end, sampleID, geno_cols_info, chrm, geno_path, genofil
 			line = filter_vcf_line(line, data_format, col_inds)
 		proc_out += line
 
+	if not proc_out:
+		raise Exception('No genotype data for target.')
+
 	# read data into dataframe
 	geno_data = pd.read_csv(
 		StringIO(proc_out.decode('utf-8')),
 		sep='\t',
 		low_memory=False,
 		header=None,
-		names=geno_cols_info['cols'],
-		dtype=geno_cols_info['dtype'])
+		names=cols,
+		dtype=dtype
+		)
 
 	geno_data = optimize_cols(geno_data)
 
@@ -364,6 +368,8 @@ def read_genotype(start, end, sampleID, geno_cols_info, chrm, geno_path, genofil
 		valid_GT = ['.|.', '0|0', '0|1', '1|0', '1|1', 
 		'./.', '0/0', '0/1', '1/0', '1/1']
 		geno_data = geno_data[np.all(geno_data[sampleID].isin(valid_GT), axis=1)].reset_index(drop=True)
+
+	geno_data = reformat_sample_vals(geno_data, data_format, sampleID)
 
 	return geno_data
 
