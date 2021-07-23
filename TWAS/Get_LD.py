@@ -103,8 +103,20 @@ Output reference covariance results file: {out_rc}
 
 ###############################################################
 # Read in block information
-# Startup for get LD job: get chr_blocks, column header info, sampleIDs
-chr_blocks, n_blocks, sampleID, geno_cols_info = tg.refcovld_startup(**args.__dict__)
+print('Reading block annotation file.')
+# read in block file
+chr_blocks = pd.read_csv(
+	args.block_path,
+	sep='\t',
+	usecols=['CHROM', 'Start', 'End'],
+	dtype={'CHROM':object, 'Start':object, 'End':object})
+chr_blocks = chr_blocks[chr_blocks['CHROM'] == args.chrm].reset_index(drop=True)
+chr_blocks = tg.optimize_cols(chr_blocks)
+
+n_blocks = len(chr_blocks)
+
+# Startup for get LD job: get column header info, sampleIDs
+sampleID, geno_cols_info = tg.genosampid_startup(**args.__dict__)
 
 # write columns out to file
 print('Creating file: ' + out_ref_cov_path + '\n')

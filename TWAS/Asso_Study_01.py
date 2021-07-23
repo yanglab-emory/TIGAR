@@ -132,7 +132,7 @@ GeneAnnotExp = tg.optimize_cols(GeneAnnotExp)
 # Read in Association information
 # P:phenotype
 # C:covariate
-Asso_Info=pd.read_csv(
+Asso_Info = pd.read_csv(
 	args.pedinfo_path,
 	sep='\t',
 	header=None,
@@ -169,7 +169,7 @@ if not sampleID.size:
 ped_cols = np.concatenate((['IND_ID'], pheno, cov))
 PED = PED[PED.IND_ID.isin(sampleID)][ped_cols]
 
-gene_cols = np.concatenate((['CHROM', 'GeneStart', 'GeneEnd', 'TargetID', 'GeneName'], sampleID))
+gene_cols = ['CHROM', 'GeneStart', 'GeneEnd', 'TargetID', 'GeneName',*sampleID]
 GeneAnnotExp = GeneAnnotExp[gene_cols]
 
 

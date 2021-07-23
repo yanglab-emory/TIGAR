@@ -247,7 +247,7 @@ sampleID, sample_size, exp_cols_info, geno_cols_info = tg.train_startup(**args._
 
 # Read in gene expression info
 print('Reading gene expression data.\n')
-GeneExp, TargetID, n_targets = tg.read_genexp(**args.__dict__, **exp_cols_info)
+GeneExp, TargetID, n_targets = tg.read_gene_annot_exp(**args.__dict__, **exp_cols_info)
 
 # PREP CROSS VALIDATION SAMPLES - Split sampleIDs for cross validation
 if args.cvR2:

@@ -134,22 +134,9 @@ def train_startup(geno_path, genofile_type, geneexp_path, sampleid_path, **kwarg
 
 	return sampleID, sample_size, exp_cols_info, geno_cols_info
 
-# train startup
-def refcovld_startup(chrm, block_path, geno_path, genofile_type, sampleid_path, **kwargs):
 
-	print('Reading block annotation file.')
-	# read in block file
-	chr_blocks = pd.read_csv(
-		block_path,
-		sep='\t',
-		usecols=['CHROM', 'Start', 'End'],
-		dtype={'CHROM':object, 'Start':object, 'End':object})
-	chr_blocks = chr_blocks[chr_blocks['CHROM'] == chrm].reset_index(drop=True)
-	chr_blocks = optimize_cols(chr_blocks)
-
-	n_blocks = len(chr_blocks)
-
-	print('Reading file headers.\n')
+#  startup
+def genosampid_startup(geno_path, genofile_type, sampleid_path, **kwargs):
 	# genotype file header
 	try:
 		geno_cols = call_tabix_header(geno_path)
@@ -179,14 +166,22 @@ def refcovld_startup(chrm, block_path, geno_path, genofile_type, sampleid_path, 
 	## columns to read-in
 	geno_cols_info = genofile_cols_dtype(geno_cols, genofile_type, sampleID)
 
-	return chr_blocks, n_blocks, sampleID, geno_cols_info
+	return sampleID, geno_cols_info
+
+def weight_cols_info(path, add_cols = [], drop_cols = ['ID']):
+	info_dict = weight_cols_dtype(get_header(path, zipped=True), add_cols, drop_cols)
+	return {'target_ind': info_dict['file_cols'].index('TargetID'), 
+		'ES_ind': info_dict['file_cols'].index('ES'),
+		**info_dict }
+
+def zscore_cols_info(z_path, chrm, **kwargs):
+	info_dict = zscore_cols_dtype(get_header(z_path, zipped=True))
+	return {'geno_path':z_path, 'chrm': chrm, 'sampleID': [], 'data_format':'Zscore', 'genofile_type':'Zscore', **info_dict}
 
 
-def read_genexp(geneexp_path, cols, col_inds, dtype, chrm, **kwargs):
-	print('Reading gene expression data.\n')
-
+def read_gene_annot_exp(geneexp_path, chrm, cols=['CHROM','GeneStart','GeneEnd','TargetID','GeneName'], col_inds=['CHROM','GeneStart','GeneEnd','TargetID','GeneName'], dtype={'CHROM':object,'GeneStart':np.int64,'GeneEnd':np.int64,'TargetID':object,'GeneName':object}, **kwargs):
 	try:
-		GeneExp_chunks = pd.read_csv(
+		Gene_chunks = pd.read_csv(
 			geneexp_path, 
 			sep='\t', 
 			iterator=True, 
@@ -194,10 +189,10 @@ def read_genexp(geneexp_path, cols, col_inds, dtype, chrm, **kwargs):
 			usecols=col_inds,
 			dtype=dtype)
 
-		GeneExp = pd.concat([x[x['CHROM']==chrm] for x in GeneExp_chunks]).reset_index(drop=True)
+		Gene = pd.concat([x[x['CHROM']==chrm] for x in Gene_chunks]).reset_index(drop=True)
 
 	except:
-		GeneExp_chunks = pd.read_csv(
+		Gene_chunks = pd.read_csv(
 			geneexp_path, 
 			sep='\t', 
 			iterator=True, 
@@ -205,86 +200,86 @@ def read_genexp(geneexp_path, cols, col_inds, dtype, chrm, **kwargs):
 			chunksize=10000,
 			usecols=col_inds)
 
-		GeneExp = pd.concat([x[x[0]==chrm] for x in GeneExp_chunks]).reset_index(drop=True).astype(dtype)
+		Gene = pd.concat([x[x[0]==chrm] for x in Gene_chunks]).reset_index(drop=True).astype(dtype)
 
-		GeneExp.columns = [exp_cols[i] for i in GeneExp.columns]
+		Gene.columns = [exp_cols[i] for i in Gene.columns]
 
-	if GeneExp.empty:
-		raise SystemExit('There are no valid gene expression training data for chromosome ' + chrm + '\n')
+	if Gene.empty:
+		raise SystemExit('There are no valid gene expression/annotation data for chromosome ' + chrm + '.\n')
 
-	GeneExp = optimize_cols(GeneExp)
+	Gene = optimize_cols(Gene)
 
-	TargetID = GeneExp.TargetID
+	TargetID = Gene.TargetID
 	n_targets = TargetID.size
 
-	return GeneExp, TargetID, n_targets
+	return Gene, TargetID, n_targets
 
 
-# divide range of positions into intervals of size n or less, convert to tabixable string
-def get_gt_regions_list(chrm, start, end, n):
-	start = int(start)
-	end = int(end)
-	n_regions = ((end - start) // n) + 1
-	for i in range(n_regions):
-		yield chrm + ':' + str(start + (n * i) + i) + '-' + str(min(start + (n * (i + 1)) + i, end))
+# # divide range of positions into intervals of size n or less, convert to tabixable string
+# def get_gt_regions_list(chrm, start, end, n):
+# 	start = int(start)
+# 	end = int(end)
+# 	n_regions = ((end - start) // n) + 1
+# 	for i in range(n_regions):
+# 		yield chrm + ':' + str(start + (n * i) + i) + '-' + str(min(start + (n * (i + 1)) + i, end))
 
 
-# get proc_out from function and parse data for regions
-@empty_df_handler
-def get_gt_regions_data(regs_str, path, g_cols, g_cols_ind, g_dtype):
+# # get proc_out from function and parse data for regions
+# @empty_df_handler
+# def get_gt_regions_data(regs_str, path, g_cols, g_cols_ind, g_dtype):
 
-	proc_out = call_tabix_regions(path, regs_str)
+# 	proc_out = call_tabix_regions(path, regs_str)
 
-	try:
-		regs_data = pd.read_csv(
-			StringIO(proc_out.decode('utf-8')),
-			sep='\t',
-			low_memory=False,
-			header=None,
-			usecols=g_cols_ind,
-			dtype=g_dtype)
-	except pd.errors.ParserError as e:
-		regs_chunks = pd.read_csv(
-			StringIO(proc_out.decode('utf-8')),
-			sep='\t',
-			low_memory=False,
-			header=None,
-			iterator=True,
-			chunksize=5000,
-			usecols=g_cols_ind,
-			dtype=g_dtype)
-		regs_data = pd.concat([chunk for chunk in regs_chunks]).reset_index(drop=True)
+# 	try:
+# 		regs_data = pd.read_csv(
+# 			StringIO(proc_out.decode('utf-8')),
+# 			sep='\t',
+# 			low_memory=False,
+# 			header=None,
+# 			usecols=g_cols_ind,
+# 			dtype=g_dtype)
+# 	except pd.errors.ParserError as e:
+# 		regs_chunks = pd.read_csv(
+# 			StringIO(proc_out.decode('utf-8')),
+# 			sep='\t',
+# 			low_memory=False,
+# 			header=None,
+# 			iterator=True,
+# 			chunksize=5000,
+# 			usecols=g_cols_ind,
+# 			dtype=g_dtype)
+# 		regs_data = pd.concat([chunk for chunk in regs_chunks]).reset_index(drop=True)
 
-	regs_data.columns = [g_cols[i] for i in regs_data.columns]
-	regs_data = optimize_cols(regs_data)
+# 	regs_data.columns = [g_cols[i] for i in regs_data.columns]
+# 	regs_data = optimize_cols(regs_data)
 
-	# get snpIDs
-	regs_data['snpID'] = get_snpIDs(regs_data)
-	regs_data = regs_data.drop_duplicates(['snpID'],keep='first').reset_index(drop=True)
+# 	# get snpIDs
+# 	regs_data['snpID'] = get_snpIDs(regs_data)
+# 	regs_data = regs_data.drop_duplicates(['snpID'],keep='first').reset_index(drop=True)
 
-	return regs_data
+# 	return regs_data
 
-# get genotype data in format needed
-@empty_df_handler
-def prep_gt_regions_data(regs_data, genofile_type, data_format, sampleID): 
-	# prep vcf file
-	if genofile_type == 'vcf':
-		regs_data = check_prep_vcf(regs_data, data_format, sampleID)
+# # get genotype data in format needed
+# @empty_df_handler
+# def prep_gt_regions_data(regs_data, genofile_type, data_format, sampleID): 
+# 	# prep vcf file
+# 	if genofile_type == 'vcf':
+# 		regs_data = check_prep_vcf(regs_data, data_format, sampleID)
 
-	# reformat sample values
-	regs_data = reformat_sample_vals(regs_data, data_format, sampleID)
+# 	# reformat sample values
+# 	regs_data = reformat_sample_vals(regs_data, data_format, sampleID)
 	
-	return regs_data
+# 	return regs_data
 
-# get proc_out from function and parse data for regions, then prep
-@empty_df_handler
-def get_prep_gt_regions_data(regs_str, path, g_cols, g_cols_ind, g_dtype, genofile_type, data_format, sampleID):
+# # get proc_out from function and parse data for regions, then prep
+# @empty_df_handler
+# def get_prep_gt_regions_data(regs_str, path, g_cols, g_cols_ind, g_dtype, genofile_type, data_format, sampleID):
 
-	regs_data = get_gt_regions_data(regs_str, path, g_cols, g_cols_ind, g_dtype)
+# 	regs_data = get_gt_regions_data(regs_str, path, g_cols, g_cols_ind, g_dtype)
 
-	regs_data = prep_gt_regions_data(regs_data, genofile_type, data_format, sampleID)
+# 	regs_data = prep_gt_regions_data(regs_data, genofile_type, data_format, sampleID)
 
-	return regs_data
+# 	return regs_data
 
 # # read in and prep genotype data
 # def read_genotype(path, chrm, start, end, g_cols, g_cols_ind, g_dtype, genofile_type, data_format, sampleID):
@@ -316,12 +311,12 @@ def get_prep_gt_regions_data(regs_str, path, g_cols, g_cols_ind, g_dtype, genofi
 # 	return gt_data
 
 
-def filter_vcf_line(line: bytes, data_format, col_inds, split_multi = True):
+def filter_vcf_line(line: bytes, bformat, col_inds, split_multi = True):
 	# split line into list
 	row = line.split(b'\t')
 
 	# convert data_format to byte
-	bformat = str.encode(data_format)
+	# bformat = str.encode(data_format)
 
 	# get index of data format
 	data_ind = row[8].split(b':').index(bformat)
@@ -356,7 +351,8 @@ def filter_vcf_line(line: bytes, data_format, col_inds, split_multi = True):
 		line = b'\t'.join(row)
 
 		# append linebreak if needed
-		line = line if line.endswith(b'\n') else line + b'\n'
+		# line = line if line.endswith(b'\n') else line + b'\n'
+		line += b'' if line.endswith(b'\n') else b'\n'
 
 	return line
 
@@ -376,17 +372,16 @@ def read_genotype(start, end, sampleID, file_cols, col_inds, cols, dtype, chrm, 
 
 	# do line filtering step for VCF files only
 	if genofile_type == 'vcf':
+		bformat = str.encode(data_format)
 		# while subprocesses running, read lines into byte array
 		while proc.poll() is None:
 			line = proc.stdout.readline()
 			if len(line) == 0:
 				break
-			line = filter_vcf_line(line, data_format, col_inds)
-			proc_out += line
+			proc_out += filter_vcf_line(line, bformat, col_inds)
 		# read in lines still remaining after subprocess completes
 		for line in proc.stdout:
-			line = filter_vcf_line(line, data_format, col_inds)
-			proc_out += line
+			proc_out += filter_vcf_line(line, bformat, col_inds)
 	else: 
 		# while subprocesses running, read lines into byte array
 		while proc.poll() is None:
@@ -432,9 +427,91 @@ def read_genotype(start, end, sampleID, file_cols, col_inds, cols, dtype, chrm, 
 		'./.', '0/0', '0/1', '1/0', '1/1']
 		geno_data = geno_data[np.all(geno_data[sampleID].isin(valid_GT), axis=1)].reset_index(drop=True)
 
-	geno_data = reformat_sample_vals(geno_data, data_format, sampleID)
+	if data_format == 'GT' or data_format == 'DS':
+		geno_data = reformat_sample_vals(geno_data, data_format, sampleID)
 
 	return geno_data
+
+
+def filter_weight_line(line: bytes, btarget: bytes, target_ind, col_inds):
+	# split line into list
+	row = line.split(b'\t')
+
+	# convert target to byte
+	# btarget = str.encode(target)
+
+	# check if row is for correct target
+	if (row[target_ind].startswith(btarget)):
+		line = b'\t'.join([row[x] for x in col_inds])
+		line += b'' if line.endswith(b'\n') else b'\n'
+		return line
+	else: 
+		return b''
+
+
+# def read_weight(start, end, target, file_cols, col_inds, cols, dtype, chrm, w_path, target_ind, ES_ind, weight_threshold = 0, **kwargs):
+def read_weight(start, end, target, file_cols, col_inds, cols, dtype, chrm, w_path, target_ind, weight_threshold = 0, **kwargs):
+
+	# subprocess command
+	command_str = ' '.join(['tabix', w_path, chrm + ':' + start + '-' + end])
+
+	proc = subprocess.Popen(
+		[command_str],
+		shell=True,
+		stdout=subprocess.PIPE,
+		bufsize=1)
+
+	# initialize bytearray
+	proc_out = bytearray()
+
+	# while subprocesses running, read lines into byte array
+	btarget = str.encode(target)
+
+	while proc.poll() is None:
+		line = proc.stdout.readline()
+		if len(line) == 0:
+			break
+		proc_out += filter_weight_line(line, btarget, target_ind, col_inds)
+
+	# read in lines still remaining after subprocess completes
+	for line in proc.stdout:
+		proc_out += filter_weight_line(line, btarget, target_ind, col_inds)
+
+	if not proc_out:
+		raise Exception('No cis-eQTL weights for TargetID: ' + target + '.\n')
+
+	weight_data = pd.read_csv(
+		StringIO(proc_out.decode('utf-8')),
+		sep='\t',
+		low_memory=False,
+		header=None,
+		names=cols,
+		dtype=dtype)
+
+	weight_data = optimize_cols(weight_data)
+
+	## figure out a way to handle target ids with decimal places when both files dont necessarily have those
+	# if not np.all(weight_data['TargetID'] == target):
+		# partial_targetids = np.unique(weight_data['TargetID'])
+
+	if not 'snpID' in cols:
+		weight_data['snpID'] = get_snpIDs(weight_data)
+
+	if weight_threshold:
+		weight_data = weight_data[operator.gt(np.abs(weight_data['ES']), weight_threshold)].reset_index(drop=True)
+
+	if weight_data.empty:
+			raise Exception('No test SNPs with cis-eQTL weights with magnitude that exceeds specified weight threshold for TargetID: ' + target + '.\n')
+
+	return weight_data
+
+
+def tabix_query_files(chrm, start, end, paths = []):
+	reg_str = ' ' + chrm + ':' + start + '-' + end
+	# for each path test if length of first line != 0
+	return np.all([len(subprocess.Popen(['tabix '+path+reg_str],
+		shell=True, stdout=subprocess.PIPE,
+		bufsize=1).stdout.readline()) > 0 for path in paths])
 
 
 # Call tabix, read in lines into byte array
@@ -656,7 +733,7 @@ def get_cols_dtype(file_cols, cols, sampleid=None, genofile_type=None, add_cols=
 			'col_inds': col_inds, 
 			'dtype': out_dtype_dict}
 	
-	return file_cols_ind, out_dtype_dict
+	return col_inds, out_dtype_dict
 
 def exp_cols_dtype(file_cols, sampleid, **kwargs):
 	return get_cols_dtype(file_cols, 
@@ -673,11 +750,11 @@ def weight_cols_dtype(file_cols, add_cols=[], drop_cols=[], get_id=True, **kwarg
 	return get_cols_dtype(file_cols, 
 		cols=['CHROM','POS','REF','ALT','TargetID','ES'], 
 		add_cols=add_cols, drop_cols=drop_cols, 
-		get_id=get_id)
+		get_id=get_id, ret_dict = True)
 
 def zscore_cols_dtype(file_cols, **kwargs):
 	return get_cols_dtype(file_cols, 
-		cols=['CHROM','POS','REF','ALT','Zscore'])
+		cols=['CHROM','POS','REF','ALT','Zscore'], ret_dict = True)
 
 def gwas_cols_dtype(file_cols, **kwargs):
 	return get_cols_dtype(file_cols, 
@@ -738,7 +815,7 @@ def call_tabix_regions(path, regs_str):
 
 	# process while subprocesses running
 	while proc.poll() is None:
-		line =  proc.stdout.readline()
+		line = proc.stdout.readline()
 		if len(line) == 0:
 			break
 		proc_out += line
@@ -908,68 +985,68 @@ def reformat_sample_vals(df: pd.DataFrame, data_format, sampleID):
 
 # reformats sample values in row to include only specified format
 
-@empty_df_handler
-def check_prep_vcf(df: pd.DataFrame, data_format, sampleID):
-	# df = df.copy()
+# @empty_df_handler
+# def check_prep_vcf(df: pd.DataFrame, data_format, sampleID):
+# 	# df = df.copy()
 
-	# check that all rows include data in the args.format format
-	rowfrmts = np.unique(df.FORMAT.values)
-	frmt_in_all = np.all(substr_in_strarray(data_format,rowfrmts))
+# 	# check that all rows include data in the args.format format
+# 	rowfrmts = np.unique(df.FORMAT.values)
+# 	frmt_in_all = np.all(substr_in_strarray(data_format,rowfrmts))
 
-	if not frmt_in_all:
-		raise Exception("Exception in check_prep_vcf(): Specified genotype format, format=" + data_format + ", does not exist in all rows of the FORMAT column for this section of the input VCF file.")
+# 	if not frmt_in_all:
+# 		raise Exception("Exception in check_prep_vcf(): Specified genotype format, format=" + data_format + ", does not exist in all rows of the FORMAT column for this section of the input VCF file.")
 
-	if rowfrmts.size > 1:
-		def vals_by_format(row):
-			frmt_ind = row.FORMAT.split(':').index(data_format)
-			return row[sampleID].apply(lambda y: y.split(':')[frmt_ind])
+# 	if rowfrmts.size > 1:
+# 		def vals_by_format(row):
+# 			frmt_ind = row.FORMAT.split(':').index(data_format)
+# 			return row[sampleID].apply(lambda y: y.split(':')[frmt_ind])
 
-		df[sampleID] = df.apply(lambda x: vals_by_format(x), axis=1)
+# 		df[sampleID] = df.apply(lambda x: vals_by_format(x), axis=1)
 		
-	# else assume rowfrmts.size == 1 
-	# if contains ':', needs to be reformatted
-	elif (':' in rowfrmts[0]): 
-		frmt_ind = rowfrmts[0].split(':').index(data_format)
-		df[sampleID] = df[sampleID].applymap(lambda x: x.split(':')[frmt_ind])
+# 	# else assume rowfrmts.size == 1 
+# 	# if contains ':', needs to be reformatted
+# 	elif (':' in rowfrmts[0]): 
+# 		frmt_ind = rowfrmts[0].split(':').index(data_format)
+# 		df[sampleID] = df[sampleID].applymap(lambda x: x.split(':')[frmt_ind])
 
-	# if doesnt contain ':' but isn't equivalent to data_format then something's very wrong
-	elif (rowfrmts[0] != data_format):
-		raise Exception('Exception in check_prep_vcf(): There is only one format in the FORMAT column for this section of the input VCF file, format_in_vcf='+str(rowfrmts[0]) +', which contains the specified genotype format, format=' + data_format + ', but it cannot be parsed. ')
+# 	# if doesnt contain ':' but isn't equivalent to data_format then something's very wrong
+# 	elif (rowfrmts[0] != data_format):
+# 		raise Exception('Exception in check_prep_vcf(): There is only one format in the FORMAT column for this section of the input VCF file, format_in_vcf='+str(rowfrmts[0]) +', which contains the specified genotype format, format=' + data_format + ', but it cannot be parsed. ')
 
-	df = df.drop(columns=['FORMAT'])
+# 	df = df.drop(columns=['FORMAT'])
 
-	# handle multi-allelic
-	if data_format == 'GT':
-		df = handle_multi_allele(df, sampleID)
+# 	# handle multi-allelic
+# 	if data_format == 'GT':
+# 		df = handle_multi_allele(df, sampleID)
 
-	return df
+# 	return df
 
-# TIGAR currently only works with bi-allelic GT data
-@empty_df_handler
-def handle_multi_allele(df: pd.DataFrame, sampleID):
-	df = df.copy()
+# # TIGAR currently only works with bi-allelic GT data
+# @empty_df_handler
+# def handle_multi_allele(df: pd.DataFrame, sampleID):
+# 	df = df.copy()
 
-	valid_GT = ['.|.', '0|0', '0|1', '1|0', '1|1', 
-		'./.', '0/0', '0/1', '1/0', '1/1']
+# 	valid_GT = ['.|.', '0|0', '0|1', '1|0', '1|1', 
+# 		'./.', '0/0', '0/1', '1/0', '1/1']
 
-	# remove rows where any value contains an alt alleles; remaining values should be biallelic or missing
-	# n_snps = df.shape[0]
+# 	# remove rows where any value contains an alt alleles; remaining values should be biallelic or missing
+# 	# n_snps = df.shape[0]
 
-	drop_index = df.loc[~np.all(df[sampleID].isin(valid_GT), axis=1)].index
-	df = df.drop(index=drop_index)
-	df = df.reset_index(drop=True)
+# 	drop_index = df.loc[~np.all(df[sampleID].isin(valid_GT), axis=1)].index
+# 	df = df.drop(index=drop_index)
+# 	df = df.reset_index(drop=True)
 
-	# df = df[np.all(df[sampleID].isin(valid_GT), axis=1)].reset_index(drop=True)
+# 	# df = df[np.all(df[sampleID].isin(valid_GT), axis=1)].reset_index(drop=True)
 
-	# n_snps_removed = n_snps - df.shape[0]
+# 	# n_snps_removed = n_snps - df.shape[0]
 
-	# if n_snps_removed:
-	#     print('Multi-allelic GT calls: Removed {} variants with alternate call >1.'.format(n_snps_removed))
+# 	# if n_snps_removed:
+# 	#     print('Multi-allelic GT calls: Removed {} variants with alternate call >1.'.format(n_snps_removed))
 
-	# reformat ALT and snpIDs for remaining rows to contain only first alt allele
-	df[['snpID','ALT']] = df[['snpID','ALT']].applymap(lambda x: x.split(',')[0])
+# 	# reformat ALT and snpIDs for remaining rows to contain only first alt allele
+# 	df[['snpID','ALT']] = df[['snpID','ALT']].applymap(lambda x: x.split(',')[0])
 
-	return df
+# 	return df
 
 
 # returns a boolean array; whether substring is in a np object array
