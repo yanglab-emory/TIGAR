@@ -116,7 +116,8 @@ chr_blocks = tg.optimize_cols(chr_blocks)
 n_blocks = len(chr_blocks)
 
 # Startup for get LD job: get column header info, sampleIDs
-sampleID, geno_cols_info = tg.genosampid_startup(**args.__dict__)
+# sampleID, sample_size, geno_info = tg.genosampid_startup(**args.__dict__)
+sampleID, sample_size, geno_info = tg.sampleid_startup(**args.__dict__)
 
 # write columns out to file
 print('Creating file: ' + out_ref_cov_path + '\n')
@@ -138,7 +139,8 @@ def thread_process(num):
 	
 	# read in and process genotype data
 	# file must be bgzipped and tabix
-	block_geno = tg.read_genotype(block.Start, block.End, sampleID, **geno_cols_info, **args.__dict__)
+	# block_geno = tg.read_genotype(block.Start, block.End, sampleID, **geno_info, **args.__dict__)
+	block_geno = tg.read_tabix(block.Start, block.End, sampleID, **geno_info)
 
 	# calculate, filter maf
 	block_geno = tg.calc_maf(block_geno, sampleID, args.maf)

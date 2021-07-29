@@ -338,11 +338,12 @@ Output training info file: {out_info}
 
 # Startup for training jobs: get column header info, sampleIDs
 print('Reading genotype, expression file headers, sample IDs.\n')
-sampleID, sample_size, exp_cols_info, geno_cols_info = tg.train_startup(**args.__dict__)
+# sampleID, sample_size, exp_info, geno_info = tg.train_startup(**args.__dict__)
+sampleID, sample_size, geno_info, exp_info = tg.sampleid_startup(**args.__dict__)
 
 # Read in gene expression info
 print('Reading gene expression data.\n')
-GeneExp, TargetID, n_targets = tg.read_gene_annot_exp(**args.__dict__, **exp_cols_info)
+GeneExp, TargetID, n_targets = tg.read_gene_annot_exp(**args.__dict__, **exp_info)
 
 # PREP CROSS VALIDATION SAMPLES - Split sampleIDs for cross validation
 if args.cvR2:
@@ -387,8 +388,9 @@ def thread_process(num):
 
 	# READ IN AND PROCESS GENOTYPE DATA 
 	# file must be bgzipped and tabix
-	target_geno = tg.read_genotype(start, end, sampleID, **geno_cols_info, **args.__dict__)
-	
+	# target_geno = tg.read_genotype(start, end, sampleID, **geno_info, **args.__dict__)
+	target_geno = tg.read_tabix(start, end, sampleID, **geno_info)
+
 	# filter out variants that exceed missing rate threshold
 	target_geno = tg.handle_missing(target_geno, sampleID, args.missing_rate)
 	

@@ -93,6 +93,59 @@ def empty_df_handler(func):
 	return wrapper
 
 
+def sampleid_startup(geno_path, sampleid_path, chrm, genofile_type, data_format, geneexp_path=None, **kwargs):
+
+	## read in sampleids file
+	print('Reading sampleID file.\n')
+	spec_sampleids = pd.read_csv(
+		sampleid_path,
+		sep='\t',
+		header=None)[0].drop_duplicates()
+
+	## read in file headers
+	print('Reading file headers.\n')
+	# genotype file header
+	try:
+		geno_cols = call_tabix_header(geno_path)
+	except: 
+		geno_cols = get_header(geno_path, zipped=True)
+
+	# get sampleids in the genotype file
+	geno_sampleids_strt_ind = {'dosage': 5, 'vcf': 9}[genofile_type]
+	geno_sampleids = geno_cols[geno_sampleids_strt_ind:]
+
+	if (geneexp_path is not None):
+		# expression file header
+		exp_cols = get_header(geneexp_path)
+		exp_sampleids = exp_cols[5:]
+
+		## match sampleids between files
+		print('Matching sampleIDs.\n')
+		sampleID = functools.reduce(np.intersect1d, (exp_sampleids, geno_sampleids, spec_sampleids))
+
+		if not sampleID.size:
+			raise SystemExit('There are no overlapped sample IDs between the gene expression file, genotype file, and sampleID file.')
+
+		## expression columns to read-in
+		exp_info = {'path': geno_path, **exp_cols_dtype(exp_cols, sampleID)}
+		geno_info = {'path': geno_path, 'chrm': chrm, 'genofile_type': genofile_type, 'data_format': data_format, **genofile_cols_dtype(geno_cols, genofile_type, sampleID)}
+
+		return sampleID, sampleID.size, geno_info, exp_info
+
+	else:
+		## match sampleids between files
+		print('Matching sampleIDs.\n')
+		sampleID = np.intersect1d(geno_sampleids, spec_sampleids)
+
+		if not sampleID.size:
+			raise SystemExit('There are no overlapped sample IDs between the genotype file and sampleID file.')
+
+		## columns to read-in
+		geno_info = {'path': geno_path, 'chrm': chrm, 'genofile_type': genofile_type, 'data_format': data_format, **genofile_cols_dtype(geno_cols, genofile_type, sampleID)}
+
+		return sampleID, sampleID.size, geno_info
+
+
 # train startup
 def train_startup(geno_path, genofile_type, geneexp_path, sampleid_path, **kwargs):
 
@@ -129,11 +182,10 @@ def train_startup(geno_path, genofile_type, geneexp_path, sampleid_path, **kwarg
 		raise SystemExit('There are no overlapped sample IDs between the gene expression file, genotype file, and sampleID file.')
 
 	## columns to read-in
-	exp_cols_info = exp_cols_dtype(exp_cols, sampleID)
-	geno_cols_info = genofile_cols_dtype(geno_cols, genofile_type, sampleID)
+	exp_info = exp_cols_dtype(exp_cols, sampleID)
+	geno_info = {'path': geno_path, **genofile_cols_dtype(geno_cols, genofile_type, sampleID)}
 
-	return sampleID, sample_size, exp_cols_info, geno_cols_info
-
+	return sampleID, sample_size, exp_info, geno_info
 
 #  startup
 def genosampid_startup(geno_path, genofile_type, sampleid_path, **kwargs):
@@ -164,25 +216,41 @@ def genosampid_startup(geno_path, genofile_type, sampleid_path, **kwargs):
 		raise SystemExit('There are no overlapped sample IDs between the genotype file and sampleID file.')
 
 	## columns to read-in
-	geno_cols_info = genofile_cols_dtype(geno_cols, genofile_type, sampleID)
+	geno_info = {'path': geno_path, **genofile_cols_dtype(geno_cols, genofile_type, sampleID)}
 
-	return sampleID, geno_cols_info
+	return sampleID, geno_info
 
-def weight_cols_info(path, add_cols = [], drop_cols = ['ID']):
-	info_dict = weight_cols_dtype(get_header(path, zipped=True), add_cols, drop_cols)
-	return {'target_ind': info_dict['file_cols'].index('TargetID'), 
-		'ES_ind': info_dict['file_cols'].index('ES'),
-		**info_dict }
 
-def zscore_cols_info(z_path, chrm, **kwargs):
+def weight_file_info(w_path, chrm, weight_threshold=0, add_cols=[], drop_cols=['ID'], **kwargs):
+	info_dict = weight_cols_dtype(get_header(w_path, zipped=True), add_cols, drop_cols)
+	return {'path': w_path, 
+		'chrm': chrm, 
+		'sampleID': [], 
+		'target_ind': info_dict['file_cols'].index('TargetID'), 
+		'ES_ind': info_dict['file_cols'].index('ES'), 
+		'data_format': 'weight', 
+		'genofile_type': 'weight', 
+		'weight_threshold': weight_threshold,
+		**info_dict}
+
+def zscore_file_info(z_path, chrm, **kwargs):
 	info_dict = zscore_cols_dtype(get_header(z_path, zipped=True))
-	return {'geno_path':z_path, 'chrm': chrm, 'sampleID': [], 'data_format':'Zscore', 'genofile_type':'Zscore', **info_dict}
+	return {'path':z_path, 
+		'chrm': chrm, 
+		'sampleID': [], 
+		'data_format': 'Zscore', 
+		'genofile_type': 'Zscore', 
+		**info_dict}
 
+# read in annotation file or gene expression file
+def read_gene_annot_exp(chrm, geneexp_path=None, annot_path=None, cols=['CHROM','GeneStart','GeneEnd','TargetID','GeneName'], col_inds=['CHROM','GeneStart','GeneEnd','TargetID','GeneName'], dtype={'CHROM':object,'GeneStart':np.int64,'GeneEnd':np.int64,'TargetID':object,'GeneName':object}, **kwargs):
 
-def read_gene_annot_exp(geneexp_path, chrm, cols=['CHROM','GeneStart','GeneEnd','TargetID','GeneName'], col_inds=['CHROM','GeneStart','GeneEnd','TargetID','GeneName'], dtype={'CHROM':object,'GeneStart':np.int64,'GeneEnd':np.int64,'TargetID':object,'GeneName':object}, **kwargs):
+	# set the path
+	path = geneexp_path if geneexp_path is not None else annot_path
+
 	try:
 		Gene_chunks = pd.read_csv(
-			geneexp_path, 
+			path, 
 			sep='\t', 
 			iterator=True, 
 			chunksize=10000,
@@ -193,7 +261,7 @@ def read_gene_annot_exp(geneexp_path, chrm, cols=['CHROM','GeneStart','GeneEnd',
 
 	except:
 		Gene_chunks = pd.read_csv(
-			geneexp_path, 
+			path, 
 			sep='\t', 
 			iterator=True, 
 			header=None,
@@ -311,7 +379,7 @@ def read_gene_annot_exp(geneexp_path, chrm, cols=['CHROM','GeneStart','GeneEnd',
 # 	return gt_data
 
 
-def filter_vcf_line(line: bytes, bformat, col_inds, split_multi = True):
+def filter_vcf_line(line: bytes, bformat, col_inds, split_multi=True):
 	# split line into list
 	row = line.split(b'\t')
 
@@ -319,15 +387,19 @@ def filter_vcf_line(line: bytes, bformat, col_inds, split_multi = True):
 	# bformat = str.encode(data_format)
 
 	# get index of data format
-	data_ind = row[8].split(b':').index(bformat)
-	row[8] = bformat
+	data_fmts = row[8].split(b':')
 
 	# may be multiallelic; only first alt allele will be used unless split_multi; later data with bad values will be filtered out
 	alt_alleles = row[4].split(b',')
 	row[4] = alt_alleles[0]
 
 	# filter sample columns to include only data in desired format; sampleIDs start at file column index 9; in new row sampleIDs now start at 4, ALT is column 3
-	row = [row[x] if x <= 8 else row[x].split(b':')[data_ind] for x in col_inds]
+	if (len(data_fmts) > 1):
+		data_ind = data_fmts.index(bformat)
+		row[8] = bformat
+		row = [row[x] if x <= 8 else row[x].split(b':')[data_ind] for x in col_inds]
+	else:
+		row = [row[x] for x in col_inds]
 
 	# turn multi-allelic lines into multiple biallelic lines
 	if split_multi & (len(alt_alleles) > 1):
@@ -356,10 +428,10 @@ def filter_vcf_line(line: bytes, bformat, col_inds, split_multi = True):
 
 	return line
 
-def read_genotype(start, end, sampleID, file_cols, col_inds, cols, dtype, chrm, geno_path, genofile_type, data_format, **kwargs):
+def read_genotype(start, end, sampleID, file_cols, col_inds, cols, dtype, chrm, path, genofile_type, data_format, **kwargs):
 
 	# subprocess command
-	command_str = ' '.join(['tabix', geno_path, chrm + ':' + start + '-' + end])
+	command_str = ' '.join(['tabix', path, chrm + ':' + start + '-' + end])
 
 	proc = subprocess.Popen(
 		[command_str],
@@ -448,6 +520,15 @@ def filter_weight_line(line: bytes, btarget: bytes, target_ind, col_inds):
 	else: 
 		return b''
 
+def filter_other_line(line: bytes, col_inds):
+	# split line into list
+	row = line.split(b'\t')
+
+	line = b'\t'.join([row[x] for x in col_inds])
+	line += b'' if line.endswith(b'\n') else b'\n'
+
+	return line
+
 
 # def read_weight(start, end, target, file_cols, col_inds, cols, dtype, chrm, w_path, target_ind, ES_ind, weight_threshold = 0, **kwargs):
 def read_weight(start, end, target, file_cols, col_inds, cols, dtype, chrm, w_path, target_ind, weight_threshold = 0, **kwargs):
@@ -506,13 +587,196 @@ def read_weight(start, end, target, file_cols, col_inds, cols, dtype, chrm, w_pa
 	return weight_data
 
 
-def tabix_query_files(chrm, start, end, paths = []):
+def read_tabix(start, end, sampleID, chrm, path, file_cols, col_inds, cols, dtype, genofile_type=None, data_format=None, target_ind=5, target=None, weight_threshold=0, **kwargs):
+
+	# subprocess command
+	command_str = ' '.join(['tabix', path, chrm + ':' + start + '-' + end])
+
+	proc = subprocess.Popen(
+		[command_str],
+		shell=True,
+		stdout=subprocess.PIPE,
+		bufsize=1)
+
+	# initialize bytearray
+	proc_out = bytearray()
+
+	# set correct filter function by file type
+	if genofile_type == 'vcf':
+		bformat = str.encode(data_format)
+		filter_line = functools.partial(filter_vcf_line, bformat=bformat, col_inds=col_inds)
+	elif genofile_type == 'weight':
+		btarget = str.encode(target)
+		filter_line = functools.partial(filter_weight_line, btarget=btarget, target_ind=target_ind, col_inds=col_inds)
+	else:
+		filter_line = functools.partial(filter_other_line, col_inds=col_inds)
+
+	# while subprocesses running, read lines into byte array
+	while proc.poll() is None:
+		line = proc.stdout.readline()
+		if len(line) == 0:
+			break
+		proc_out += filter_line(line)
+	# read in lines still remaining after subprocess completes
+	for line in proc.stdout:
+		proc_out += filter_line(line)
+
+	if not proc_out:
+		raise Exception('No tabix data for TargetID: ' + target+ '.\n')
+
+	# read data into dataframe
+	data = pd.read_csv(
+		StringIO(proc_out.decode('utf-8')),
+		sep='\t',
+		low_memory=False,
+		header=None,
+		names=cols,
+		dtype=dtype)
+
+	data = optimize_cols(data)
+
+	# get snpID, filter out duplicates
+	if (genofile_type != 'weight') or (not 'snpID' in cols):
+		data['snpID'] = get_snpIDs(data)
+		data = data.drop_duplicates(['snpID'], keep='first').reset_index(drop=True)
+
+	if (genofile_type == 'weight') and weight_threshold:
+		data = data[operator.gt(np.abs(data['ES']), weight_threshold)].reset_index(drop=True)
+		if data.empty:
+				raise Exception('No test SNPs with cis-eQTL weights with magnitude that exceeds specified weight threshold for TargetID: ' + target + '.\n')
+
+	# remove rows with non-valid GT values; ie those from multiallelic rows
+	if (data_format == 'GT'):
+		valid_GT = ['.|.', '0|0', '0|1', '1|0', '1|1', 
+		'./.', '0/0', '0/1', '1/0', '1/1']
+		data = data[np.all(data[sampleID].isin(valid_GT), axis=1)].reset_index(drop=True)
+
+	if (data_format == 'GT') or (data_format == 'DS'):
+		data = reformat_sample_vals(data, data_format, sampleID)
+
+	return data
+
+
+# def read_tabix(start, end, sampleID, file_cols, col_inds, cols, dtype, chrm, path, genofile_type, data_format, target_ind = 5, target = None, weight_threshold = 0, **kwargs):
+
+# 	# subprocess command
+# 	command_str = ' '.join(['tabix', path, chrm + ':' + start + '-' + end])
+
+# 	proc = subprocess.Popen(
+# 		[command_str],
+# 		shell=True,
+# 		stdout=subprocess.PIPE,
+# 		bufsize=1)
+
+# 	# initialize bytearray
+# 	proc_out = bytearray()
+
+# 	if genofile_type == 'vcf':
+# 		bformat = str.encode(data_format)
+# 		filter_line = filter_vcf_line(bformat=bformat, col_inds=col_inds)
+# 	elif genofile_type == 'weight':
+# 		btarget = str.encode(target)
+# 		filter_line = filter_weight_line(btarget=btarget, target_ind=target_ind, col_inds=col_inds)
+# 	else:
+# 		filter_line = filter_other_line(col_inds=col_inds)
+
+# 	# do line filtering step for VCF files only
+# 	if genofile_type == 'vcf':
+# 		bformat = str.encode(data_format)
+# 		# while subprocesses running, read lines into byte array
+# 		while proc.poll() is None:
+# 			line = proc.stdout.readline()
+# 			if len(line) == 0:
+# 				break
+# 			proc_out += filter_vcf_line(line, bformat, col_inds)
+# 		# read in lines still remaining after subprocess completes
+# 		for line in proc.stdout:
+# 			proc_out += filter_vcf_line(line, bformat, col_inds)
+
+# 	elif genofile_type == 'weight':
+# 		btarget = str.encode(target)
+# 		# while subprocesses running, read lines into byte array
+# 		while proc.poll() is None:
+# 			line = proc.stdout.readline()
+# 			if len(line) == 0:
+# 				break
+# 			proc_out += filter_weight_line(line, btarget, target_ind, col_inds)
+# 		# read in lines still remaining after subprocess completes
+# 		for line in proc.stdout:
+# 			proc_out += filter_weight_line(line, btarget, target_ind, col_inds)
+
+# 	else: 
+# 		# while subprocesses running, read lines into byte array
+# 		while proc.poll() is None:
+# 			line = proc.stdout.readline()
+# 			if len(line) == 0:
+# 				break
+# 			proc_out += line
+# 		# read in lines still remaining after subprocess completes
+# 		for line in proc.stdout:
+# 			proc_out += line
+
+# 	if not proc_out:
+# 		raise Exception('No tabix data for target.')
+
+# 	# read data into dataframe
+# 	if genofile_type in ['vcf', 'weight']:
+# 		data = pd.read_csv(
+# 			StringIO(proc_out.decode('utf-8')),
+# 			sep='\t',
+# 			low_memory=False,
+# 			header=None,
+# 			names=cols,
+# 			dtype=dtype)
+# 	else:
+# 		data = pd.read_csv(
+# 			StringIO(proc_out.decode('utf-8')),
+# 			sep='\t',
+# 			low_memory=False,
+# 			header=None,
+# 			names=file_cols,
+# 			usecols=col_inds,
+# 			dtype=dtype)
+
+# 	data = optimize_cols(data)
+
+# 	# get snpID, filter out duplicates
+# 	if (genofile_type != 'weight') or (not 'snpID' in cols):
+# 		data['snpID'] = get_snpIDs(data)
+# 		data = data.drop_duplicates(['snpID'], keep='first').reset_index(drop=True)
+
+
+# 	if (genofile_type == 'weight') and weight_threshold:
+# 		data = data[operator.gt(np.abs(data['ES']), weight_threshold)].reset_index(drop=True)
+# 		if data.empty:
+# 				raise Exception('No test SNPs with cis-eQTL weights with magnitude that exceeds specified weight threshold for TargetID: ' + target + '.\n')
+
+# 	# remove non-valid GT values; ie those from multiallelic rows
+# 	if data_format == 'GT':
+# 		valid_GT = ['.|.', '0|0', '0|1', '1|0', '1|1', 
+# 		'./.', '0/0', '0/1', '1/0', '1/1']
+# 		data = data[np.all(data[sampleID].isin(valid_GT), axis=1)].reset_index(drop=True)
+
+# 	if data_format == 'GT' or data_format == 'DS':
+# 		data = reformat_sample_vals(data, data_format, sampleID)
+
+# 	return data
+
+
+def tabix_query_files(start, end, chrm, geno_path=None, w_path=None, z_path=None, **kwargs):
+	paths = [path for path in [geno_path, w_path, z_path] if path is not None]
 	reg_str = ' ' + chrm + ':' + start + '-' + end
 	# for each path test if length of first line != 0
 	return np.all([len(subprocess.Popen(['tabix '+path+reg_str],
 		shell=True, stdout=subprocess.PIPE,
-		bufsize=1).stdout.readline()) > 0 for path in paths])
+		bufsize=1).stdout.readline()) > 0  for path in paths])
 
+# def tabix_query_files(chrm, start, end, paths = []):
+# 	reg_str = ' ' + chrm + ':' + start + '-' + end
+# 	# for each path test if length of first line != 0
+# 	return np.all([len(subprocess.Popen(['tabix '+path+reg_str],
+# 		shell=True, stdout=subprocess.PIPE,
+# 		bufsize=1).stdout.readline()) > 0 for path in paths])
 
 # Call tabix, read in lines into byte array
 def call_tabix(path, chrm, start, end, add_command_str = ''):
@@ -920,6 +1184,7 @@ def get_snpIDs(df: pd.DataFrame, flip=False):
 	else:
 		return [':'.join(i) for i in zip(chrom,pos,ref,alt)]
 
+
 # Decrease memory by downcasting 'CHROM' column to integer, integer and float columns to minimum size that will not lose info
 def optimize_cols(df: pd.DataFrame):
 
@@ -1079,12 +1344,12 @@ def handle_missing(df: pd.DataFrame, sampleID, missing_rate, filter=True, op=ope
 
 	return df
 
-
 # calculate maf
 def calc_maf(df: pd.DataFrame, sampleID, maf, filter=True, op=operator.gt):
 	df = df.copy()
 
 	# calculate MAF
+	# df['MAF'] = np.apply_along_axis(lambda x:np.nansum(x)/(2 * count_notnan(x)), 1, df[sampleID].values)
 	df['MAF'] = df[sampleID].apply(lambda x:np.nansum(x)/(2 * count_notnan(x)), axis=1)
 
 	### Dealing with NaN - impute missing with mean

@@ -168,8 +168,7 @@ tg.print_args(args)
 
 # Load annotation file
 print('Reading gene annotation file.')
-Gene, TargetID, n_targets = tg.read_gene_annot_exp(args.annot_path, args.chrm)
-
+Gene, TargetID, n_targets = tg.read_gene_annot_exp(**args.__dict__)
 
 # Gene_chunks = pd.read_csv(
 # 	args.annot_path, 
@@ -186,10 +185,11 @@ Gene, TargetID, n_targets = tg.read_gene_annot_exp(args.annot_path, args.chrm)
 # Gene = tg.optimize_cols(Gene)
 
 # get weight file info
-weight_info = tg.weight_cols_info(args.w_path, ['MAF'])
+weight_info = tg.weight_file_info(add_cols=['MAF'], **args.__dict__)
 
 # Load genotype column names of test genotype file
-sampleID, geno_cols_info = tg.genosampid_startup(**args.__dict__)
+# sampleID, geno_info = tg.genosampid_startup(**args.__dict__)
+sampleID, sample_size, geno_info = tg.sampleid_startup(**args.__dict__)
 # print('Reading genotype file header.\n')
 # g_cols = tg.call_tabix_header(args.geno_path)
 # gcol_sampleids = g_cols[gcol_sampleids_strt_ind:]
@@ -216,8 +216,7 @@ TargetID = Gene.TargetID.values
 n_targets = TargetID.size
 
 print('Creating output file: ' + out_pred_path + '\n')
-out_cols = np.concatenate((
-	['CHROM','GeneStart','GeneEnd','TargetID','GeneName'], sampleID))
+out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName', *sampleID]
 pd.DataFrame(columns=out_cols).to_csv(
 	out_pred_path,
 	sep='\t', 
@@ -238,84 +237,23 @@ def thread_process(num):
 	start = str(max(int(Gene_info.GeneStart)-args.window, 0))
 	end = str(int(Gene_info.GeneEnd)+args.window)
 
-
-	# # tabix Weight file   
-	# w_proc_out = tg.call_tabix(args.w_path, args.chrm, start, end)
-
-	# if not w_proc_out:
-	# 	print('No cis-eQTL weights for TargetID: ' + target + '\n')
-	# 	return None
-
 	# check that both files have data for target
-	tabix_query = tg.tabix_query_files(args.chrm, start, end, [args.w_path, args.geno_path])
+	# tabix_query = tg.tabix_query_files(args.chrm, start, end, [args.w_path, args.geno_path])
+	tabix_query = tg.tabix_query_files(start, end, **args.__dict__)
 
 	if not tabix_query:
 		print('No cis-eQTL weights and/or genotype data for TargetID: ' + target + '\n')
 		return None
 
 	print('Getting weight data for target.')
-	target_weight = tg.read_weight(start, end, target, **args.__dict__, **weight_info)
-	target_weight = target_weight[['snpID', 'ES', 'MAF']]
+	# Weight = tg.read_weight(start, end, target, **args.__dict__, **weight_info)
+	Weight = tg.read_tabix(start, end, target=target, **weight_info)
+	Weight = Weight[['snpID', 'ES', 'MAF']]
 
 	# tabix genotype file
 	print('Reading genotype data.')
-	target_geno = tg.read_genotype(start, end, sampleID, **geno_cols_info, **args.__dict__)
-
-	# Read in genotype data
-	# g_proc_out = tg.call_tabix(args.geno_path, args.chrm, start, end)
-	
-	# if not g_proc_out:
-	# 	print('There is no genotype data for TargetID: ' + target + '\n')
-	# 	return None
-	
-	# target_geno = pd.read_csv(StringIO(g_proc_out.decode('utf-8')),
-	# 		sep='\t',
-	# 		low_memory=False,
-	# 		header=None,
-	# 		usecols=g_cols_ind,
-	# 		dtype=g_dtype)
-	# target_geno.columns = [g_cols[i] for i in target_geno.columns]
-	# target_geno = tg.optimize_cols(target_geno)
-
-	# # parse tabix output for Weight, filtered by target, threshold
-	# Weight_chunks = pd.read_csv(
-	# 	StringIO(w_proc_out.decode('utf-8')),
-	# 	sep='\t',
-	# 	header=None,
-	# 	low_memory=False,
-	# 	iterator=True, 
-	# 	chunksize=10000,
-	# 	usecols=w_cols_ind,
-	# 	dtype=w_dtype)
-	
-	# target_weight = pd.concat([x[ (x[w_cols_ind[4]]==target) ] for x in Weight_chunks]).reset_index(drop=True)
-
-	# if target_weight.empty:
-	# 	print('No cis-eQTL weights for TargetID: ' + target + '\n')
-	# 	return None
-
-	# target_weight.columns = [w_cols[i] for i in tuple(target_weight.columns)]
-
-	# target_weight = tg.optimize_cols(target_weight)
-
-	# if 'ID' in target_weight.columns:
-	# 	target_weight.rename(columns={'ID':'snpID'})
-
-	# if not 'snpID' in target_weight.columns:
-	# 	target_weight['snpID'] = tg.get_snpIDs(target_weight)
-
-	# target_weight = target_weight[['snpID', 'ES', 'MAF']]
-
-
-	# Intersect SNPs from eQTL weight file and test genotype file
-	# initial filter to reduce amount of dataframe processing
-
-	# # vcf files may have data in multiple formats, check if this is the case and remove unnecessary formats. requires that all rows have data in the user-specified format
-	# if args.genofile_type == 'vcf':
-	# 	target_geno = tg.check_prep_vcf(target_geno, args.data_format, sampleID)
-
-	# # reformat values in target_geno data frame
-	# target_geno = tg.reformat_sample_vals(target_geno, args.data_format, sampleID)
+	# target_geno = tg.read_genotype(start, end, sampleID, **geno_info, **args.__dict__)
+	target_geno = tg.read_tabix(start, end, sampleID, **geno_info)
 
 	# filter out variants that exceed missing rate threshold
 	target_geno = tg.handle_missing(target_geno, sampleID, args.missing_rate)
@@ -323,48 +261,88 @@ def thread_process(num):
 	# calculate MAF
 	target_geno = tg.calc_maf(target_geno, sampleID, 0, op=operator.ge)
 
-	# center data
-	target_geno = tg.center(target_geno, sampleID)
+	# get flipped snpIDs
+	target_geno['snpIDflip'] = tg.get_snpIDs(target_geno, flip=True)
 
-	# Get original and flipped snpIDs, filter out duplicates
-	target_geno['IDorig'] = tg.get_snpIDs(target_geno)
-	target_geno['IDflip'] = tg.get_snpIDs(target_geno, flip=True)
-	target_geno = target_geno.drop(columns=['CHROM','POS','REF','ALT'])
-	target_geno = target_geno.drop_duplicates(['IDorig'], keep='first')
-
-	# get overlapping snps
-	snp_overlap_orig = np.intersect1d(target_weight.snpID, target_geno.IDorig)
-	snp_overlap_flip = np.intersect1d(target_weight.snpID, target_geno.IDflip)
-	snp_overlap = np.concatenate((snp_overlap_orig, snp_overlap_flip))
+	snp_overlap = np.intersect1d(Weight.snpID, target_geno[['snpID','snpIDflip']])
 
 	if not snp_overlap.size:
 		print('No overlapping test SNPs between weight and genotype file for TargetID: ' + target + '\n')
 		return None
 
-	# print('Number of SNPs overlapped between eQTL weight file and test genotype file: ' + str(snp_overlap.size))
+	# filter out non-matching snpID rows
+	Weight = Weight[Weight.snpID.isin(snp_overlap)]
+	target_geno = target_geno[np.any(target_geno[['snpID','snpIDflip']].isin(snp_overlap), axis=1)].reset_index(drop=True)
 
-	target_weight = target_weight[target_weight.snpID.isin(snp_overlap)]
-	target_geno = target_geno[target_geno.IDorig.isin(snp_overlap_orig) | target_geno.IDflip.isin(snp_overlap_flip)]
+	# if not in Weight.snpIDs, assumed flipped; if flipped, 1 - MAF
+	flip = np.where(target_geno.snpID.isin(Weight.snpID), True, False)
 
-	# HANDLE FLIPPED SNPS
-	if (snp_overlap_orig.size > 0) and (snp_overlap_flip.size > 0):
-		# assume mix of flipped, non-flipped
-		target_geno['snpID'], target_geno['MAF_test'], target_geno[sampleID] = handle_flip_pred(target_geno, sampleID,snp_overlap_orig, snp_overlap_flip)
+	if not np.all(flip):
+		# set correct snpID, MAF
+		target_geno['snpID'] = np.where(flip, target_geno.snpID, target_geno.snpIDflip)
+		target_geno['MAF_test'] = np.where(flip, target_geno.MAF, 1 - target_geno.MAF)
 
-	elif snp_overlap_orig.size == snp_overlap.size:
-		# assume all non-flipped 
-		target_geno[['snpID','MAF_test']] = target_geno[['IDorig','MAF']]
+		# reshape flip for setting sampleIDs, set correct sampleID values
+		flip = flip.reshape((target_geno.shape[0], 1))
+		target_geno[sampleID] = np.where(flip, target_geno[sampleID], 2 - target_geno[sampleID])
 
 	else:
-		# assume all flipped
-		target_geno['snpID'], target_geno['MAF_test'] = target_geno['IDflip'], 1-target_geno['MAF'].astype('float')
-		target_geno[sampleID] = target_geno[sampleID].apply(lambda x: 2-x).astype('float')
+		target_geno['MAF_test'] = target_geno['MAF']
 
-	target_geno = target_geno.drop(columns=['IDorig','IDflip','MAF'])
+	target_geno = target_geno.drop(columns=['CHROM','POS','REF','ALT','snpIDflip','MAF'])
 
-	# merge target_geno, target_weight
+	# center data
+	target_geno = tg.center(target_geno, sampleID)
+
+	# # flip2 = np.where(flip==1, 0, 1)
+	# # np.choose(flip2, [target_geno[sampleID], 2 - target_geno[sampleID]])
+
+	# snp_overlap = [*np.intersect1d(Weight.snpID, target_geno.snpID), *np.intersect1d(Weight.snpID, target_geno.snpIDflip)]
+
+	# len([*np.intersect1d(Weight.snpID, target_geno.snpID), *np.intersect1d(Weight.snpID, target_geno.snpIDflip)])
+
+	# np.intersect1d(Weight.snpID, target_geno[['snpID','snpIDflip']])
+
+	# target_geno[['snpID','snpIDflip']]
+	# # Get original and flipped snpIDs, filter out duplicates
+	# target_geno['IDorig'] = tg.get_snpIDs(target_geno)
+	# target_geno['IDflip'] = tg.get_snpIDs(target_geno, flip=True)
+	# target_geno = target_geno.drop(columns=['CHROM','POS','REF','ALT'])
+	# target_geno = target_geno.drop_duplicates(['IDorig'], keep='first')
+
+	# # get overlapping snps
+	# snp_overlap_orig = np.intersect1d(Weight.snpID, target_geno.IDorig)
+	# snp_overlap_flip = np.intersect1d(Weight.snpID, target_geno.IDflip)
+	# snp_overlap = np.concatenate((snp_overlap_orig, snp_overlap_flip))
+
+	# if not snp_overlap.size:
+	# 	print('No overlapping test SNPs between weight and genotype file for TargetID: ' + target + '\n')
+	# 	return None
+
+	# # print('Number of SNPs overlapped between eQTL weight file and test genotype file: ' + str(snp_overlap.size))
+
+	# Weight = Weight[Weight.snpID.isin(snp_overlap)]
+	# target_geno = target_geno[target_geno.IDorig.isin(snp_overlap_orig) | target_geno.IDflip.isin(snp_overlap_flip)]
+
+	# # HANDLE FLIPPED SNPS
+	# if (snp_overlap_orig.size > 0) and (snp_overlap_flip.size > 0):
+	# 	# assume mix of flipped, non-flipped
+	# 	target_geno['snpID'], target_geno['MAF_test'], target_geno[sampleID] = handle_flip_pred(target_geno, sampleID,snp_overlap_orig, snp_overlap_flip)
+
+	# elif snp_overlap_orig.size == snp_overlap.size:
+	# 	# assume all non-flipped 
+	# 	target_geno[['snpID','MAF_test']] = target_geno[['IDorig','MAF']]
+
+	# else:
+	# 	# assume all flipped
+	# 	target_geno['snpID'], target_geno['MAF_test'] = target_geno['IDflip'], 1-target_geno['MAF'].astype('float')
+	# 	target_geno[sampleID] = target_geno[sampleID].apply(lambda x: 2-x).astype('float')
+
+	# target_geno = target_geno.drop(columns=['IDorig','IDflip','MAF'])
+
+	# merge target_geno, Weight
 	Pred = target_geno.merge(
-		target_weight, 
+		Weight, 
 		left_on='snpID', 
 		right_on='snpID', 
 		how='outer')
@@ -374,7 +352,7 @@ def thread_process(num):
 	Pred = Pred[Pred['diff'] <= args.maf_diff].drop(columns=['MAF','MAF_test','diff'])
 
 	if Pred.empty:
-		print('All SNP MAFs for training data and testing data differ by a magnitude greater than '+str(args.maf_diff) + ' for TargetID: ' + target + '\n')
+		print('All SNP MAFs for training data and testing data differ by a magnitude greater than ' + str(args.maf_diff) + ' for TargetID: ' + target + '\n')
 		return None
 
 	# print('Number of SNPs used for prediction after filtering by maf_diff: ' + str(Pred.snpID.size))
