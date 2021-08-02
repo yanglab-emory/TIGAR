@@ -49,6 +49,9 @@ parser.add_argument('--maf', type=float)
 # number of threads
 parser.add_argument('--thread', type=int)
 
+# output file path
+parser.add_argument('--out_ld_file', type=str)
+
 # output dir
 parser.add_argument('--out_dir', type=str)
 
@@ -61,12 +64,14 @@ sys.path.append(args.TIGAR_dir)
 import TIGARutils as tg
 
 # limit to 4 decimal places max, strip trailing 0s
-# def cov_print_frmt(x): return ('%.4f' % x).rstrip('0').rstrip('.')
 def cov_fmt(x): return ('%.4f' % x).rstrip('0').rstrip('.')
 
 # trim array by positionin matrix (length should be rownumber:total for each row);
 # format each element in each row, join all together separated by comma
 def cov_str(cov_lst): return [','.join([cov_fmt(x) for x in row]) for row in [cov_lst[i][i:len(cov_lst)] for i in range(len(cov_lst))]]
+
+def out_block_path(num):
+	return(args.out_dir + '/' + args.out_ld_file + '_block_' + str(num) + '.txt.gz')
 
 ###############################################################
 # check input arguments
@@ -79,8 +84,8 @@ elif args.genofile_type == 'dosage':
 
 else:
 	raise SystemExit('Please specify the type input genotype file type (--genofile_type) as either "vcf" or "dosage".\n')
-	
-out_ref_cov_path = args.out_dir + '/CHR' + args.chrm + '_reference_cov.txt'
+
+out_refcovld_path = args.out_dir + '/' + args.out_ld_file + '.txt'
 
 ###############################################################
 # Print input arguments
@@ -99,31 +104,30 @@ Output directory: {out_dir}
 Output reference covariance results file: {out_rc}
 ********************************'''.format(
 	**args.__dict__,
-	out_rc = out_ref_cov_path))
+	out_rc = out_refcovld_path))
 
 ###############################################################
 # Read in block information
 print('Reading block annotation file.')
+
 # read in block file
-chr_blocks = pd.read_csv(
+Blocks = pd.read_csv(
 	args.block_path,
 	sep='\t',
-	usecols=['CHROM', 'Start', 'End'],
+	usecols=['CHROM','Start','End'],
 	dtype={'CHROM':object, 'Start':object, 'End':object})
-chr_blocks = chr_blocks[chr_blocks['CHROM'] == args.chrm].reset_index(drop=True)
-chr_blocks = tg.optimize_cols(chr_blocks)
-
-n_blocks = len(chr_blocks)
+Blocks = Blocks[Blocks['CHROM'] == args.chrm].reset_index(drop=True)
+Blocks = tg.optimize_cols(Blocks)
+n_blocks = len(Blocks)
 
 # Startup for get LD job: get column header info, sampleIDs
-# sampleID, sample_size, geno_info = tg.genosampid_startup(**args.__dict__)
 sampleID, sample_size, geno_info = tg.sampleid_startup(**args.__dict__)
 
 # write columns out to file
-print('Creating file: ' + out_ref_cov_path + '\n')
-out_cols = ['#snpID', 'CHROM', 'POS', 'block', 'blockpos',  'COV']
+print('Creating file: ' + out_refcovld_path + '\n')
+out_cols = ['#0','snpID','CHROM','POS','COV']
 pd.DataFrame(columns=out_cols).to_csv(
-	out_ref_cov_path,
+	out_refcovld_path,
 	sep='\t',
 	index=None,
 	header=True,
@@ -134,36 +138,33 @@ print('********************************\n')
 ###############################################################
 @tg.error_handler
 def thread_process(num):
-	block = chr_blocks.loc[num]
+	Block = Blocks.loc[num]
 	print('num=' + str(num))
 	
-	# read in and process genotype data
-	# file must be bgzipped and tabix
-	# block_geno = tg.read_genotype(block.Start, block.End, sampleID, **geno_info, **args.__dict__)
-	block_geno = tg.read_tabix(block.Start, block.End, sampleID, **geno_info)
+	# read in and process genotype data; file must be bgzipped/tabix
+	Geno = tg.read_tabix(Block.Start, Block.End, sampleID, **geno_info)
 
 	# calculate, filter maf
-	block_geno = tg.calc_maf(block_geno, sampleID, args.maf)
+	Geno = tg.calc_maf(Geno, sampleID, args.maf)
 
 	# get upper covariance matrix
-	mcovar = np.triu(np.cov(block_geno[sampleID].values)).tolist()
+	mcovar = np.triu(np.cov(Geno[sampleID].values)).tolist()
 
 	# output values
-	block_geno = block_geno[['snpID', 'CHROM', 'POS']]
-	block_geno['COV'] = cov_str(mcovar)
-	block_geno.to_csv(
-		out_ref_cov_path,
+	Geno = Geno[['snpID', 'CHROM', 'POS']]
+	Geno['COV'] = cov_str(mcovar)
+	Geno.to_csv(
+		out_block_path(num),
 		sep='\t',
 		index=None,
 		header=None,
+		compression='gzip',
 		mode='a')
 
 	print('Block LD calculation completed for block.\n')
 
-
 ##################################################################
 # thread process
-
 if __name__ == '__main__':
 	print('Starting LD calculation for ' + str(n_blocks) + ' blocks.\n')
 	pool = multiprocessing.Pool(args.thread)

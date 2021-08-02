@@ -45,7 +45,6 @@ do
         --window|-window) window=$2; shift 2;;
         --missing_rate|-missing_rate) missing_rate=$2; shift 2;;
         --maf_diff|-maf_diff) maf_diff=$2; shift 2;;
-        --sub_dir|-sub_dir) sub_dir=$2; shift 2;;
         --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
         --thread|-thread) thread=$2; shift 2;;
         --sub_dir|-sub_dir) sub_dir=$2; shift 2;;
@@ -62,7 +61,7 @@ window=${window:-$((10**6))}
 missing_rate=${missing_rate:-0.2}
 maf_diff=${maf_diff:-0.2}
 thread=${thread:-1}
-out_pred_file=${out_pred_file:-CHR${chr}_Pred_GReX.txt}
+out_pred_file=${out_pred_file:-CHR${chr}_Pred_GReX}.txt
 log_file=${log_file:-CHR${chr}_Pred_log.txt}
 
 # sub_dir: whether to use subdirectory inside out_dir for output files
