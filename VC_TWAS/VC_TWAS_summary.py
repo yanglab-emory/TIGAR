@@ -4,7 +4,6 @@
 ###################################################################
 # Import packages needed
 import argparse
-from io import StringIO
 import multiprocessing
 import subprocess
 import sys

@@ -955,8 +955,6 @@ def optimize_cols(df: pd.DataFrame):
 	return df
 
 
-
-
 # Reform vcf file
 ### input each sample genotype
 ### For GT data_format:
@@ -987,68 +985,75 @@ def substr_in_strarray(substr, strarray):
    return np.frompyfunc(lambda x: substr in x, 1,1)(strarray)
 
 
-# count the number of non-nan values
-def count_notnan(x):
-	return x.size - np.count_nonzero(np.isnan(x))
-
-
 # drop variants with missing rate that exceeds threshold
 def handle_missing(df: pd.DataFrame, sampleID, missing_rate, filter=True, op=operator.le):
 	df = df.copy()
 
-	# if all sample data for a row is NaN, drop the row
-	drop_index = df.loc[df[sampleID].count(axis=1) == 0].index
-	df = df.drop(index=drop_index)
+	# exclude rows where all sample data is NaN
+	df = df[df[sampleID].count(axis=1) > 0].reset_index(drop=True)
+	vals = df[sampleID].values
 
-	# calculate missing rate for each snp
-	df['missing_rate'] = df[sampleID].apply(lambda x: np.count_nonzero(np.isnan(x))/x.size, axis=1)
+	# calculate missing rate for each snp, read into series and downcast
+	MissingRate = pd.to_numeric(
+		pd.Series(
+			np.apply_along_axis(lambda x: np.count_nonzero(np.isnan(x))/x.size, 1, vals), 
+			name='missing_rate'),
+		downcast='float')
 
-	# downcast floats
-	samp_miss_cols = np.append(sampleID,'missing_rate')
-	df[samp_miss_cols] = df[samp_miss_cols].apply(pd.to_numeric, downcast='float')
+	# re combine dataframe
+	df = pd.concat([df.drop(columns=sampleID), pd.DataFrame(vals, columns=sampleID), MissingRate], axis=1)
 
 	if filter:
 		df = df[op(df.missing_rate, missing_rate)].reset_index(drop=True)
 
 	return df
 
-# calculate maf
-def calc_maf(df: pd.DataFrame, sampleID, maf, filter=True, op=operator.gt):
-	df = df.copy()
-
+# function to perform MAF calculation/imputation on each row
+def row_maf_impute(x):
 	# calculate MAF
-	# df['MAF'] = np.apply_along_axis(lambda x:np.nansum(x)/(2 * count_notnan(x)), 1, df[sampleID].values)
-	df['MAF'] = df[sampleID].apply(lambda x:np.nansum(x)/(2 * count_notnan(x)), axis=1)
+	MAF_val = np.array(
+		np.nansum(x) / (2 * (x.size - np.count_nonzero(np.isnan(x)))), 
+		dtype=x.dtype)
+	# impute missing values
+	x[np.where(np.isnan(x))] = 2 * MAF_val
+	return np.append(x, MAF_val)
 
-	### Dealing with NaN - impute missing with mean
-	samp_maf_cols = np.append(sampleID,'MAF')
-	df[samp_maf_cols] = df[samp_maf_cols].apply(lambda x: x.fillna(2*x.MAF), axis=1)
+def calc_maf(df: pd.DataFrame, sampleID, maf, filter=True, op=operator.gt):
+	df = df.reset_index(drop=True).copy()
+	vals = df[sampleID].values
 
-	# downcast floats
-	df[samp_maf_cols] = df[samp_maf_cols].apply(pd.to_numeric, downcast='float')
+	# calculate MAF, impute missing
+	sample_MAF = np.apply_along_axis(row_maf_impute, 1, vals)
+
+	# re combine dataframe (faster than editing in place)
+	df = pd.concat([df.drop(columns=sampleID), pd.DataFrame(sample_MAF, columns=[*sampleID, 'MAF'])], axis=1)	
 
 	if filter:
 		df = df[op(df.MAF, maf)].reset_index(drop=True)
 
 	return df
 
-
 # Calculate, filter p val of HWE
 def calc_p_hwe(df: pd.DataFrame, sampleID, pval, filter=True, op=operator.gt):
-	df = df.copy()
+	df = df.reset_index(drop=True).copy()
+	vals = df[sampleID].values
 
-	df['p_HWE'] = df[sampleID].apply(lambda x:p_HWE(x.dropna()), axis=1)
-	df['p_HWE'] = pd.to_numeric(df['p_HWE'], downcast='float')
+	HWE = pd.to_numeric(
+		pd.Series(
+			np.apply_along_axis(lambda x:prep_p_HWE(x[np.where(~np.isnan(x))]), 1, vals), 
+			name='p_HWE'),
+		downcast='float')
+
+	# re combine dataframe
+	df = pd.concat([df.drop(columns=sampleID), pd.DataFrame(vals, columns=sampleID), HWE], axis=1)	
 
 	if filter:
 		df = df[op(df.p_HWE, pval)].reset_index(drop=True)
 
 	return df
 
-
 ### Prepare for HWE input
-def p_HWE(sample_row):
-	vals = sample_row.values
+def prep_p_HWE(vals):
 	if not vals.size:
 		p_hwe = np.nan
 	else:
@@ -1056,7 +1061,7 @@ def p_HWE(sample_row):
 		N_aa = vals[(vals >= 0) & (vals < 0.5)].size
 		N_AA = vals[(vals >= 1.5) & (vals <= 2)].size
 
-		p_hwe = calc_HWE(N_hets, N_AA, N_aa)
+		p_hwe = HWE(N_hets, N_AA, N_aa)
 
 	return p_hwe
 
@@ -1074,7 +1079,7 @@ def p_HWE(sample_row):
 ### 3.obs_hom2: Observed aa homozygosity = Number of 2 in each SNPs(i.e. 1.5 <= gij <= 2)
 
 ### Output: p-value for Hardy Weinberg Equilibrium exact test
-def calc_HWE(obs_hets, obs_hom1, obs_hom2):
+def HWE(obs_hets, obs_hom1, obs_hom2):
 	if obs_hom1 < 0 or obs_hom2 < 0 or obs_hets < 0:
 		raise Exception("FATAL ERROR - SNP-HWE: Current genotype configuration (%s  %s %s) includes negative count" % (obs_hets, obs_hom1, obs_hom2))
 
@@ -1147,10 +1152,19 @@ def calc_HWE(obs_hets, obs_hom1, obs_hom2):
 
 	return p_hwe
 
+
 # center
-def center(df: pd.DataFrame, sampleID):
-	df = df.copy()
-	df[sampleID] = df[sampleID].apply(lambda x: x - np.mean(x), axis=1)
+def center(df: pd.DataFrame, sampleID=None):
+	df = df.reset_index(drop=True).copy()
+	if sampleID is None:
+		vals = df.values
+		vals = np.apply_along_axis(lambda x: x - np.mean(x), 1, vals)
+		df = pd.DataFrame(vals, columns=df.columns)
+	else: 
+		vals = df[sampleID].values
+		vals = np.apply_along_axis(lambda x: x - np.mean(x), 1, vals)
+		df = pd.concat([df.drop(columns=sampleID), 
+			pd.DataFrame(vals, columns=sampleID)], axis=1)	
 	return df
 
 

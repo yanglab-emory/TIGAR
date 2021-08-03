@@ -7,7 +7,6 @@ import multiprocessing
 import subprocess
 import sys
 
-from io import StringIO
 from time import time
 
 import numpy as np

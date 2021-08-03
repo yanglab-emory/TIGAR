@@ -8,7 +8,6 @@ import multiprocessing
 import subprocess
 import sys
 
-from io import StringIO
 from time import time
 
 import numpy as np
@@ -121,7 +120,8 @@ Output prediction results file: {out_path}
 	**args.__dict__,
 	out_path = out_pred_path))
 
-tg.print_args(args)
+# tg.print_args(args)
+
 ###############################################################
 
 # Load genotype column names of test genotype file

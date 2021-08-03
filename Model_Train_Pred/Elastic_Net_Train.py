@@ -9,7 +9,6 @@ import subprocess
 import sys
 import warnings
 
-from io import StringIO
 from time import time
 
 import numpy as np
@@ -215,6 +214,8 @@ Output training info file: {out_info}
 	out_weight = out_weight_path,
 	out_info = out_info_path))
 
+# tg.print_args(args)
+
 ###############################################################
 # Training Processing
 ### Read in Gene annotation and Expression level file (text file)
@@ -245,7 +246,7 @@ else:
 
 # PREP OUTPUT - print output headers to files
 print('Creating file: ' + out_weight_path + '\n')
-weight_cols = ['CHROM','POS','ID','REF','ALT','TargetID','MAF','p_HWE','ES']
+weight_cols = ['CHROM','POS','snpID','REF','ALT','TargetID','MAF','p_HWE','ES']
 pd.DataFrame(columns=weight_cols).to_csv(
 	out_weight_path,
 	header=True,
@@ -331,10 +332,11 @@ def thread_process(num):
 	Weight['ES'], R2, Pvalue, Alpha, Lambda, cvm = elastic_net(Geno_Exp)
 
 	# filter
-	Weight = Weight[Weight['ES']!=0]
+	Weight = Weight[Weight['ES'] != 0]
+	n_effect_snp = Weight.ES.size
 
 	# reorder columns for output
-	Weight = Weight[['CHROM','POS','snpID','REF','ALT','TargetID','MAF','p_HWE','ES']]
+	Weight = Weight[weight_cols]
 
 	Weight.to_csv(
 		out_weight_path,
@@ -348,7 +350,7 @@ def thread_process(num):
 
 	Info['sample_size'] = sample_size
 	Info['n_snp'] = n_snp
-	Info['n_effect_snp'] = n_effect_snp = Weight.ES.size
+	Info['n_effect_snp'] = n_effect_snp
 	Info['CVR2'] = avg_r2_cv
 	Info['TrainPVALUE'] = Pvalue if not np.isnan(Pvalue) else 'NaN'
 	Info['TrainR2'] = R2 if n_effect_snp else 0

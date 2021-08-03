@@ -9,7 +9,6 @@ import os
 import subprocess
 import sys
 
-from io import StringIO
 from time import time
 
 import numpy as np
@@ -105,24 +104,21 @@ dpr_file_dir = abs_out_dir + '/DPR_Files' + args.job_suf + '/'
 dpr_file_dir_cv = abs_out_dir + '/CV_Files' + args.job_suf + '/'
 
 # preps dpr input files, runs DPR, reads in dpr output
-def prep_call_dpr(bimbam_df, pheno_df, snpannot_df, dpr_file_dir, targetid):
+def prep_call_dpr(Bimbam_df, Pheno_df, dpr_file_dir, targetid):
 	## PATHS FOR DPR INPUT
 	bimbam_pth = dpr_file_dir + targetid + '_bimbam.txt'
 	pheno_pth = dpr_file_dir + targetid + '_pheno.txt'
-	snpannot_pth = dpr_file_dir + targetid + '_snp_annot.txt'
 
 	#  OUTPUT FILES FOR DPR INPUT
 	out_args = {'header':False, 'index':None, 'sep':'\t', 'mode':'w', 'float_format':'%f'}
-	bimbam_df.to_csv(bimbam_pth, **out_args)
-	pheno_df.to_csv(pheno_pth, **out_args)
-	snpannot_df.to_csv(snpannot_pth, **out_args)
+	Bimbam_df.to_csv(bimbam_pth, **out_args)
+	Pheno_df.to_csv(pheno_pth, **out_args)
 
 	# CALL DPR
 	try:
 		DPR_call_args = [DPR_path, 
 			'-g', bimbam_pth, 
 			'-p', pheno_pth, 
-			'-a', snpannot_pth, 
 			'-dpr', args.dpr, 
 			'-notsnp',
 			'-o', 'DPR_' + targetid]
@@ -138,12 +134,11 @@ def prep_call_dpr(bimbam_df, pheno_df, snpannot_df, dpr_file_dir, targetid):
 	finally:
 		os.remove(bimbam_pth)
 		os.remove(pheno_pth)
-		os.remove(snpannot_pth)
 
 	# READ IN AND PROCESS DPR OUTPUT
 	dpr_out_pth = dpr_file_dir + 'output/DPR_' + targetid + '.param.txt'
 
-	dpr_out = pd.read_csv(
+	DPR_Out = pd.read_csv(
 		dpr_out_pth,
 		sep='\t',
 		header=0,
@@ -153,45 +148,26 @@ def prep_call_dpr(bimbam_df, pheno_df, snpannot_df, dpr_file_dir, targetid):
 
 	os.remove(dpr_out_pth)
 
-	dpr_out = tg.optimize_cols(dpr_out)
+	DPR_Out = tg.optimize_cols(DPR_Out)
 
 	# GET EFFECT SIZE
 	if args.ES == 'fixed':
-		dpr_out['ES'] = dpr_out['beta']
+		DPR_Out['ES'] = DPR_Out['beta']
 
 	elif args.ES == 'additive':
-		dpr_out['ES'] = dpr_out['beta'] + dpr_out['b']
+		DPR_Out['ES'] = DPR_Out['beta'] + DPR_Out['b']
 
-	return dpr_out
+	return DPR_Out
 
-
-# calculated r2 of prediction based on out_weights_df, genotype data in bimbam_test_df , actual values pheno_test_df
-def calc_r2(out_weights_df, bimbam_test_df, pheno_test_df, cv=False):
-
-	# filter by snp overlap
-	snp_overlap = np.intersect1d(out_weights_df.snpID, bimbam_test_df.snpID)
-	out_weights_df = out_weights_df[out_weights_df.snpID.isin(snp_overlap)]
-	bimbam_test_df = bimbam_test_df[bimbam_test_df.snpID.isin(snp_overlap)]
-
-	# genotype, weight data for prediction
-	test_geno_weights = out_weights_df.merge(
-		bimbam_test_df,
-		left_on='snpID',
-		right_on='snpID',
-		how='outer').set_index(['snpID'])
-	test_geno_weights = tg.optimize_cols(test_geno_weights)
-
-	snp_weights = test_geno_weights['ES']
+# calculated r2 of prediction based on ES weights, centered geno, centered pheno
+def calc_r2(Weight_df, Geno_df, Pheno_df, cv=False):
 
 	if cv:
-		snp_weights = snp_weights.fillna(0)
-
-	test_geno = test_geno_weights.drop(columns=['ES']).T
+		Weight_df = Weight_df.fillna(0)
 
 	### calculate predicted value for test set
-	target_pred = np.dot(test_geno, snp_weights)
-
-	lm = sm.OLS(pheno_test_df.values, sm.add_constant(target_pred)).fit()
+	Pred = np.dot(Geno_df, Weight_df)
+	lm = sm.OLS(Pheno_df.values, sm.add_constant(Pred)).fit()
 
 	if cv:
 		return lm.rsquared
@@ -201,42 +177,42 @@ def calc_r2(out_weights_df, bimbam_test_df, pheno_test_df, cv=False):
 
 
 # function to do the ith cross validation step
-def do_cv(i, target, Geno_df, Expr_df, snp_annot_df, cv_trainID, cv_testID):
-	target_cv = target + '_CV' + str(i+1)
+# def do_cv(i, target, Bimbam_df, Pheno_df, cv_trainID, cv_testID):
+def do_cv(target, Bimbam_df, Pheno_df, BimbamC_df, PhenoC_df, cv_train_test_id, k_folds=5):
 
-	trainID = cv_trainID[i]
-	testID = cv_testID[i]
+	k_fold_R2 = []
 
-	bimbam_train = Geno_df[['snpID','REF','ALT', *trainID]]
+	for i in range(k_folds):
+		target_cv = target + '_CV' + str(i+1)
 
-	pheno_train = Expr_df[trainID].T
+		trainID, testID = cv_train_test_id[i]
 
-	# PREP INPUT, CALL DPR
-	try:
-		dpr_out_cv = prep_call_dpr(
-			bimbam_train, 
-			pheno_train, 
-			snp_annot_df,
-			dpr_file_dir_cv, 
-			target_cv)
+		# PREP INPUT, CALL DPR
+		try:
+			DPR_Out = prep_call_dpr(
+				Bimbam_df[['snpID','REF','ALT', *trainID]], 
+				Pheno_df.loc[trainID], 
+				dpr_file_dir_cv, 
+				target_cv)[['snpID','ES']]
 
-	except subprocess.CalledProcessError as err:
-		print('DPR failed in CV' + str(i+1) + ' for TargetID: ' + target)
-		return 0
-	
-	### for R2 calculation
-	out_weights_cv = dpr_out_cv[['snpID','ES']]
-	bimbam_test = Geno_df[['snpID', *testID]]
-	pheno_test = Expr_df[testID].T
+			### for R2 calculation
+			cv_rsquared = calc_r2(
+				DPR_Out.ES,
+				BimbamC_df[BimbamC_df.snpID.isin(DPR_Out.snpID)][testID].T,
+				PhenoC_df.loc[testID], 
+				cv=True)
 
-	cv_rsquared = calc_r2(
-		out_weights_cv, 
-		bimbam_test, 
-		pheno_test, 
-		cv=True)
+			k_fold_R2.append(cv_rsquared)
 
+		except subprocess.CalledProcessError as err:
+			print('DPR failed in CV' + str(i+1) + ' for TargetID: ' + target)
+			k_fold_R2.append(0)
+
+	avg_r2_cv = sum(k_fold_R2) / k_folds
+		
 	# RETURN R2 RESULT
-	return(cv_rsquared)
+	return avg_r2_cv
+
 
 #############################################################
 # set absolute paths
@@ -310,9 +286,7 @@ GeneExp, TargetID, n_targets = tg.read_gene_annot_exp(**exp_info)
 # PREP CROSS VALIDATION SAMPLES - Split sampleIDs for cross validation
 if args.cvR2:
 	print('Splitting sample IDs randomly for 5-fold cross validation by average R2...\n')
-	kf = KFold(n_splits=5)
-	kf_splits = [(sampleID[x], sampleID[y]) for x,y in kf.split(sampleID)]
-	CV_trainID, CV_testID = zip(*kf_splits)
+	CV_train_test_ID = [(sampleID[x], sampleID[y]) for x,y in KFold(n_splits=5).split(sampleID)]
 else:
 	print('Skipping splitting samples for 5-fold cross validation...\n')
 
@@ -365,21 +339,25 @@ def thread_process(num):
 		print('No valid data for target.')
 		return None
 
-	# Geno, Exprr not centered since 
+	n_snp = Geno.snpID.size
+
+	# Geno, Expr not centered since 
 	## 1) DPR script centers input 
 	## 2) DPR script sometimes segfaults when reading in genotype files when data was centered
 
-	snp_annot = Geno[['snpID','POS','CHROM']]
+	# PREP INPUT FILES, CALL DPR, READ IN DPR OUTPUT
+	Bimbam = Geno[['snpID','REF','ALT', *sampleID]]
+	Pheno = Expr[sampleID].T
+
+	# center data for R2 calculation
+	BimbamC = tg.center(Bimbam, sampleID).drop(columns=['REF', 'ALT'])
+	PhenoC = tg.center(Expr[sampleID]).T
 
 	# 5-FOLD CROSS-VALIDATION
 	if args.cvR2:
 		print('Running 5-fold CV.')
-		do_cv_args = [target, Geno, Expr, snp_annot, CV_trainID, CV_testID]
 
-		k_fold_R2 = [do_cv(i, *do_cv_args) for i in range(5)]
-
-		avg_r2_cv = sum(k_fold_R2) / 5
-
+		avg_r2_cv = do_cv(target, Bimbam, Pheno, BimbamC, PhenoC, CV_train_test_ID)
 		print('Average R2 for 5-fold CV: {:.4f}'.format(avg_r2_cv))
 
 		if avg_r2_cv < args.cvR2_threshold:
@@ -387,50 +365,39 @@ def thread_process(num):
 			return None
 
 	else:
-		avg_r2_cv = 0
 		print('Skipping evaluation by 5-fold CV average R2...')
-
+		avg_r2_cv = 0
 
 	# FINAL MODEL TRAINING
 	print('Running DPR training.')
 
-	# PREP INPUT FILES, CALL DPR, READ IN DPR OUTPUT
-	bimbam = Geno[['snpID','REF','ALT', *sampleID]]
-	pheno = Expr[sampleID].T
-
 	try:
-		dpr_out = prep_call_dpr(bimbam, pheno, snp_annot, dpr_file_dir, target)
+		DPR_Out = prep_call_dpr(Bimbam, Pheno, dpr_file_dir, target)
 
 	except subprocess.CalledProcessError as err:
 		print('DPR failed for TargetID: ' + target + '\n')
 		return None
 
 	# FILTER FOR SNPS WITH ES!=0
-	n_snp = dpr_out.ES.size
-
-	dpr_out = dpr_out[dpr_out.ES != 0]
-
-	n_effect_snp = dpr_out.ES.size
+	DPR_Out = DPR_Out[DPR_Out.ES != 0]
+	n_effect_snp = DPR_Out.ES.size
 
 	# R2 CALCULATION
-	out_weights = dpr_out[['snpID','ES']]
+	BimbamC = BimbamC[BimbamC.snpID.isin(DPR_Out.snpID)][sampleID].T
 
-	bimbam = bimbam.drop(columns=['REF','ALT'])
-
-	train_pvalue, train_rsquared = calc_r2(out_weights, bimbam, pheno)
+	train_pvalue, train_rsquared = calc_r2(DPR_Out.ES, BimbamC, PhenoC)
 
 	# OUTPUT TARGET WEIGHTS TO FILE
 	# initialize df with MAF, pHWE, other info
 	Weight = Geno[['CHROM','POS','REF','ALT','snpID','p_HWE','MAF']].copy()
-	Weight = Weight[Weight.snpID.isin(dpr_out.snpID)]
 	Weight['TargetID'] = target
 
 	# merge with dpr output weights, reorder columns using existing col list
 	Weight = Weight.merge(
-		dpr_out, 
+		DPR_Out, 
 		left_on='snpID',
 		right_on='snpID',
-		how='outer')[weight_cols]
+		how='inner')[weight_cols]
 
 	Weight.to_csv(
 		out_weight_path,

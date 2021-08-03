@@ -8,7 +8,6 @@ import operator
 import subprocess
 import sys
 
-from io import StringIO
 from time import time
 
 import pandas as pd
@@ -105,6 +104,8 @@ Output reference covariance results file: {out_rc}
 ********************************'''.format(
 	**args.__dict__,
 	out_rc = out_refcovld_path))
+
+# tg.print_args(args)
 
 ###############################################################
 # Read in block information
