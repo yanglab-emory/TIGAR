@@ -19,7 +19,7 @@
 
 #######################################################################
 VARS=`getopt -o "" -a -l \
-gene_anno:,GWAS_result:,Weight:,sample_size:,weight_threshold:,LD:,chr:,window:,thread:,out_dir: \
+TIGAR_dir:,gene_anno:,GWAS_result:,weight:,sample_size:,weight_threshold:,LD:,chr:,window:,thread:,sub_dir:,log_file:,out_dir: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -33,15 +33,18 @@ eval set -- "$VARS"
 while true
 do
     case "$1" in
+        --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
         --gene_anno|-gene_anno) gene_anno=$2; shift 2;;
         --GWAS_result|-GWAS_result) GWAS_result=$2; shift 2;;
-        --Weight|-Weight) Weight=$2; shift 2;;
+        --weight|-weight) weight=$2; shift 2;;
         --sample_size|-sample_size) sample_size=$2; shift 2;;
         --weight_threshold|-weight_threshold) weight_threshold=$2; shift 2;;
         --LD|-LD) LD=$2; shift 2;;
         --chr|-chr) chr=$2; shift 2;;
         --window|-window) window=$2; shift 2;;
         --thread|-thread) thread=$2; shift 2;;
+        --sub_dir|-sub_dir) sub_dir=$2; shift 2;;
+        --log_file|-log_file) log_file=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
         --) shift;break;;
         *) echo "Internal error!";exit 1;;
@@ -51,10 +54,23 @@ done
 #### default value
 window=${window:-$((10**6))}
 thread=${thread:-1}
+log_file=${log_file:-CHR${chr}_VCTWAS_sum_log.txt}
+
+# sub_dir: whether to use subdirectory inside out_dir for output files
+sub_dir=${sub_dir:-1}
 
 #### Create output directory if not existed
 mkdir -p ${out_dir}
-mkdir -p ${out_dir}/VC_TWAS_summary_CHR${chr}
+mkdir -p ${out_dir}/logs
+
+# sub directory in out directory
+if [[ "$sub_dir"x == "1"x ]];then
+    out_sub_dir=${out_dir}/VCTWAS_sum_CHR${chr}
+else
+    out_sub_dir=${out_dir}
+fi
+
+mkdir -p ${out_sub_dir}
 
 ####################################################
 # check tabix command
@@ -63,43 +79,46 @@ if [ ! -x "$(command -v tabix)" ]; then
     exit 1
 fi
 
-# Check Weight file 
-if [ ! -f "${Weight}" ] ; then
-    echo Error: Training genotype file ${Weight} dose not exist or empty. >&2
+# Check weight file 
+if [ ! -f "${weight}" ] ; then
+    echo Error: Training genotype file ${weight} does not exist or is empty. >&2
     exit 1
 fi
 
-
 # Check gwas result file
 if [ ! -f "${GWAS_result}" ] ; then
-    echo Error: eQTL weight file ${GWAS_result} dose not exist or empty. >&2
+    echo Error: eQTL weight file ${GWAS_result} does not exist or is empty. >&2
     exit 1
 fi
 
 # Check gene annotation file
 if [ ! -f "${gene_anno}" ] ; then
-    echo Error: eQTL weight file ${gene_anno} dose not exist or empty. >&2
+    echo Error: eQTL weight file ${gene_anno} does not exist or is empty. >&2
     exit 1
 fi
 
 # Make python script executible
-if [[ ! -x  {TIGAR_dir}/VC_TWAS/VC_TWAS_summary.py ]] ; then
-    #chmod 755  ${TIGAR_dir}/VC_TWAS/VC_TWAS.py
-    chmod 755  {TIGAR_dir}/VC_TWAS/VC_TWAS_summary.py
+if [[ ! -x ${TIGAR_dir}/VC_TWAS/VC_TWAS_summary.py ]] ; then
+    chmod 755 ${TIGAR_dir}/VC_TWAS/VC_TWAS_summary.py
 fi
 
-#python ${TIGAR_dir}/VC_TWAS/VC_TWAS.py \
-python {TIGAR_dir}/VC_TWAS/VC_TWAS_summary.py \
+python ${TIGAR_dir}/VC_TWAS/VC_TWAS_summary.py \
+--TIGAR_dir ${TIGAR_dir} \
 --gene_anno ${gene_anno} \
 --GWAS_result ${GWAS_result} \
---Weight ${Weight} \
+--weight ${weight} \
 --sample_size ${sample_size} \
 --weight_threshold ${weight_threshold} \
 --LD ${LD} \
 --chr ${chr} \
 --window ${window} \
 --thread ${thread} \
---out_dir ${out_dir}/VC_TWAS_summary_CHR${chr} \
-> ${out_dir}/VC_TWAS_summary_CHR${chr}/CHR${chr}_sum_VC_TWAS_Log.txt
+--out_dir ${out_sub_dir} \
+> ${out_dir}/logs/${log_file}
+
+# > ${out_dir}/VC_TWAS_summary_CHR${chr}/CHR${chr}_sum_VC_TWAS_Log.txt
     
 # rm -f ${out_dir}/Pred_CHR${chr}/test_geno_colnames.txt
+
+echo "Completed TWAS."
+

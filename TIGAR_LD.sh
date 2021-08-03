@@ -17,7 +17,7 @@
 ###
 
 VARS=`getopt -o "" -a -l \
-genome_block:,genofile:,genofile_type:,chr:,format:,maf:,TIGAR_dir:,thread:,out_dir:,sampleID: \
+genome_block:,genofile:,genofile_type:,chr:,format:,maf:,TIGAR_dir:,thread:,sub_dir:,log_file:,out_dir:,out_ld_file:,sampleID: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -39,7 +39,10 @@ do
         --maf|-maf) maf=$2; shift 2;;
         --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
         --thread|-thread) thread=$2; shift 2;;
+        --sub_dir|-sub_dir) sub_dir=$2; shift 2;;
+        --log_file|-log_file) log_file=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
+        --out_ld_file|-out_ld_file) out_ld_file=$2; shift 2;;
         --sampleID|-sampleID) sampleID=$2; shift 2;;
         --) shift;break;;
         *) echo "Please check input arguments!";exit 1;;
@@ -49,11 +52,26 @@ done
 #### setting default value
 thread=${thread:-1}
 maf=${maf:-0}
+log_file=${log_file:-CHR${chr}_LD_log.txt}
+out_ld_file=${out_ld_file:-CHR${chr}_reference_cov}
 
-###
+# sub_dir: whether to use subdirectory inside out_dir for output files
+sub_dir=${sub_dir:-1}
+
+#### Create output directory if not existed
 mkdir -p ${out_dir}
 mkdir -p ${out_dir}/logs
-# mkdir -p ${out_dir}/RefLD
+
+# sub directory in out directory
+if [[ "$sub_dir"x == "1"x ]];then
+    out_sub_dir=${out_dir}/RefLD
+else
+    out_sub_dir=${out_dir}
+fi
+
+mkdir -p ${out_sub_dir}
+
+################################################
 
 # check tabix command
 if [ ! -x "$(command -v tabix)" ]; then
@@ -66,7 +84,7 @@ if [ ! -f "${genofile}" ] ; then
     echo Error: Reference genotype file ${genofile} does not exist or is empty. >&2
     exit 1
 fi
-echo $genofile
+
 
 ################################################
 ### 1. Calculate covariance matrix (LD) of genetic variants
@@ -84,33 +102,66 @@ python ${TIGAR_dir}/TWAS/Get_LD.py \
 --format ${format} \
 --maf ${maf} \
 --thread ${thread} \
---out_dir ${out_dir} \
+--out_dir ${out_sub_dir} \
+--out_ld_file ${out_ld_file} \
 --sampleID ${sampleID} \
 --TIGAR_dir ${TIGAR_dir} \
-> ${out_dir}/logs/CHR${chr}_LD_log.txt
+> ${out_dir}/logs/${log_file}
 
-#/RefLD
 
 ### 2. TABIX output file
-# Check genotype file 
-if [ ! -f ${out_dir}/CHR${chr}_reference_cov.txt ] ; then
-    echo Error: Reference LD covariance file ${out_dir}/CHR${chr}_reference_cov.txt was not generated successfully. >&2
+# Check ld file 
+if [ ! -f ${out_sub_dir}/${out_ld_file}.txt ] ; then
+    echo Error: Reference LD covariance file ${out_sub_dir}/${out_ld_file}.txt was not generated successfully. >&2
+    exit 1
+elif [ ! -f ${out_sub_dir}/${out_ld_file}_block_0.txt.gz ] ; then
+    # if 0th block file does not exist something went wrong
+    echo Error: Reference LD covariance block files not generated successfully. >&2
     exit 1
 else
-    tail -n+2 ${out_dir}/CHR${chr}_reference_cov.txt | sort -n -k3 | \
-        nl -nln -s$'\t' | \
-        awk 'BEGIN{FS=OFS="\t"}{if(NR == 1){print "#0\tsnpID\tCHROM\tPOS\tCOV";} print;}' | \
-        bgzip -c > ${out_dir}/CHR${chr}_reference_cov.txt.gz
-    tabix -f -s3 -b4 -e4 -S1 ${out_dir}/CHR${chr}_reference_cov.txt.gz    
-    rm -f ${out_dir}/CHR${chr}_reference_cov.txt
-fi
+    # bgzip file with header in order to append concatenated, numberd, and bgzipped block files lines from stdout
+    bgzip -f ${out_sub_dir}/${out_ld_file}.txt
+
+    # file should contain header and the output block index starts at 0, but just in case setting nblocks equal to number of lines in the file
+    nblocks=$(grep -c $ "${genome_block}")
+
+    # get list of block paths
+    block_paths=()
+    for block_i in $(seq 0 $nblocks); do
+        block_path=${out_sub_dir}/${out_ld_file}_block_${block_i}.txt.gz
+        # if block_path exists
+        if [ -f ${block_path} ] ; then
+            block_paths+=( ${block_path} )
+        fi
+    done
+
+    echo Concatenating and bgzipping output LD block files.
+
+    start_row=1
+    for block_path in ${block_paths[@]}; do
+        # number the lines then add bgzipped lines to final output
+        gunzip -c ${block_path} | \
+            nl -nln -s$'\t' -v${start_row} | \
+            bgzip -c >> ${out_sub_dir}/${out_ld_file}.txt.gz
+        # get starting row number for next block
+        start_row=$(( $(zgrep -c $ "${block_path}") + start_row ))
+        # remove block input file
+        rm -f ${block_path}
+    done
+
+    echo 'Tabix-ing output weight file.'
+    # tabix
+    tabix -f -s3 -b4 -e4 -S1 ${out_sub_dir}/${out_ld_file}.txt.gz
+fi    
 
 
-# Check genotype file 
-if [ ! -f ${out_dir}/CHR${chr}_reference_cov.txt.gz.tbi ] ; then
-    echo Error: Tabix reference LD covariance file ${out_dir}/CHR${chr}_reference_cov.txt.gz failed. >&2
+# Check tabix file
+if [ ! -f ${out_sub_dir}/${out_ld_file}.txt.gz.tbi ] ; then
+    echo Error: Tabix reference LD covariance file ${out_sub_dir}/${out_ld_file}.txt.gz failed. >&2
     exit 1
+else 
+    echo Successfully generated reference LD covariance file: ${out_sub_dir}/${out_ld_file}.txt.gz
 fi
 
-echo Successfully generated reference LD covariance file ${out_dir}/CHR${chr}_reference_cov.txt... 
+
 

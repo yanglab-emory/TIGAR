@@ -54,8 +54,8 @@ sys.path.append(args.TIGAR_dir)
 import TIGARutils as tg
 
 # For single phenotype
-def regression_single(method,X,Y,annotdf: pd.DataFrame,target):
-	result = annotdf.copy()
+def regression_single(method,X,Y,Annot_df: pd.DataFrame,target):
+	Result = Annot_df.copy()
 
 	# add intercept column for design matrix
 	newX = sm.add_constant(X)
@@ -63,32 +63,32 @@ def regression_single(method,X,Y,annotdf: pd.DataFrame,target):
 	# regression
 	if method=='OLS':
 		lm = sm.OLS(Y,newX).fit()
-		result['R2'] = lm.rsquared
+		Result['R2'] = lm.rsquared
 		
 	elif method=='Logit':
 		lm = sm.Logit(Y-1,newX).fit()
-		result['R2'] = lm.prsquared
+		Result['R2'] = lm.prsquared
 
-	result['BETA'] = lm.params.get(target)
-	result['BETA_SE'] = lm.bse.get(target)
-	result['T_STAT'] = lm.tvalues.get(target)
-	result['PVALUE'] = lm.pvalues.get(target)
-	result['N'] = len(X)
+	Result['BETA'] = lm.params.get(target)
+	Result['BETA_SE'] = lm.bse.get(target)
+	Result['T_STAT'] = lm.tvalues.get(target)
+	Result['PVALUE'] = lm.pvalues.get(target)
+	Result['N'] = len(X)
 	
-	return result
+	return Result
 
 # For multiple phenotype
-def regression_multi(X,Y,annotdf: pd.DataFrame):
-	result = annotdf.copy()
+def regression_multi(X,Y,Annot_df: pd.DataFrame):
+	Result = Annot_df.copy()
 
 	lm = sm.OLS(Y,X).fit()
 
-	result['R2'] = lm.rsquared
-	result['F_STAT'] = lm.fvalue
-	result['PVALUE'] = lm.f_pvalue
-	result['N'] = len(X)
+	Result['R2'] = lm.rsquared
+	Result['F_STAT'] = lm.fvalue
+	Result['PVALUE'] = lm.f_pvalue
+	Result['N'] = len(X)
 	
-	return result
+	return Result
 
 ###########################################################
 # Print input arguments
@@ -97,88 +97,44 @@ out_twas_path = args.out_dir + '/indv_' + args.method + '_assoc.txt'
 print(
 '''********************************
 Input Arguments
-
 Predicted GReX data file: {geneexp_path}
-
 PED phenotype/covariate data file: {ped_path}
-
 PED information file: {pedinfo_path}
-
 Regression model used for association test: {method}
-
 Number of threads: {thread}
-
 Output directory: {out_dir}
-
 Output TWAS results file: {out_path}
 ********************************'''.format(
 	**args.__dict__, 
 	out_path = out_twas_path))
 
+# tg.print_args(args)
+
 ############################################################
+
+# get sampleIDs, ped column info, expression file info
+sampleID, sample_size, exp_info, ped_cols, n_pheno, pheno, cov = tg.sampleid_startup(**args.__dict__)
+print('Phenotypes to be studied: ' + ', '.join(pheno) + '\n')
+print('Covariates to be used: ' + ', '.join(cov) + '\n')
+
+print('Reading gene expression/annotation data.\n')
+AnnotExp, TargetID, n_targets = tg.read_gene_annot_exp(**exp_info)
+
 # Read in PED file
 PED = pd.read_csv(
 	args.ped_path,
-	sep='\t').rename(columns={'#FAM_ID':'FAM_ID'})
+	sep='\t',
+	usecols=['IND_ID', *ped_cols])
+PED = PED[PED.IND_ID.isin(sampleID)]
 PED = tg.optimize_cols(PED)
 
-# Gene annotation and Expression level file
-GeneAnnotExp = pd.read_csv(
-	args.geneexp_path,
-	sep='\t',
-	low_memory=False)
-GeneAnnotExp = tg.optimize_cols(GeneAnnotExp)
+# get separate Annot, Exp dataframes
+Exp = (AnnotExp[sampleID]).T
+Exp.columns = TargetID
+Exp['IND_ID'] = Exp.index
+Exp = Exp.reset_index(drop=True)
 
-# Read in Association information
-# P:phenotype
-# C:covariate
-Asso_Info=pd.read_csv(
-	args.pedinfo_path,
-	sep='\t',
-	header=None,
-	names=['Ind','Var'])
-
-# phenotype
-pheno = Asso_Info[Asso_Info.Ind=='P'].Var.values
-n_pheno = pheno.size
-
-if not n_pheno:
-	raise SystemExit('No phenotype column name is provided by --PED_info.')
-
-print('Phenotypes to be studied: ' + ', '.join([x for x in pheno.tolist()]) + '\n')
-
-# covariates
-cov = Asso_Info[Asso_Info.Ind=='C'].Var.values
-if not cov.size:
-	raise SystemExit('No covariates provided.')
-
-print('Covariates to be used: ' + ', '.join([x for x in cov.tolist()]) + '\n')
-
-TargetID = GeneAnnotExp.TargetID
-n_targets = TargetID.size
-
-if not n_targets:
-	raise SystemExit('There is no GREx data in gene expression file provided by --gene_exp ')
-
-sampleID = np.intersect1d(PED.IND_ID, GeneAnnotExp.columns[5:])
-
-if not sampleID.size:
-	raise SystemExit('There is no overlapped sample IDs between gene expression file and PED file.')
-
-# Organizing PED and Gene-expression file
-ped_cols = np.concatenate((['IND_ID'], pheno, cov))
-PED = PED[PED.IND_ID.isin(sampleID)][ped_cols]
-
-gene_cols = np.concatenate((['CHROM', 'GeneStart', 'GeneEnd', 'TargetID', 'GeneName'], sampleID))
-GeneAnnotExp = GeneAnnotExp[gene_cols]
-
-
-GeneExp = (GeneAnnotExp[sampleID]).T
-GeneExp.columns = TargetID
-GeneExp['IND_ID'] = GeneExp.index
-GeneExp = GeneExp.reset_index(drop=True)
-
-GeneAnnot = GeneAnnotExp[GeneAnnotExp.columns[0:5]]
+Annot = AnnotExp[AnnotExp.columns[0:5]]
 
 ###################################################
 # Thread Process
@@ -187,17 +143,16 @@ GeneAnnot = GeneAnnotExp[GeneAnnotExp.columns[0:5]]
 @tg.error_handler
 def thread_single(num):
 	target = TargetID[num]
-	target_cols = np.concatenate((pheno, cov, [target]))
-	target_data = PEDExp[target_cols].dropna(axis=0, how='any')
-	target_annot = GeneAnnot.iloc[[num]]
 
-	X_cols = np.append(cov, target)
-	X = target_data[X_cols]
+	target_data = PEDExp[[*pheno,*cov,target]].dropna(axis=0, how='any')
+	target_annot = Annot.iloc[[num]]
+
+	X = target_data[[*cov, target]]
 	Y = target_data[pheno]
 
-	out = regression_single('OLS',X,Y,target_annot,target)
+	Result = regression_single('OLS',X,Y,target_annot,target)
 
-	out.to_csv(
+	Result.to_csv(
 		out_twas_path,
 		sep='\t',
 		header=None,
@@ -209,16 +164,15 @@ def thread_single(num):
 @tg.error_handler
 def thread_multi(num):
 	target = TargetID[num]
-	target_cols = np.insert(pheno,0,target)
-	target_data = resid_exp[target_cols].dropna(axis=0, how='any')
-	target_annot = GeneAnnot.iloc[[num]]
+	target_data = Resid_Exp[[target, *pheno]].dropna(axis=0, how='any')
+	target_annot = Annot.iloc[[num]]
 
 	X = target_data[pheno]
 	Y = target_data[target]
 
-	out = regression_multi(X,Y,target_annot)
+	Result = regression_multi(X,Y,target_annot)
 
-	out.to_csv(
+	Result.to_csv(
 		out_twas_path,
 		sep='\t',
 		header=None,
@@ -230,7 +184,7 @@ def thread_multi(num):
 if __name__ == '__main__':
 	if n_pheno == 1:
 		PEDExp = PED.merge(
-			GeneExp,
+			Exp,
 			left_on='IND_ID',
 			right_on='IND_ID',
 			how='outer').drop(columns=['IND_ID'])
@@ -239,11 +193,11 @@ if __name__ == '__main__':
 		out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName',
 			'R2','BETA','BETA_SE','T_STAT','PVALUE','N'] 
 		pd.DataFrame(columns=out_cols).to_csv(
-				out_twas_path,
-				sep='\t',
-				header=True,
-				index=None,
-				mode='w')
+			out_twas_path,
+			sep='\t',
+			header=True,
+			index=None,
+			mode='w')
 
 		pool = multiprocessing.Pool(args.thread)
 		pool.imap(thread_single,[num for num in range(n_targets)])
@@ -251,14 +205,14 @@ if __name__ == '__main__':
 		pool.join()
 
 	elif n_pheno > 1:
-		resid = PED[['IND_ID']].copy()
+		Resid = PED[['IND_ID']].copy()
 		
 		for i in range(n_pheno):
-			resid[pheno[i]] = sm.OLS(PED[pheno[i]],
-				sm.add_constant(PED[cov])).fit().resid.values
+			Resid[pheno[i]] = sm.OLS(PED[pheno[i]],
+				sm.add_constant(PED[cov])).fit().Resid.values
 
-		resid_exp = resid.merge(
-			GeneExp,
+		Resid_Exp = Resid.merge(
+			Exp,
 			left_on='IND_ID',
 			right_on='IND_ID',
 			how='outer').drop(columns=['IND_ID'])
@@ -267,11 +221,11 @@ if __name__ == '__main__':
 		out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName',
 			'R2','F_STAT','PVALUE','N']   
 		pd.DataFrame(columns=out_cols).to_csv(
-				out_twas_path,
-				sep='\t',
-				header=True,
-				index=None,
-				mode='w')
+			out_twas_path,
+			sep='\t',
+			header=True,
+			index=None,
+			mode='w')
 		
 		pool = multiprocessing.Pool(args.thread)
 		pool.imap(thread_multi,[num for num in range(n_targets)])
@@ -281,7 +235,7 @@ if __name__ == '__main__':
 
 ############################################################
 # time calculation
-elapsed_sec = time()-start_time
+elapsed_sec = time() - start_time
 elapsed_time = tg.format_elapsed_time(elapsed_sec)
 print('Computation time (DD:HH:MM:SS): ' + elapsed_time)
 
