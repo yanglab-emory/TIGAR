@@ -814,6 +814,7 @@ def get_ld_regions_list(snp_ids):
 		yield chrm + str(y[0][1]) + '-' + str(y[-1][1])
 
 
+
 # call tabix using regions string
 def call_tabix_regions(path, regs_str):
 
@@ -926,12 +927,12 @@ def get_ld_matrix(MCOV, return_diag=False):
 
 # return snp ids; join CHROM, POS, REF, ALT columns into : separated string
 def get_snpIDs(df: pd.DataFrame, flip=False):
-	chrom = df['CHROM'].astype('str').values
+	chrms = df['CHROM'].astype('str').values
 	pos = df['POS'].astype('str').values
 	ref = df['REF'].values
 	alt = df['ALT'].values
 	if flip:
-		return [':'.join(i) for i in zip(chrom,pos,alt,ref)]
+		return [':'.join(i) for i in zip(chrms,pos,alt,ref)]
 	else:
 		return [':'.join(i) for i in zip(chrom,pos,ref,alt)]
 
