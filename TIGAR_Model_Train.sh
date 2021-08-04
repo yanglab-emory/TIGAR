@@ -106,7 +106,7 @@ sub_dir=${sub_dir:-1}
 
 # used to differentiate intermmediate file folders when sub_dir!=1
 # script deletes DPR_Files_, CV_Files_ directories by default; job_suf prevents issues with deleting a directory used by simultaneous jobs
-job_suf=${job_suf:-"_"}
+job_suf=${job_suf:-"_CHR"${chr}}
 
 
 #### Create output directory if not existed

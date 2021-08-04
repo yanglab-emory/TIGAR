@@ -578,7 +578,6 @@ def call_tabix_header(path, out='tuple', rename={}):
 		# filter out lines starting with ##, which denotes comment in vcf file
 		if not line.startswith(b'##'):
 			proc_out += line
-
 	# read in lines still remaining after subprocess completes
 	for line in proc.stdout:
 		if not line.startswith(b'##'):
@@ -934,7 +933,12 @@ def get_snpIDs(df: pd.DataFrame, flip=False):
 	if flip:
 		return [':'.join(i) for i in zip(chrms,pos,alt,ref)]
 	else:
-		return [':'.join(i) for i in zip(chrom,pos,ref,alt)]
+		return [':'.join(i) for i in zip(chrms,pos,ref,alt)]
+
+
+# gives flipped snpIDs for an array/list of snpIDs
+def flip_snpIDs(snpIDs):
+	return np.array([':'.join([y[0],y[1],y[3],y[2]]) for y in [x.split(':') for x in snpIDs]])
 
 
 # Decrease memory by downcasting 'CHROM' column to integer, integer and float columns to minimum size that will not lose info

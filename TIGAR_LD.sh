@@ -114,13 +114,14 @@ python ${TIGAR_dir}/TWAS/Get_LD.py \
 if [ ! -f ${out_sub_dir}/${out_ld_file}.txt ] ; then
     echo Error: Reference LD covariance file ${out_sub_dir}/${out_ld_file}.txt was not generated successfully. >&2
     exit 1
-elif [ ! -f ${out_sub_dir}/${out_ld_file}_block_0.txt.gz ] ; then
+# elif [ ! -f ${out_sub_dir}/${out_ld_file}_block_0.txt.gz ] ; then
+elif [ ! -f ${out_sub_dir}/${out_ld_file}_block_0.txt ] ; then
     # if 0th block file does not exist something went wrong
     echo Error: Reference LD covariance block files not generated successfully. >&2
     exit 1
 else
-    # bgzip file with header in order to append concatenated, numberd, and bgzipped block files lines from stdout
-    bgzip -f ${out_sub_dir}/${out_ld_file}.txt
+    # # bgzip file with header in order to append concatenated, numberd, and bgzipped block files lines from stdout
+    # bgzip -f ${out_sub_dir}/${out_ld_file}.txt
 
     # file should contain header and the output block index starts at 0, but just in case setting nblocks equal to number of lines in the file
     nblocks=$(grep -c $ "${genome_block}")
@@ -128,7 +129,8 @@ else
     # get list of block paths
     block_paths=()
     for block_i in $(seq 0 $nblocks); do
-        block_path=${out_sub_dir}/${out_ld_file}_block_${block_i}.txt.gz
+        # block_path=${out_sub_dir}/${out_ld_file}_block_${block_i}.txt.gz
+        block_path=${out_sub_dir}/${out_ld_file}_block_${block_i}.txt
         # if block_path exists
         if [ -f ${block_path} ] ; then
             block_paths+=( ${block_path} )
@@ -139,17 +141,27 @@ else
 
     start_row=1
     for block_path in ${block_paths[@]}; do
+        # # number the lines then add bgzipped lines to final output
+        # gunzip -c ${block_path} | \
+        #     nl -nln -s$'\t' -v${start_row} | \
+        #     bgzip -c >> ${out_sub_dir}/${out_ld_file}.txt.gz
+        # # get starting row number for next block
+        # start_row=$(( $(zgrep -c $ "${block_path}") + start_row ))
+
         # number the lines then add bgzipped lines to final output
-        gunzip -c ${block_path} | \
-            nl -nln -s$'\t' -v${start_row} | \
-            bgzip -c >> ${out_sub_dir}/${out_ld_file}.txt.gz
+        nl -nln -s$'\t' -v${start_row} ${block_path} \
+            >> ${out_sub_dir}/${out_ld_file}.txt
         # get starting row number for next block
-        start_row=$(( $(zgrep -c $ "${block_path}") + start_row ))
+        start_row=$(( $(grep -c $ "${block_path}") + start_row ))
+
         # remove block input file
         rm -f ${block_path}
     done
+    echo 'Bgzipping final output LD file.'
+    # bgzip -d ${out_sub_dir}/${out_ld_file}.txt.gz
+    bgzip -f ${out_sub_dir}/${out_ld_file}.txt
 
-    echo 'Tabix-ing output weight file.'
+    echo 'Tabix-ing output LD file.'
     # tabix
     tabix -f -s3 -b4 -e4 -S1 ${out_sub_dir}/${out_ld_file}.txt.gz
 fi    

@@ -215,7 +215,7 @@ def thread_process(num):
 		Weight, 
 		left_on='snpID', 
 		right_on='snpID', 
-		how='outer')
+		how='inner')
 
 	Pred['diff'] = np.abs(Pred['MAF'].astype('float') - Pred['MAF_test'].astype('float'))
 	

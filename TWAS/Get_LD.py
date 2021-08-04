@@ -70,7 +70,10 @@ def cov_fmt(x): return ('%.4f' % x).rstrip('0').rstrip('.')
 def cov_str(cov_lst): return [','.join([cov_fmt(x) for x in row]) for row in [cov_lst[i][i:len(cov_lst)] for i in range(len(cov_lst))]]
 
 def out_block_path(num):
-	return(args.out_dir + '/' + args.out_ld_file + '_block_' + str(num) + '.txt.gz')
+	return(args.out_dir + '/' + args.out_ld_file + '_block_' + str(num) + '.txt')
+
+# def out_block_path(num):
+# 	return(args.out_dir + '/' + args.out_ld_file + '_block_' + str(num) + '.txt.gz')
 
 ###############################################################
 # check input arguments
@@ -159,7 +162,7 @@ def thread_process(num):
 		sep='\t',
 		index=None,
 		header=None,
-		compression='gzip',
+		# compression='gzip',
 		mode='a')
 
 	print('Block LD calculation completed for block.\n')

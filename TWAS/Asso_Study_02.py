@@ -203,7 +203,8 @@ def thread_process(num):
 	# merge Zscore and Weight dataframes on snpIDs
 	ZW = Weight.merge(Zscore[['snpID','Zscore']], 
 		left_on='snpID', 
-		right_on='snpID')
+		right_on='snpID', 
+		how='inner')
 
 	snp_search_ids = ZW.snpID.values
 
