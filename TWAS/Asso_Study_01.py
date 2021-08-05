@@ -209,7 +209,7 @@ if __name__ == '__main__':
 		
 		for i in range(n_pheno):
 			Resid[pheno[i]] = sm.OLS(PED[pheno[i]],
-				sm.add_constant(PED[cov])).fit().Resid.values
+				sm.add_constant(PED[cov])).fit().resid.values
 
 		Resid_Exp = Resid.merge(
 			Exp,
