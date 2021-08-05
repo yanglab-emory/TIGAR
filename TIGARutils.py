@@ -339,7 +339,7 @@ def read_gene_annot_exp(chrm=None, geneexp_path=None, annot_path=None, cols=['CH
 				chunksize=10000,
 				usecols=col_inds)
 			Gene = pd.concat([x[x[0]==chrm] for x in Gene_chunks]).reset_index(drop=True).astype(dtype)
-			Gene.columns = [exp_cols[i] for i in Gene.columns]
+			Gene.columns = [cols[i] for i in Gene.columns]
 
 		if Gene.empty:
 			raise SystemExit('There are no valid gene expression/annotation data for chromosome ' + chrm + '.\n')
@@ -357,7 +357,7 @@ def read_gene_annot_exp(chrm=None, geneexp_path=None, annot_path=None, cols=['CH
 				header=None,
 				usecols=col_inds)
 
-			Gene.columns = [exp_cols[i] for i in Gene.columns]
+			Gene.columns = [cols[i] for i in Gene.columns]
 
 	Gene = optimize_cols(Gene)
 
