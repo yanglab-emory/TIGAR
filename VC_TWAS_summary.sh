@@ -19,7 +19,7 @@
 
 #######################################################################
 VARS=`getopt -o "" -a -l \
-gene_anno:,GWAS_result:,Weight:,sample_size:,weight_threshold:,LD:,chr:,window:,thread:,out_dir: \
+TIGAR_dir:,gene_anno:,GWAS_result:,Weight:,sample_size:,weight_threshold:,LD:,chr:,window:,thread:,out_dir: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -33,6 +33,7 @@ eval set -- "$VARS"
 while true
 do
     case "$1" in
+        --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
         --gene_anno|-gene_anno) gene_anno=$2; shift 2;;
         --GWAS_result|-GWAS_result) GWAS_result=$2; shift 2;;
         --Weight|-Weight) Weight=$2; shift 2;;
@@ -83,13 +84,14 @@ if [ ! -f "${gene_anno}" ] ; then
 fi
 
 # Make python script executible
-if [[ ! -x  {TIGAR_dir}/VC_TWAS/VC_TWAS_summary.py ]] ; then
+if [[ ! -x ${TIGAR_dir}/VC_TWAS/VC_TWAS_summary.py ]] ; then
     #chmod 755  ${TIGAR_dir}/VC_TWAS/VC_TWAS.py
-    chmod 755  {TIGAR_dir}/VC_TWAS/VC_TWAS_summary.py
+    chmod 755 ${TIGAR_dir}/VC_TWAS/VC_TWAS_summary.py
 fi
 
 #python ${TIGAR_dir}/VC_TWAS/VC_TWAS.py \
-python {TIGAR_dir}/VC_TWAS/VC_TWAS_summary.py \
+python ${TIGAR_dir}/VC_TWAS/VC_TWAS_summary.py \
+--TIGAR_dir ${TIGAR_dir} \
 --gene_anno ${gene_anno} \
 --GWAS_result ${GWAS_result} \
 --Weight ${Weight} \
