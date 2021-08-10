@@ -7,7 +7,6 @@ import multiprocessing
 import subprocess
 import sys
 
-from io import StringIO
 from time import time
 
 import numpy as np
@@ -64,29 +63,6 @@ sys.path.append(args.TIGAR_dir)
 ## Import TIGAR functions, define other functions
 import TIGARutils as tg
 
-# Determine index of required columns,
-# assigns correct dtype to correct index
-# 'ID' column does not exist in TIGAR training output from previous versions
-# check to see if it is in the file, if not will need to generate snpIDs later
-
-# return correct snpID and Zscore value
-# change sign of Zscore value if matching snpID is flipped wrt Weight snpID
-def handle_flip(df: pd.DataFrame, origID, flipID, origValCol, orig_overlap, flip_overlap):
-	orig = df[origID].values
-	flip = df[flipID].values
-	origval = df[origValCol].values
-
-	ids = np.empty_like(orig)
-	val = np.empty_like(origval)
-
-	for i in range(len(df)):
-		if orig[i] in orig_overlap:
-			ids[i], val[i] = orig[i], origval[i]
-		elif flip[i] in flip_overlap:
-			ids[i], val[i] = flip[i], -origval[i]
-
-	return ids, val
-
 def get_pval(z): return np.format_float_scientific(1-chi2.cdf(z**2, 1), precision=15, exp_digits=0)
 
 def get_V_cor(V_cov):
@@ -122,69 +98,42 @@ out_twas_path = args.out_dir + '/CHR' + args.chrm + '_sumstat_assoc.txt'
 print(
 '''********************************
 Input Arguments
-
 Gene annotation file specifying genes for TWAS: {annot_path}
-
 Chromosome: {chrm}
-
 cis-eQTL weight file: {w_path}
-
 GWAS summary statistics Z-score file: {z_path}
-
 Reference LD genotype covariance file: {ld_path}
-
 Gene training region SNP inclusion window: +-{window}
-
 SNP weight inclusion threshold: {weight_threshold}
-
 Test statistic to use: {test_stat_str}
-
 Number of threads: {thread}
-
 Output directory: {out_dir}
-
 Output TWAS results file: {out_path}
 ********************************'''.format(
 	**args.__dict__,
 	test_stat_str = 'FUSION and SPrediXcan' if args.test_stat=='both' else args.test_stat,
 	out_path = out_twas_path))
 
-tg.print_args(args)
+# tg.print_args(args)
 
 ###############################################################
 ### Read in gene annotation 
 print('Reading gene annotation file.')
-Gene_chunks = pd.read_csv(
-	args.annot_path, 
-	sep='\t', 
-	iterator=True, 
-	chunksize=10000,
-	dtype={'CHROM':object,'GeneStart':np.int64,'GeneEnd':np.int64,'TargetID':object,'GeneName':object}, 
-	usecols=['CHROM','GeneStart','GeneEnd','TargetID','GeneName'])
+# Gene, TargetID, n_targets = tg.read_gene_annot_exp(args.annot_path, args.chrm)
+Gene, TargetID, n_targets = tg.read_gene_annot_exp(**args.__dict__)
 
-Gene = pd.concat([x[x['CHROM']==args.chrm] for x in Gene_chunks] ).reset_index(drop=True)
-
-Gene = tg.optimize_cols(Gene)
-
-TargetID = np.array(Gene.TargetID)
-n_targets = TargetID.size
-
-# read in headers for Weight and Zscore files
+# read in headers for Weight and Zscore files; get the indices and dtypes for reading files into pandas
 print('Reading file headers.\n')
-w_cols = tg.get_header(args.w_path, zipped=True)
-z_cols = tg.get_header(args.z_path, zipped=True)
-
-# get the indices and dtypes for reading files into pandas
-w_cols_ind, w_dtype = tg.weight_cols_dtype(w_cols)
-z_cols_ind, z_dtype = tg.zscore_cols_dtype(z_cols)
+weight_info = tg.weight_file_info(**args.__dict__)
+zscore_info = tg.zscore_file_info(**args.__dict__)
 
 # PREP OUTPUT - print output headers to files
 print('Creating file: ' + out_twas_path + '\n')
 out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName','n_snps']
 if args.test_stat == 'both':
-	out_cols = out_cols + ['FUSION_Z','FUSION_PVAL','SPred_Z','SPred_PVAL']
+	out_cols += ['FUSION_Z','FUSION_PVAL','SPred_Z','SPred_PVAL']
 else:
-	out_cols = out_cols + ['Zscore','PVALUE']
+	out_cols += ['Zscore','PVALUE']
 
 pd.DataFrame(columns=out_cols).to_csv(
 	out_twas_path,
@@ -199,94 +148,63 @@ pd.DataFrame(columns=out_cols).to_csv(
 def thread_process(num):
 	target = TargetID[num]
 	print('num=' + str(num) + '\nTargetID=' + target)
-	Gene_info = Gene.iloc[[num]].reset_index(drop=True)
+	Gene_Info = Gene.iloc[[num]].reset_index(drop=True)
 
 	# get start and end positions to tabix
-	start = str(max(int(Gene_info.GeneStart)-args.window,0))
-	end = str(int(Gene_info.GeneEnd)+args.window)
+	start = str(max(int(Gene_Info.GeneStart)-args.window,0))
+	end = str(int(Gene_Info.GeneEnd)+args.window)
 
-	# tabix Weight file
-	# print('Reading weight data.')
-	w_proc_out = tg.call_tabix(args.w_path, args.chrm, start, end)
+	# check that both files have data for target
+	tabix_query = tg.tabix_query_files(start, end, **args.__dict__)
 
-	if not w_proc_out:
-		print('No test SNPs with non-zero cis-eQTL weights for TargetID: ' + target + '\n')
+	if not tabix_query:
+		print('No test SNPs with non-zero cis-eQTL weights and/or no test SNPs GWAS Zscore for TargetID: ' + target + '.\n')
 		return None
 
-	# tabix Zscore file
-	# print('Reading Zscore data.')
-	z_proc_out = tg.call_tabix(args.z_path, args.chrm, start, end)
+	# read in weight data for target, filtered by weight_threshold
+	Weight = tg.read_tabix(start, end, target=target, **weight_info)
 
-	if not z_proc_out:
-		print('No test SNPs with GWAS Zscore for TargetID: ' + target + '\n')
+	# read in Zscore data
+	Zscore = tg.read_tabix(start, end, **zscore_info)
+
+	# get flipped snpIDs
+	Zscore['snpIDflip'] = tg.get_snpIDs(Zscore, flip=True)
+
+	snp_overlap = np.intersect1d(Weight.snpID, Zscore[['snpID','snpIDflip']])
+
+	if not snp_overlap.size:
+		print('No overlapping test SNPs that have magnitude of cis-eQTL weights greater than threshold value and with GWAS Zscore for TargetID: ' + target + '.\n')
 		return None
 
-	# parse tabix output for Weight, filtered by target, threshold
-	Weight_chunks = pd.read_csv(
-		StringIO(w_proc_out.decode('utf-8')),
-		sep='\t',
-		header=None,
-		low_memory=False,
-		iterator=True, 
-		chunksize=10000,
-		usecols=w_cols_ind,
-		dtype=w_dtype)
-
-	Weight = pd.concat([x[ (x[w_cols_ind[4]]==target) & (abs(x[w_cols_ind[5]]) > args.weight_threshold )] for x in Weight_chunks]).reset_index(drop=True)
-
-	if Weight.empty:
-		print('No test SNPs with cis-eQTL weights with magnitude that exceeds specified weight threshold for TargetID: ' + target + '\n')
-		return None
-
-	Weight.columns = [w_cols[i] for i in tuple(Weight.columns)]
-	Weight = tg.optimize_cols(Weight)
-
-	# 'ID' snpID column does not exist in TIGAR training output from previous versions
-	# check to see if it is in the file, if not will need to generate snpIDs later
-	if 'ID' in Weight.columns:
-		Weight = Weight.rename(columns={'ID':'snpID'})
-
-	if not 'snpID' in Weight.columns:
-		Weight['snpID'] = tg.get_snpIDs(Weight)
-
-	# parse tabix output for Zscore
-	Zscore = pd.read_csv(
-		StringIO(z_proc_out.decode('utf-8')),
-		sep='\t',
-		header=None,
-		low_memory=False,
-		usecols=z_cols_ind,
-		dtype=z_dtype)
-
-	Zscore.columns = [z_cols[i] for i in tuple(Zscore.columns)]
-	Zscore = tg.optimize_cols(Zscore)
-
-	# get snpIDs
-	Zscore['snpID'] = tg.get_snpIDs(Zscore)
-	Zscore['snpIDflip'] = tg.get_snpIDs(Zscore, flip = True)
+	# filter out non-matching snpID rows
+	Weight = Weight[Weight.snpID.isin(snp_overlap)]
+	Zscore = Zscore[np.any(Zscore[['snpID','snpIDflip']].isin(snp_overlap), axis=1)].reset_index(drop=True)	
 
 	# if not in Weight.snpIDs, assumed flipped; if flipped, flip Zscore sign
-	flip_factor = np.where(Zscore.snpID.isin(Weight.snpID), 1, -1)
-	Zscore['snpID'] = np.where(flip_factor == 1, Zscore.snpID, Zscore.snpIDflip)
-	Zscore['Zscore'] = flip_factor * Zscore['Zscore']
+	flip = np.where(Zscore.snpID.isin(Weight.snpID), 1, -1)
+
+	if not np.all(flip == 1):
+		Zscore['snpID'] = np.where(flip == 1, Zscore.snpID, Zscore.snpIDflip)
+		Zscore['Zscore'] = flip * Zscore['Zscore']
 
 	# drop unneeded columns
 	Zscore = Zscore.drop(columns=['CHROM','POS','REF','ALT','snpIDflip'])
 
-	# filter remaining by snpIDs
-	snp_overlap = np.intersect1d(Weight.snpID, Zscore.snpID)
+	# # filter remaining by snpIDs
+	# snp_overlap = np.intersect1d(Weight.snpID, Zscore.snpID)
 
-	if not snp_overlap.size:
-		print('No overlapping test SNPs that have magnitude of cis-eQTL weights greater than threshold value and with GWAS Zscore for TargetID: ' + target + '\n')
-		return None
+	# if not snp_overlap.size:
+	# 	print('No overlapping test SNPs that have magnitude of cis-eQTL weights greater than threshold value and with GWAS Zscore for TargetID: ' + target + '\n')
+	# 	return None
 
-	Weight = Weight[Weight.snpID.isin(snp_overlap)]
-	Zscore = Zscore[Zscore.snpID.isin(snp_overlap)]
+	# Weight = Weight[Weight.snpID.isin(snp_overlap)]
+	# Zscore = Zscore[Zscore.snpID.isin(snp_overlap)]
 
 	# merge Zscore and Weight dataframes on snpIDs
 	ZW = Weight.merge(Zscore[['snpID','Zscore']], 
 		left_on='snpID', 
-		right_on='snpID').drop_duplicates(['snpID'], keep='first').reset_index(drop=True)
+		right_on='snpID', 
+		how='inner')
 
 	snp_search_ids = ZW.snpID.values
 
@@ -306,23 +224,23 @@ def thread_process(num):
 	print('Running TWAS.\nN SNPs=' + n_snps)
 
 	### create output dataframe
-	result = Gene_info.copy()
-	result['n_snps'] = n_snps
+	Result = Gene_Info.copy()
+	Result['n_snps'] = n_snps
 
 	### calculate zscore(s), pvalue(s)
 	# get_zscore_args = [V_cov, ZW, snp_sd]
 	get_zscore_args = [V_cov, ZW.ES.values, ZW.Zscore.values, snp_sd]
 
 	if args.test_stat == 'both':
-		result['FUSION_Z'], result['FUSION_PVAL'] = get_fusion_zscore(*get_zscore_args)
+		Result['FUSION_Z'], Result['FUSION_PVAL'] = get_fusion_zscore(*get_zscore_args)
 
-		result['SPred_Z'], result['SPred_PVAL'] = get_spred_zscore(*get_zscore_args)
+		Result['SPred_Z'], Result['SPred_PVAL'] = get_spred_zscore(*get_zscore_args)
 
 	else:
-		result['TWAS_Zscore'], result['PVALUE'] = get_burden_zscore(args.test_stat, get_zscore_args)
+		Result['TWAS_Zscore'], Result['PVALUE'] = get_burden_zscore(args.test_stat, get_zscore_args)
 
 	# write to file
-	result.to_csv(
+	Result.to_csv(
 		out_twas_path,
 		sep='\t',
 		index=None,

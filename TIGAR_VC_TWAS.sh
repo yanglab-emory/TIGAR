@@ -28,7 +28,7 @@
 
 #######################################################################
 VARS=`getopt -o "" -a -l \
-chr:,weight:,test_sampleID:,gene_anno:,genofile:,genofile_type:,format:,window:,phenotype_type:,maf:,hwe:,weight_threshold:,PED:,PED_info:,TIGAR_dir:,thread:,out_dir: \
+chr:,weight:,test_sampleID:,gene_anno:,genofile:,genofile_type:,format:,window:,phenotype_type:,missing_rate:,maf:,hwe:,weight_threshold:,PED:,PED_info:,TIGAR_dir:,thread:,sub_dir:,log_file:,out_dir: \
 -- "$@"`
 
 echo "Conducting VC-TWAS using individual-level GReX and phenotype data ... "
@@ -53,6 +53,7 @@ do
         --format|-format) format=$2; shift 2;;
         --window|-window) window=$2; shift 2;;
         --phenotype_type|-phenotype_type) phenotype_type=$2; shift 2;;
+        --missing_rate|-missing_rate) missing_rate=$2; shift 2;;
         --maf|-maf) maf=$2; shift 2;;
         --hwe|-hwe) hwe=$2; shift 2;;
         --weight_threshold|-weight_threshold) weight_threshold=$2; shift 2;;
@@ -60,6 +61,8 @@ do
         --PED_info|-PED_info) PED_info=$2; shift 2;;
         --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
         --thread|-thread) thread=$2; shift 2;;
+        --sub_dir|-sub_dir) sub_dir=$2; shift 2;;
+        --log_file|-log_file) log_file=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
         --) shift;break;;
         *) echo "Internal error!";exit 1;;
@@ -69,12 +72,27 @@ done
 #### default value
 thread=${thread:-1}
 window=${window:-$((10**6))}
+missing_rate=${missing_rate:-0.2}
 maf=${maf:-0.01}
 hwe=${hwe:-0.00001}
+log_file=${log_file:-CHR${chr}_VCTWAS_log.txt}
+
+# sub_dir: whether to use subdirectory inside out_dir for output files
+sub_dir=${sub_dir:-1}
 
 #### Create output directory if not existed
+mkdir -p ${out_dir}
 mkdir -p ${out_dir}/logs
-mkdir -p ${out_dir}/VC_TWAS_CHR${chr}
+
+# sub directory in out directory
+if [[ "$sub_dir"x == "1"x ]];then
+    out_sub_dir=${out_dir}/VCTWAS_CHR${chr}
+else
+    out_sub_dir=${out_dir}
+fi
+
+mkdir -p ${out_sub_dir}
+# mkdir -p ${out_dir}/VC_TWAS_CHR${chr}
 
 ####################################################
 # check tabix command
@@ -84,32 +102,37 @@ if [ ! -x "$(command -v tabix)" ]; then
 fi
 
 # Check genotype file 
-if [ ! -f "${genofile}" ] ; then
-    echo Error: Training genotype file ${genofile} does not exist or empty. >&2
+if [ ! -f "${genofile}" ]; then
+    echo Error: Training genotype file ${genofile} does not exist or is empty. >&2
     exit 1
 fi
 
 # Check training sample ID file
-if [ ! -f "${test_sampleID_file}" ] ; then
-    echo Error: Test sample ID file ${test_sampleID_file} does not exist or empty. >&2
+if [ ! -f "${test_sampleID_file}" ]; then
+    echo Error: Test sample ID file ${test_sampleID_file} does not exist or is empty. >&2
     exit 1
 fi
 
 # Check eQTL weight file
-if [ ! -f "${weight_file}" ] ; then
-    echo Error: eQTL weight file ${weight_file} does not exist or empty. >&2
+if [ ! -f "${weight_file}" ]; then
+    echo Error: eQTL weight file ${weight_file} does not exist or is empty. >&2
     exit 1
 fi
 
 # Check gene annotation file
-if [ ! -f "${gene_anno}" ] ; then
-    echo Error: eQTL weight file ${gene_anno} does not exist or empty. >&2
+if [ ! -f "${gene_anno}" ]; then
+    echo Error: eQTL weight file ${gene_anno} does not exist or is empty. >&2
     exit 1
 fi
 
 # Make python script executible
-if [[ ! -x  ${TIGAR_dir}/VC_TWAS/VC_TWAS_ver1.py ]] ; then
-    chmod 755  ${TIGAR_dir}/VC_TWAS/VC_TWAS.py
+# if [[ ! -x  ${TIGAR_dir}/VC_TWAS/VC_TWAS_ver1.py ]] ; then
+#     chmod 755  ${TIGAR_dir}/VC_TWAS/VC_TWAS.py
+# fi
+
+# Make python script executible
+if [[ ! -x  ${TIGAR_dir}/VC_TWAS/VC_TWAS.py ]]; then
+    chmod 755 ${TIGAR_dir}/VC_TWAS/VC_TWAS.py
 fi
 
 python ${TIGAR_dir}/VC_TWAS/VC_TWAS.py \
@@ -122,6 +145,7 @@ python ${TIGAR_dir}/VC_TWAS/VC_TWAS.py \
 --format ${format} \
 --window ${window} \
 --phenotype_type ${phenotype_type} \
+--missing_rate ${missing_rate} \
 --maf ${maf} \
 --hwe ${hwe} \
 --weight_threshold ${weight_threshold} \
@@ -129,7 +153,9 @@ python ${TIGAR_dir}/VC_TWAS/VC_TWAS.py \
 --PED ${PED} \
 --PED_info ${PED_info} \
 --TIGAR_dir ${TIGAR_dir} \
---out_dir ${out_dir}/VC_TWAS_CHR${chr} \
-> ${out_dir}/logs/CHR${chr}_VC_TWAS_log.txt
+--out_dir ${out_sub_dir} \
+> ${out_dir}/logs/${log_file}
 
 echo "Completed TWAS."
+
+

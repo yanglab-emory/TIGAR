@@ -9,7 +9,6 @@ import subprocess
 import sys
 import warnings
 
-from io import StringIO
 from time import time
 
 import numpy as np
@@ -162,10 +161,10 @@ def elastic_net(train, test=None, k=args.cv, Alpha=args.alpha):
 
 
 # function to do the ith cross validation step
-def do_cv(i, target_geno_exp_df, cv_trainID, cv_testID):
-	target_geno_exp_df = target_geno_exp_df.copy()
-	train_geno_exp = target_geno_exp_df.loc[cv_trainID[i]].dropna()
-	test_geno_exp = target_geno_exp_df.loc[cv_testID[i]].dropna()
+def do_cv(i, Geno_Exp_df, cv_trainID, cv_testID):
+	Geno_Exp_df = Geno_Exp_df.copy()
+	train_geno_exp = Geno_Exp_df.loc[cv_trainID[i]].dropna()
+	test_geno_exp = Geno_Exp_df.loc[cv_testID[i]].dropna()
 
 	cv_rsquared = elastic_net(train_geno_exp, test_geno_exp)
 	return cv_rsquared
@@ -173,20 +172,17 @@ def do_cv(i, target_geno_exp_df, cv_trainID, cv_testID):
 ###############################################################
 # check input arguments
 if args.genofile_type == 'vcf':
-	gcol_sampleids_strt_ind = 9
-
 	if (args.data_format != 'GT') and (args.data_format != 'DS'):
 		raise SystemExit('Please specify the genotype data format used by the vcf file (--format ) as either "GT" or "DS".\n')
 		
 elif args.genofile_type == 'dosage':
-	gcol_sampleids_strt_ind = 5
 	args.data_format = 'DS'
 
 else:
 	raise SystemExit('Please specify the type input genotype file type (--genofile_type) as either "vcf" or "dosage".\n')
 	
-out_train_weight_path = args.out_dir + '/temp_' + args.out_weight_file
-out_train_info_path = args.out_dir + '/' +  args.out_info_file
+out_weight_path = args.out_dir + '/temp_' + args.out_weight_file
+out_info_path = args.out_dir + '/' +  args.out_info_file
 
 ###############################################################
 # Print input arguments
@@ -195,44 +191,30 @@ print(
 Input Arguments
 
 Gene Annotation and Expression file: {geneexp_path}
-
 Training sampleID file: {sampleid_path}
-
 Chromosome: {chrm}
-
 Training genotype file: {geno_path}
-
 Genotype file used for training is type: {genofile_type}
-
 Genotype data format: {data_format}
-
 Gene training region SNP inclusion window: +-{window}
-
 Excluding SNPs if missing rate exceeds: {missing_rate}
-
 MAF threshold for SNP inclusion: {maf}
-
 HWE p-value threshold for SNP inclusion: {hwe}
-
 {cvR2_str1} Elastic-Net model by 5-fold cross validation{cvR2_str2}.
-
 Number of cross-validation folds used to tune Elastic-Net penalty parameter (lambda): {cv}
-
 Ratio for L1 & L2 penalty used by Elastic-Net regression (alpha): {alpha}
-
 Number of threads: {thread}
-
 Output directory: {out_dir}
-
 Output training weights file: {out_weight}
-
 Output training info file: {out_info}
 ********************************'''.format(
 	**args.__dict__,
 	cvR2_str1 = {0:'Skipping evaluation of', 1:'Evaluating'}[args.cvR2],
 	cvR2_str2 = {0:'', 1:' with inclusion threshold Avg.CVR2 >' + str(args.cvR2_threshold)}[args.cvR2],
-	out_weight = out_train_weight_path,
-	out_info = out_train_info_path))
+	out_weight = out_weight_path,
+	out_info = out_info_path))
+
+# tg.print_args(args)
 
 ###############################################################
 # Training Processing
@@ -244,68 +226,17 @@ Output training info file: {out_info}
 ### 4.TargetID (i.e.GeneID, treated as unique annotation for each gene)
 ### 5.Gene Name
 
-# Gene Expression header, sampleIDs
-print('Reading genotype, expression file headers.\n')
-exp_cols = tg.get_header(args.geneexp_path)
-exp_sampleids = exp_cols[5:]
+# Startup for training jobs: get column header info, sampleIDs
+print('Reading genotype, expression file headers, sample IDs.\n')
+sampleID, sample_size, geno_info, exp_info = tg.sampleid_startup(**args.__dict__)
 
-# genofile header, sampleIDs
-try:
-	g_cols = tg.call_tabix_header(args.geno_path)
-except: 
-	g_cols = tg.get_header(args.geno_path, zipped=True)
-
-gcol_sampleids = g_cols[gcol_sampleids_strt_ind:]
-
-# geno, exp overlapping sampleIDs
-gcol_exp_sampleids = np.intersect1d(gcol_sampleids, exp_sampleids)
-
-if not gcol_exp_sampleids.size:
-	raise SystemExit('The gene expression file and genotype file have no sampleIDs in common.')
-
-# get sampleIDs
-print('Reading sampleID file.\n')
-spec_sampleids = pd.read_csv(
-	args.sampleid_path,
-	sep='\t',
-	header=None)[0].drop_duplicates()
-
-print('Matching sampleIDs.\n')
-sampleID = np.intersect1d(spec_sampleids, gcol_exp_sampleids)
-
-sample_size = sampleID.size
-
-if not sample_size:
-	raise SystemExit('There is no overlapped sample IDs between gene expression file, genotype file, and sampleID file.')
-
-# get columns to read in
-g_cols_ind, g_dtype = tg.genofile_cols_dtype(g_cols, args.genofile_type, sampleID)
-e_cols_ind, e_dtype = tg.exp_cols_dtype(exp_cols, sampleID)
-
-# EXPRESSION FILE - Extract expression level by chromosome
+# Read in gene expression info
 print('Reading gene expression data.\n')
-GeneExp_chunks = pd.read_csv(
-	args.geneexp_path, 
-	sep='\t', 
-	iterator=True, 
-	chunksize=10000,
-	usecols=e_cols_ind,
-	dtype=e_dtype)
-
-GeneExp = pd.concat([x[x['CHROM']==args.chrm] for x in GeneExp_chunks]).reset_index(drop=True)
-
-if GeneExp.empty:
-	raise SystemExit('There are no valid gene expression training data for chromosome ' + args.chrm+ '\n')
-
-GeneExp = tg.optimize_cols(GeneExp)
-
-TargetID = GeneExp.TargetID.values
-n_targets = TargetID.size
+GeneExp, TargetID, n_targets = tg.read_gene_annot_exp(**exp_info)
 
 # PREP CROSS VALIDATION SAMPLES - Split sampleIDs for cross validation
 if args.cvR2:
 	print('Splitting sample IDs randomly for 5-fold cross validation by average R2...\n')
-
 	kf = KFold(n_splits=5)
 	kf_splits = [(sampleID[x], sampleID[y]) for x,y in kf.split(sampleID)]
 	CV_trainID, CV_testID = zip(*kf_splits)
@@ -314,19 +245,19 @@ else:
 	print('Skipping splitting samples for 5-fold cross validation...\n')
 
 # PREP OUTPUT - print output headers to files
-print('Creating file: ' + out_train_weight_path + '\n')
-weight_out_cols = ['CHROM','POS','ID','REF','ALT','TargetID','MAF','p_HWE','ES']
-pd.DataFrame(columns=weight_out_cols).to_csv(
-	out_train_weight_path,
+print('Creating file: ' + out_weight_path + '\n')
+weight_cols = ['CHROM','POS','snpID','REF','ALT','TargetID','MAF','p_HWE','ES']
+pd.DataFrame(columns=weight_cols).to_csv(
+	out_weight_path,
 	header=True,
 	index=None,
 	sep='\t',
 	mode='w')
 
-print('Creating file: ' + out_train_info_path + '\n')
-info_out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName','sample_size','n_snp','n_effect_snp','CVR2','TrainPVALUE','TrainR2','k-fold','alpha','Lambda','cvm','CVR2_threshold']
-pd.DataFrame(columns=info_out_cols).to_csv(
-	out_train_info_path,
+print('Creating file: ' + out_info_path + '\n')
+info_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName','sample_size','n_snp','n_effect_snp','CVR2','TrainPVALUE','TrainR2','k-fold','alpha','Lambda','cvm','CVR2_threshold']
+pd.DataFrame(columns=info_cols).to_csv(
+	out_info_path,
 	header=True,
 	index=None,
 	sep='\t',
@@ -340,59 +271,34 @@ print('********************************\n')
 def thread_process(num):
 	target = TargetID[num]
 	print('num=' + str(num) + '\nTargetID=' + target)
-	target_exp = GeneExp.iloc[[num]]
-	start = str(max(int(target_exp.GeneStart) - args.window,0))
-	end = str(int(target_exp.GeneEnd) + args.window)
+	Expr = GeneExp.iloc[[num]]
 
-	# select corresponding vcf file by tabix
-	print('Reading genotype data.')
-	g_proc_out = tg.call_tabix(args.geno_path, args.chrm, start, end)
+	start = str(max(int(Expr.GeneStart) - args.window,0))
+	end = str(int(Expr.GeneEnd) + args.window)
 
-	if not g_proc_out:
-		print('There is no genotype data for TargetID: ' + target + '\n') 
-		return None
-	  
-	# Recode subprocess output in 'utf-8'
-	print('Preparing Elastic-Net input.')
-	target_geno = pd.read_csv(StringIO(g_proc_out.decode('utf-8')),
-		sep='\t',
-		low_memory=False,
-		header=None,
-		usecols=g_cols_ind,
-		dtype=g_dtype)
-	target_geno.columns = [g_cols[i] for i in target_geno.columns]
-	target_geno = tg.optimize_cols(target_geno)
-
-	# get snpIDs
-	target_geno['snpID'] = tg.get_snpIDs(target_geno)
-	target_geno = target_geno.drop_duplicates(['snpID'], keep='first').reset_index(drop=True)
-
-	n_snp = target_geno['snpID'].size
-
-	# prep vcf file
-	if args.genofile_type=='vcf':
-		target_geno = tg.check_prep_vcf(target_geno, args.data_format, sampleID)
-
-	# reformat sample values
-	target_geno = tg.reformat_sample_vals(target_geno, args.data_format, sampleID)
+	# READ IN AND PROCESS GENOTYPE DATA 
+	# file must be bgzipped and tabix
+	Geno = tg.read_tabix(start, end, sampleID, **geno_info)
 
 	# filter out variants that exceed missing rate threshold
-	target_geno = tg.handle_missing(target_geno, sampleID, args.missing_rate)
+	Geno = tg.handle_missing(Geno, sampleID, args.missing_rate)
 
 	# get, filter maf
-	target_geno = tg.calc_maf(target_geno, sampleID, args.maf, op=operator.ge)
+	Geno = tg.calc_maf(Geno, sampleID, args.maf, op=operator.ge)
 
 	# get, filter p_HWE
-	target_geno = tg.calc_p_hwe(target_geno, sampleID, args.hwe, op=operator.ge)
+	Geno = tg.calc_p_hwe(Geno, sampleID, args.hwe, op=operator.ge)
+
+	n_snp = Geno['snpID'].size
 
 	# center data
-	target_geno = tg.center(target_geno, sampleID)
-	target_exp = tg.center(target_exp, sampleID)
+	Geno = tg.center(Geno, sampleID)
+	Expr = tg.center(Expr, sampleID)
 
 	# merge geno, expression files, transpose
-	target_geno_exp = pd.concat([
-		target_geno.set_index(['snpID'])[sampleID],
-		target_exp.set_index(['TargetID'])[sampleID]
+	Geno_Exp = pd.concat([
+		Geno.set_index(['snpID'])[sampleID],
+		Expr.set_index(['TargetID'])[sampleID]
 		]).T
 
 	# 5-FOLD CROSS-VALIDATION
@@ -400,7 +306,7 @@ def thread_process(num):
 	if args.cvR2:
 		print('Running 5-fold CV.')
 		# print('Starting with Elastic-Net penalty parameter')
-		do_cv_args = [target_geno_exp, CV_trainID, CV_testID]
+		do_cv_args = [Geno_Exp, CV_trainID, CV_testID]
 		k_fold_R2 = [do_cv(i, *do_cv_args) for i in range(5)]
 
 		avg_r2_cv = sum(k_fold_R2) / 5
@@ -410,50 +316,52 @@ def thread_process(num):
 		if avg_r2_cv < args.cvR2_threshold:
 			print('Average R2 < ' + str(args.cvR2_threshold) + '; Skipping Elastic-Net training for TargetID: ' + target + '\n')
 			return None
+
 	else:
 		avg_r2_cv = 0
 		print('Skipping evaluation by 5-fold CV average R2...')
 
 	# FINAL MODEL TRAINING
 	print('Running Elastic-Net training.')
-	# initialize target_weights dataframe
-	target_weights = target_geno[['CHROM','POS','snpID','REF','ALT','p_HWE','MAF']].copy()
+	# initialize Weight dataframe
+	Weight = Geno[['CHROM','POS','snpID','REF','ALT','p_HWE','MAF']].copy()
 
-	target_weights['TargetID'] = target
+	Weight['TargetID'] = target
 
 	# do elastic net training
-	target_weights['ES'], R2, Pvalue, Alpha, Lambda, cvm = elastic_net(target_geno_exp)
+	Weight['ES'], R2, Pvalue, Alpha, Lambda, cvm = elastic_net(Geno_Exp)
 
 	# filter
-	target_weights = target_weights[target_weights['ES']!=0]
+	Weight = Weight[Weight['ES'] != 0]
+	n_effect_snp = Weight.ES.size
 
 	# reorder columns for output
-	target_weights = target_weights[['CHROM','POS','snpID','REF','ALT','TargetID','MAF','p_HWE','ES']]
+	Weight = Weight[weight_cols]
 
-	target_weights.to_csv(
-		out_train_weight_path,
+	Weight.to_csv(
+		out_weight_path,
 		header=False,
 		index=None,
 		sep='\t',
 		mode='a')
 
 	# output training information, result from elastic net
-	train_info = target_exp[['CHROM','GeneStart','GeneEnd','TargetID','GeneName']].copy()
+	Info = Expr[['CHROM','GeneStart','GeneEnd','TargetID','GeneName']].copy()
 
-	train_info['sample_size'] = sample_size
-	train_info['n_snp'] = n_snp
-	train_info['n_effect_snp'] = n_effect_snp = target_weights.ES.size
-	train_info['CVR2'] = avg_r2_cv
-	train_info['TrainPVALUE'] = Pvalue if not np.isnan(Pvalue) else 'NaN'
-	train_info['TrainR2'] = R2 if n_effect_snp else 0
-	train_info['k_fold'] = args.cv
-	train_info['alpha'] = Alpha
-	train_info['lambda'] = Lambda
-	train_info['cvm'] = cvm
-	train_info['CVR2_threshold'] = args.cvR2_threshold
+	Info['sample_size'] = sample_size
+	Info['n_snp'] = n_snp
+	Info['n_effect_snp'] = n_effect_snp
+	Info['CVR2'] = avg_r2_cv
+	Info['TrainPVALUE'] = Pvalue if not np.isnan(Pvalue) else 'NaN'
+	Info['TrainR2'] = R2 if n_effect_snp else 0
+	Info['k_fold'] = args.cv
+	Info['alpha'] = Alpha
+	Info['lambda'] = Lambda
+	Info['cvm'] = cvm
+	Info['CVR2_threshold'] = args.cvR2_threshold if args.cvR2 else 0
 
-	train_info.to_csv(
-		out_train_info_path,
+	Info.to_csv(
+		out_info_path,
 		header=None,
 		index=None,
 		sep='\t',

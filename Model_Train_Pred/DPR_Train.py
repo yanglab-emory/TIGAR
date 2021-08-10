@@ -9,7 +9,6 @@ import os
 import subprocess
 import sys
 
-from io import StringIO
 from time import time
 
 import numpy as np
@@ -99,44 +98,27 @@ sys.path.append(args.TIGAR_dir)
 # DEFINE, IMPORT FUNCTIONS
 import TIGARutils as tg
 
+# directory for temporary output files; need to be defined here for some functions
+abs_out_dir = tg.get_abs_path(args.out_dir)
+dpr_file_dir = abs_out_dir + '/DPR_Files' + args.job_suf + '/'
+dpr_file_dir_cv = abs_out_dir + '/CV_Files' + args.job_suf + '/'
+
 # preps dpr input files, runs DPR, reads in dpr output
-def prep_call_dpr(bimbam_df, pheno_df, snpannot_df, dpr_file_dir, targetid):
+def prep_call_dpr(Bimbam_df, Pheno_df, dpr_file_dir, targetid):
 	## PATHS FOR DPR INPUT
 	bimbam_pth = dpr_file_dir + targetid + '_bimbam.txt'
 	pheno_pth = dpr_file_dir + targetid + '_pheno.txt'
-	snpannot_pth = dpr_file_dir + targetid + '_snp_annot.txt'
 
 	#  OUTPUT FILES FOR DPR INPUT
-	bimbam_df.to_csv(
-		bimbam_pth,
-		header=False,
-		index=None,
-		sep='\t',
-		mode='w',
-		float_format='%f')
-
-	pheno_df.to_csv(
-		pheno_pth,
-		header=False,
-		index=None,
-		sep='\t',
-		mode='w',
-		float_format='%f')
-
-	snpannot_df.to_csv(
-		snpannot_pth,
-		header=False,
-		index=None,
-		sep='\t',
-		mode='w',
-		float_format='%f')
+	out_args = {'header':False, 'index':None, 'sep':'\t', 'mode':'w', 'float_format':'%f'}
+	Bimbam_df.to_csv(bimbam_pth, **out_args)
+	Pheno_df.to_csv(pheno_pth, **out_args)
 
 	# CALL DPR
 	try:
 		DPR_call_args = [DPR_path, 
 			'-g', bimbam_pth, 
 			'-p', pheno_pth, 
-			'-a', snpannot_pth, 
 			'-dpr', args.dpr, 
 			'-notsnp',
 			'-o', 'DPR_' + targetid]
@@ -152,60 +134,40 @@ def prep_call_dpr(bimbam_df, pheno_df, snpannot_df, dpr_file_dir, targetid):
 	finally:
 		os.remove(bimbam_pth)
 		os.remove(pheno_pth)
-		os.remove(snpannot_pth)
 
 	# READ IN AND PROCESS DPR OUTPUT
 	dpr_out_pth = dpr_file_dir + 'output/DPR_' + targetid + '.param.txt'
 
-	dpr_out = pd.read_csv(
+	DPR_Out = pd.read_csv(
 		dpr_out_pth,
 		sep='\t',
 		header=0,
 		names=['CHROM','snpID','POS','n_miss','b','beta','gamma'],
 		usecols=['snpID','b','beta'],
-		dtype={'snpID': object, 'b': np.float64, 'beta': np.float64})
+		dtype={'snpID':object, 'b':np.float64, 'beta':np.float64})
 
 	os.remove(dpr_out_pth)
 
-	dpr_out = tg.optimize_cols(dpr_out)
+	DPR_Out = tg.optimize_cols(DPR_Out)
 
 	# GET EFFECT SIZE
 	if args.ES == 'fixed':
-		dpr_out['ES'] = dpr_out['beta']
+		DPR_Out['ES'] = DPR_Out['beta']
 
 	elif args.ES == 'additive':
-		dpr_out['ES'] = dpr_out['beta'] + dpr_out['b']
+		DPR_Out['ES'] = DPR_Out['beta'] + DPR_Out['b']
 
-	return dpr_out
+	return DPR_Out
 
-
-# calculated r2 of prediction based on out_weights_df, genotype data in bimbam_test_df , actual values pheno_test_df
-def calc_r2(out_weights_df, bimbam_test_df, pheno_test_df, cv=False):
-
-	# filter by snp overlap
-	snp_overlap = np.intersect1d(out_weights_df.snpID, bimbam_test_df.snpID)
-	out_weights_df = out_weights_df[out_weights_df.snpID.isin(snp_overlap)]
-	bimbam_test_df = bimbam_test_df[bimbam_test_df.snpID.isin(snp_overlap)]
-
-	# genotype, weight data for prediction
-	test_geno_weights = out_weights_df.merge(
-		bimbam_test_df,
-		left_on='snpID',
-		right_on='snpID',
-		how='outer').set_index(['snpID'])
-	test_geno_weights = tg.optimize_cols(test_geno_weights)
-
-	snp_weights = test_geno_weights['ES']
+# calculated r2 of prediction based on ES weights, centered geno, centered pheno
+def calc_r2(Weight_df, Geno_df, Pheno_df, cv=False):
 
 	if cv:
-		snp_weights = snp_weights.fillna(0)
-
-	test_geno = test_geno_weights.drop(columns=['ES']).T
+		Weight_df = Weight_df.fillna(0)
 
 	### calculate predicted value for test set
-	target_pred = np.dot(test_geno, snp_weights)
-
-	lm = sm.OLS(pheno_test_df.values, sm.add_constant(target_pred)).fit()
+	Pred = np.dot(Geno_df, Weight_df)
+	lm = sm.OLS(Pheno_df.values, sm.add_constant(Pred)).fit()
 
 	if cv:
 		return lm.rsquared
@@ -215,220 +177,133 @@ def calc_r2(out_weights_df, bimbam_test_df, pheno_test_df, cv=False):
 
 
 # function to do the ith cross validation step
-def do_cv(i, target, target_geno_df, target_exp_df, snp_annot_df, cv_trainID, cv_testID, ):
-	dpr_file_dir_cv = abs_out_dir + '/CV_Files' + args.job_suf + '/'
-	target_cv = target + '_CV' + str(i+1)
+# def do_cv(i, target, Bimbam_df, Pheno_df, cv_trainID, cv_testID):
+def do_cv(target, Bimbam_df, Pheno_df, BimbamC_df, PhenoC_df, cv_train_test_id, k_folds=5):
 
-	trainID = cv_trainID[i]
-	testID = cv_testID[i]
+	k_fold_R2 = []
 
-	bimbam_train = target_geno_df[np.concatenate((['snpID','REF','ALT'],trainID))]
+	for i in range(k_folds):
+		target_cv = target + '_CV' + str(i+1)
 
-	pheno_train = target_exp_df[trainID].T
+		trainID, testID = cv_train_test_id[i]
 
-	# PREP INPUT, CALL DPR
-	try:
-		dpr_out_cv = prep_call_dpr(
-			bimbam_train, 
-			pheno_train, 
-			snp_annot_df,
-			dpr_file_dir_cv, 
-			target_cv)
+		# PREP INPUT, CALL DPR
+		try:
+			DPR_Out = prep_call_dpr(
+				Bimbam_df[['snpID','REF','ALT', *trainID]], 
+				Pheno_df.loc[trainID], 
+				dpr_file_dir_cv, 
+				target_cv)[['snpID','ES']]
 
-	except subprocess.CalledProcessError as err:
-		print('DPR failed in CV' + str(i+1) + ' for TargetID: ' + target)
-		return 0
-	
-	### for R2 calculation
-	out_weights_cv = dpr_out_cv[['snpID','ES']]
-	bimbam_test = target_geno_df[np.append(['snpID'],testID)]
-	pheno_test = target_exp_df[testID].T
+			### for R2 calculation
+			cv_rsquared = calc_r2(
+				DPR_Out.ES,
+				BimbamC_df[BimbamC_df.snpID.isin(DPR_Out.snpID)][testID].T,
+				PhenoC_df.loc[testID], 
+				cv=True)
 
-	cv_rsquared = calc_r2(
-		out_weights_cv, 
-		bimbam_test, 
-		pheno_test, 
-		cv=True)
+			k_fold_R2.append(cv_rsquared)
 
+		except subprocess.CalledProcessError as err:
+			print('DPR failed in CV' + str(i+1) + ' for TargetID: ' + target)
+			k_fold_R2.append(0)
+
+	avg_r2_cv = sum(k_fold_R2) / k_folds
+		
 	# RETURN R2 RESULT
-	return(cv_rsquared)
+	return avg_r2_cv
+
 
 #############################################################
 # set absolute paths
 DPR_path = tg.get_abs_path(args.TIGAR_dir) + '/Model_Train_Pred/DPR'
-abs_out_dir = tg.get_abs_path(args.out_dir)
 
 # check input arguments
 if args.genofile_type == 'vcf':
-	gcol_sampleids_strt_ind = 9
-
 	if (args.data_format != 'GT') and (args.data_format != 'DS'):
 		raise SystemExit('Please specify the genotype data format used by the vcf file (--format ) as either "GT" or "DS".\n')
-		
+
 elif args.genofile_type == 'dosage':
-	gcol_sampleids_strt_ind = 5
 	args.data_format = 'DS'
 
 else:
 	raise SystemExit('Please specify the type input genotype file type (--genofile_type) as either "vcf" or "dosage".\n')
 
-out_train_weight_path = args.out_dir + '/temp_' + args.out_weight_file
-out_train_info_path = args.out_dir + '/' +  args.out_info_file
+out_weight_path = args.out_dir + '/temp_' + args.out_weight_file
+out_info_path = args.out_dir + '/' +  args.out_info_file
+
 #############################################################
 # Print input arguments to log
 print(
 '''********************************
 Input Arguments
-
 Gene Annotation and Expression file: {geneexp_path}
-
 Training sampleID file: {sampleid_path}
-
 Chromosome: {chrm}
-
 Training genotype file: {geno_path}
-
 Genotype file used for training is type: {genofile_type}
-
 Genotype data format: {data_format}
-
 Gene training region SNP inclusion window: +-{window}
-
 Excluding SNPs if missing rate exceeds: {missing_rate}
-
 MAF threshold for SNP inclusion: {maf}
-
 HWE p-value threshold for SNP inclusion: {hwe}
-
 {cvR2_str1} DPR model by 5-fold cross validation{cvR2_str2}.
-
 DPR model: {dpr} - {dpr_type}
-
 Output Effect-size type: {ES}
-
 Number of threads: {thread}
-
 Output directory: {out_dir}
-
 Output training weights file: {out_weight}
-
 Output training info file: {out_info}
 ********************************'''.format(
 	**args.__dict__,
 	dpr_type = {'1':'Variational Bayesian', '2':'MCMC'}[args.dpr],
 	cvR2_str1 = {0:'Skipping evaluation of', 1:'Evaluating'}[args.cvR2],
 	cvR2_str2 = {0:'', 1:' with inclusion threshold Avg.CVR2 >' + str(args.cvR2_threshold)}[args.cvR2],
-	out_weight = out_train_weight_path,
-	out_info = out_train_info_path))
+	out_weight = out_weight_path,
+	out_info = out_info_path))
+
+# tg.print_args(args)
 
 #############################################################
 # Prepare DPR input
 
-### Read in Gene annotation and Expression level file (text file)
+### Read in Gene Expression/Annotation file
 ### First five columns should be fixed:
-### 1.Chrmosome Number
-### 2.GeneStart Posistion
-### 3.GeneEnd Position
-### 4.TargetID (i.e.GeneID, treated as unique annotation for each gene)
-### 5.Gene Name
+### 1.CHROM
+### 2.GeneStart
+### 3.GeneEnd
+### 4.TargetID [i.e.GeneID, treated as unique annotation for each gene]
+### 5.GeneName
 
-# gene Expression header, sampleIDs
-print('Reading genotype, expression file headers.\n')
-exp_cols = tg.get_header(args.geneexp_path)
-exp_sampleids = exp_cols[5:]
+# Startup for training jobs: get column header info, sampleIDs
+print('Reading genotype, expression file headers, sample IDs.\n')
+sampleID, sample_size, geno_info, exp_info = tg.sampleid_startup(**args.__dict__)
 
-# genofile header, sampleIDs
-try:
-	g_cols = tg.call_tabix_header(args.geno_path)
-except: 
-	g_cols = tg.get_header(args.geno_path, zipped=True)
-
-gcol_sampleids = g_cols[gcol_sampleids_strt_ind:]
-
-# geno, exp overlapping sampleIDs
-gcol_exp_sampleids = np.intersect1d(gcol_sampleids, exp_sampleids)
-
-if not gcol_exp_sampleids.size:
-	raise SystemExit('The gene expression file and genotype file have no sampleIDs in common.')
-
-# get sampleIDs
-print('Reading sampleID file.\n')
-spec_sampleids = pd.read_csv(
-	args.sampleid_path,
-	sep='\t',
-	header=None)[0].drop_duplicates()
-
-print('Matching sampleIDs.\n')
-sampleID = np.intersect1d(spec_sampleids, gcol_exp_sampleids)
-
-sample_size = sampleID.size
-
-if not sample_size:
-	raise SystemExit('There are no overlapped sample IDs between the gene expression file, genotype file, and sampleID file.')
-
-# get columns to read in
-g_cols_ind, g_dtype = tg.genofile_cols_dtype(g_cols, args.genofile_type, sampleID)
-e_cols_ind, e_dtype = tg.exp_cols_dtype(exp_cols, sampleID)
-
-# extract expression level for chromosome
+# Read in gene expression info
 print('Reading gene expression data.\n')
-try:
-	GeneExp_chunks = pd.read_csv(
-		args.geneexp_path, 
-		sep='\t', 
-		iterator=True, 
-		chunksize=10000,
-		usecols=e_cols_ind,
-		dtype=e_dtype)
-
-	GeneExp = pd.concat([x[x['CHROM']==args.chrm] for x in GeneExp_chunks]).reset_index(drop=True)
-
-except:
-	GeneExp_chunks = pd.read_csv(
-		args.geneexp_path, 
-		sep='\t', 
-		iterator=True, 
-		header=None,
-		chunksize=10000,
-		usecols=e_cols_ind)
-
-	GeneExp = pd.concat([x[x[0]==args.chrm] for x in GeneExp_chunks]).reset_index(drop=True).astype(e_dtype)
-
-	GeneExp.columns = [exp_cols[i] for i in GeneExp.columns]
-
-if GeneExp.empty:
-	raise SystemExit('There are no valid gene expression training data for chromosome ' + args.chrm + '\n')
-
-GeneExp = tg.optimize_cols(GeneExp)
-
-TargetID = GeneExp.TargetID
-n_targets = TargetID.size
+GeneExp, TargetID, n_targets = tg.read_gene_annot_exp(**exp_info)
 
 # PREP CROSS VALIDATION SAMPLES - Split sampleIDs for cross validation
 if args.cvR2:
 	print('Splitting sample IDs randomly for 5-fold cross validation by average R2...\n')
-
-	kf = KFold(n_splits=5)
-	kf_splits = [(sampleID[x], sampleID[y]) for x,y in kf.split(sampleID)]
-	CV_trainID, CV_testID = zip(*kf_splits)
-
+	CV_train_test_ID = [(sampleID[x], sampleID[y]) for x,y in KFold(n_splits=5).split(sampleID)]
 else:
 	print('Skipping splitting samples for 5-fold cross validation...\n')
 
 # PREP OUTPUT - print output headers to files
-print('Creating file: ' + out_train_weight_path + '\n')
-weight_out_cols = ['CHROM','POS', 'snpID', 'REF','ALT','TargetID','MAF','p_HWE','ES','b','beta']
-pd.DataFrame(columns=weight_out_cols).to_csv(
-	out_train_weight_path,
+print('Creating file: ' + out_weight_path + '\n')
+weight_cols = ['CHROM','POS', 'snpID', 'REF','ALT','TargetID','MAF','p_HWE','ES','b','beta']
+pd.DataFrame(columns=weight_cols).to_csv(
+	out_weight_path,
 	sep='\t',
 	header=True,
 	index=None,
 	mode='w')
 
-print('Creating file: ' + out_train_info_path + '\n')
-info_out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName','sample_size','n_snp', 'n_effect_snp','CVR2','TrainPVALUE','TrainR2','CVR2_threshold']
-pd.DataFrame(columns=info_out_cols).to_csv(
-	out_train_info_path,
+print('Creating file: ' + out_info_path + '\n')
+info_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName','sample_size','n_snp', 'n_effect_snp','CVR2','TrainPVALUE','TrainR2','CVR2_threshold']
+pd.DataFrame(columns=info_cols).to_csv(
+	out_info_path,
 	sep='\t',
 	header=True,
 	index=None,
@@ -442,67 +317,47 @@ print('********************************\n')
 def thread_process(num):
 	target = TargetID[num]
 	print('num=' + str(num) + '\nTargetID=' + target)
-	target_exp = GeneExp.iloc[[num]]
+	Expr = GeneExp.iloc[[num]]
 
-	start = str(max(int(target_exp.GeneStart) - args.window, 0))
-	end = str(int(target_exp.GeneEnd) + args.window)
+	start = str(max(int(Expr.GeneStart) - args.window, 0))
+	end = str(int(Expr.GeneEnd) + args.window)
 
 	# READ IN AND PROCESS GENOTYPE DATA 
-	# Requirement for input vcf file: Must be bgzip and tabix
-	### select corresponding vcf file by tabix
-	print('Reading genotype data.')
-	g_proc_out = tg.call_tabix(args.geno_path, args.chrm, start, end)
+	# file must be bgzipped and tabix
+	Geno = tg.read_tabix(start, end, sampleID, **geno_info)
 
-	if not g_proc_out:
-		print('There is no genotype data for TargetID: ' + target + '\n')
-		return None
-
-	print('Preparing DPR input.')
-	target_geno = pd.read_csv(StringIO(g_proc_out.decode('utf-8')),
-			sep='\t',
-			low_memory=False,
-			header=None,
-			usecols=g_cols_ind,
-			dtype=g_dtype,
-			na_values=['.', '.|.', './.'])
-	target_geno.columns = [g_cols[i] for i in target_geno.columns]
-	target_geno = tg.optimize_cols(target_geno)
-
-	# get snpIDs
-	target_geno['snpID'] = tg.get_snpIDs(target_geno)
-	target_geno = target_geno.drop_duplicates(['snpID'],keep='first').reset_index(drop=True)
-
-	# prep vcf file
-	if args.genofile_type == 'vcf':
-		target_geno = tg.check_prep_vcf(target_geno, args.data_format, sampleID)
-
-	# reformat sample values
-	target_geno = tg.reformat_sample_vals(target_geno, args.data_format, sampleID)
-	
 	# filter out variants that exceed missing rate threshold
-	target_geno = tg.handle_missing(target_geno, sampleID, args.missing_rate)
+	Geno = tg.handle_missing(Geno, sampleID, args.missing_rate)
 	
 	# get, filter maf
-	target_geno = tg.calc_maf(target_geno, sampleID, args.maf)
+	Geno = tg.calc_maf(Geno, sampleID, args.maf)
 
 	# get, filter p_HWE
-	target_geno = tg.calc_p_hwe(target_geno, sampleID, args.hwe)
+	Geno = tg.calc_p_hwe(Geno, sampleID, args.hwe)
 
-	# target_geno, target_expr not centered since 
+	if Geno.empty:
+		print('No valid data for target.')
+		return None
+
+	n_snp = Geno.snpID.size
+
+	# Geno, Expr not centered since 
 	## 1) DPR script centers input 
 	## 2) DPR script sometimes segfaults when reading in genotype files when data was centered
 
-	snp_annot = target_geno[['snpID','POS','CHROM']]
+	# PREP INPUT FILES, CALL DPR, READ IN DPR OUTPUT
+	Bimbam = Geno[['snpID','REF','ALT', *sampleID]]
+	Pheno = Expr[sampleID].T
+
+	# center data for R2 calculation
+	BimbamC = tg.center(Bimbam, sampleID).drop(columns=['REF', 'ALT'])
+	PhenoC = tg.center(Expr[sampleID]).T
 
 	# 5-FOLD CROSS-VALIDATION
 	if args.cvR2:
 		print('Running 5-fold CV.')
-		do_cv_args = [target, target_geno, target_exp, snp_annot, CV_trainID, CV_testID]
 
-		k_fold_R2 = [do_cv(i, *do_cv_args) for i in range(5)]
-
-		avg_r2_cv = sum(k_fold_R2) / 5
-
+		avg_r2_cv = do_cv(target, Bimbam, Pheno, BimbamC, PhenoC, CV_train_test_ID)
 		print('Average R2 for 5-fold CV: {:.4f}'.format(avg_r2_cv))
 
 		if avg_r2_cv < args.cvR2_threshold:
@@ -510,75 +365,62 @@ def thread_process(num):
 			return None
 
 	else:
-		avg_r2_cv = 0
 		print('Skipping evaluation by 5-fold CV average R2...')
-
+		avg_r2_cv = 0
 
 	# FINAL MODEL TRAINING
 	print('Running DPR training.')
-	dpr_file_dir = abs_out_dir + '/DPR_Files' + args.job_suf + '/'
-	
-	bimbam = target_geno[np.concatenate((['snpID','REF','ALT'],sampleID))]
 
-	pheno = target_exp[sampleID].T
-
-	# PREP INPUT FILES, CALL DPR, READ IN DPR OUTPUT
 	try:
-		dpr_out = prep_call_dpr(bimbam, pheno, snp_annot, dpr_file_dir, target)
+		DPR_Out = prep_call_dpr(Bimbam, Pheno, dpr_file_dir, target)
 
 	except subprocess.CalledProcessError as err:
 		print('DPR failed for TargetID: ' + target + '\n')
 		return None
 
 	# FILTER FOR SNPS WITH ES!=0
-	n_snp = dpr_out.ES.size
-
-	dpr_out = dpr_out[dpr_out.ES!=0]
-
-	n_effect_snp = dpr_out.ES.size
+	DPR_Out = DPR_Out[DPR_Out.ES != 0]
+	n_effect_snp = DPR_Out.ES.size
 
 	# R2 CALCULATION
-	out_weights = dpr_out[['snpID','ES']]
+	BimbamC = BimbamC[BimbamC.snpID.isin(DPR_Out.snpID)][sampleID].T
 
-	bimbam = bimbam.drop(columns=['REF','ALT'])
-
-	train_pvalue, train_rsquared = calc_r2(out_weights, bimbam, pheno)
+	train_pvalue, train_rsquared = calc_r2(DPR_Out.ES, BimbamC, PhenoC)
 
 	# OUTPUT TARGET WEIGHTS TO FILE
 	# initialize df with MAF, pHWE, other info
-	target_weights = target_geno[['CHROM','POS','REF','ALT','snpID','p_HWE','MAF']].copy()
-	target_weights = target_weights[target_weights.snpID.isin(dpr_out.snpID)]
-	target_weights['TargetID'] = target
+	Weight = Geno[['CHROM','POS','REF','ALT','snpID','p_HWE','MAF']].copy()
+	Weight['TargetID'] = target
 
 	# merge with dpr output weights, reorder columns using existing col list
-	target_weights = target_weights.merge(
-		dpr_out, 
+	Weight = Weight.merge(
+		DPR_Out, 
 		left_on='snpID',
 		right_on='snpID',
-		how='outer')[weight_out_cols]
+		how='inner')[weight_cols]
 
-	target_weights.to_csv(
-		out_train_weight_path,
+	Weight.to_csv(
+		out_weight_path,
 		sep='\t',
 		header=None,
 		index=None,
-		mode='a')        
+		mode='a')
 
 	# OUTPUT TARGET TRAINING INFO TO FILE
 	# initialize dataframe for storing training info
-	train_info = target_exp[
+	Info = Expr[
 		['CHROM','GeneStart','GeneEnd','TargetID','GeneName']].copy()
-	train_info['sample_size'] = sample_size
-	train_info['n_snp'] = n_snp
-	train_info['n_effect_snp'] = n_effect_snp
-	train_info['CVR2'] = avg_r2_cv
-	train_info['TrainPVALUE'] = train_pvalue
-	train_info['TrainR2'] = train_rsquared
-	train_info['CVR2_threshold'] = args.cvR2_threshold
+	Info['sample_size'] = sample_size
+	Info['n_snp'] = n_snp
+	Info['n_effect_snp'] = n_effect_snp
+	Info['CVR2'] = avg_r2_cv
+	Info['TrainPVALUE'] = train_pvalue
+	Info['TrainR2'] = train_rsquared
+	Info['CVR2_threshold'] = args.cvR2_threshold if args.cvR2 else 0
 
 	# output training info
-	train_info.to_csv(
-		out_train_info_path,
+	Info.to_csv(
+		out_info_path,
 		sep='\t',
 		header=None,
 		index=None,

@@ -36,7 +36,7 @@
 
 #################################
 VARS=`getopt -o "" -a -l \
-model:,gene_exp:,train_sampleID:,chr:,genofile_type:,genofile:,format:,missing_rate:,maf:,hwe:,window:,cvR2:,cvR2_threshold:,cv:,alpha:,use_alpha:,dpr:,ES:,TIGAR_dir:,thread:,out_dir:,sub_dir:,out_weight_file:,out_info_file:,log_file:,job_suf: \
+model:,gene_exp:,train_sampleID:,chr:,genofile_type:,genofile:,format:,missing_rate:,maf:,hwe:,window:,cvR2:,cvR2_threshold:,cv:,alpha:,use_alpha:,dpr:,ES:,TIGAR_dir:,thread:,out_dir:,sub_dir:,out_prefix:,out_weight_file:,out_info_file:,log_file:,job_suf: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -73,6 +73,7 @@ do
         --sub_dir|-sub_dir) sub_dir=$2; shift 2;;
         --out_weight_file|-out_weight_file) out_weight_file=$2; shift 2;;
         --out_info_file|-out_info_file) out_info_file=$2; shift 2;;
+        --out_prefix|-out_prefix) out_prefix=$2; shift 2;;
         --log_file|-log_file) log_file=$2; shift 2;;
         --job_suf|-job_suf) job_suf=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
@@ -105,7 +106,7 @@ sub_dir=${sub_dir:-1}
 
 # used to differentiate intermmediate file folders when sub_dir!=1
 # script deletes DPR_Files_, CV_Files_ directories by default; job_suf prevents issues with deleting a directory used by simultaneous jobs
-job_suf=${job_suf:-"_"}
+job_suf=${job_suf:-"_CHR"${chr}}
 
 
 #### Create output directory if not existed
@@ -119,19 +120,19 @@ if [ ! -x "$(command -v tabix)" ]; then
 fi
 
 # Check gene expression file
-if [ ! -f "${gene_exp}" ] ; then
+if [ ! -f "${gene_exp}" ]; then
     echo Error: Gene expression file ${gene_exp} does not exist or is empty. >&2
     exit 1
 fi
 
 # Check training sample ID file
-if [ ! -f "${train_sampleID}" ] ; then
+if [ ! -f "${train_sampleID}" ]; then
     echo Error: Training sample ID file ${train_sampleID} does not exist or is empty. >&2
     exit 1
 fi
 
 # Check genotype file 
-if [ ! -f "${genofile}" ] ; then
+if [ ! -f "${genofile}" ]; then
     echo Error: Training genotype file ${genofile} does not exist or is empty. >&2
     exit 1
 fi
@@ -156,9 +157,10 @@ if [[ "$model"x == "elastic_net"x ]];then
         out_sub_dir=${out_dir}
     fi
 
-    out_weight_file=${out_weight_file:-CHR${chr}_EN_train_eQTLweights.txt}
-    out_info_file=${out_info_file:-CHR${chr}_EN_train_GeneInfo.txt}
-    log_file=${log_file:-CHR${chr}_EN_train_log.txt}
+    out_prefix=${out_prefix:-CHR${chr}_EN_train}
+    out_weight_file=${out_weight_file:-${out_prefix}_eQTLweights.txt}
+    out_info_file=${out_info_file:-${out_prefix}_GeneInfo.txt}
+    log_file=${log_file:-${out_prefix}_log.txt}
 
     mkdir -p ${out_sub_dir}
 
@@ -196,9 +198,10 @@ elif [[ "$model"x == "DPR"x ]]; then
         out_sub_dir=${out_dir}
     fi
 
-    out_weight_file=${out_weight_file:-CHR${chr}_DPR_train_eQTLweights.txt}
-    out_info_file=${out_info_file:-CHR${chr}_DPR_train_GeneInfo.txt}
-    log_file=${log_file:-CHR${chr}_DPR_train_log.txt}
+    out_prefix=${out_prefix:-CHR${chr}_DPR_train}
+    out_weight_file=${out_weight_file:-${out_prefix}_eQTLweights.txt}
+    out_info_file=${out_info_file:-${out_prefix}_GeneInfo.txt}
+    log_file=${log_file:-${out_prefix}_log.txt}
 
     ### Store DPR Results
     mkdir -p ${out_sub_dir}
@@ -288,6 +291,3 @@ else
     exit 1
 fi
 
-
-
-exit
