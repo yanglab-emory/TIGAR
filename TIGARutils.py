@@ -265,6 +265,8 @@ def sampleid_startup(chrm=None, genofile_type=None, data_format=None, sampleid_p
 	if not sampleID.size:
 		raise SystemExit('There are no overlapped sample IDs in the input files.')
 
+	print('Running job for ' + str(sampleID.size) + ' matched sampleIDs.')
+
 	## return values
 	return_lst = [sampleID, sampleID.size]
 
