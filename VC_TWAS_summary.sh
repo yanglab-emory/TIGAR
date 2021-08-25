@@ -116,9 +116,6 @@ python ${TIGAR_dir}/VC_TWAS/VC_TWAS_summary.py \
 --out_dir ${out_sub_dir} \
 > ${out_dir}/logs/${log_file}
 
-# > ${out_dir}/VC_TWAS_summary_CHR${chr}/CHR${chr}_sum_VC_TWAS_Log.txt
-    
-# rm -f ${out_dir}/Pred_CHR${chr}/test_geno_colnames.txt
 
-echo "Completed TWAS."
+echo "Completed VC-TWAS."
 
