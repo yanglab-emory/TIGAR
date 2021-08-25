@@ -104,11 +104,6 @@ format=${format:-"GT"}
 # sub_dir: whether to use subdirectory inside out_dir for output files
 sub_dir=${sub_dir:-1}
 
-# used to differentiate intermmediate file folders when sub_dir!=1
-# script deletes DPR_Files_, CV_Files_ directories by default; job_suf prevents issues with deleting a directory used by simultaneous jobs
-job_suf=${job_suf:-"_CHR"${chr}}
-
-
 #### Create output directory if not existed
 mkdir -p ${out_dir}
 mkdir -p ${out_dir}/logs
@@ -190,6 +185,10 @@ if [[ "$model"x == "elastic_net"x ]];then
 
 elif [[ "$model"x == "DPR"x ]]; then
     echo "Training gene expression imputation models using Nonparametric Bayesian DPR method..."
+
+    # used to differentiate intermmediate file folders when sub_dir!=1
+    # script deletes DPR_Files_, CV_Files_ directories by default; job_suf prevents issues with deleting a directory used by simultaneous jobs
+    job_suf=${job_suf:-"_CHR"${chr}}
 
     # sub directory in out directory
     if [[ "$sub_dir"x == "1"x ]];then

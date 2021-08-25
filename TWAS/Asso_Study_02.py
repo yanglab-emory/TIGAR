@@ -181,7 +181,7 @@ def thread_process(num):
 	Zscore = Zscore[np.any(Zscore[['snpID','snpIDflip']].isin(snp_overlap), axis=1)].reset_index(drop=True)	
 
 	# if not in Weight.snpIDs, assumed flipped; if flipped, flip Zscore sign
-	flip = np.where(Zscore.snpID.isin(Weight.snpID), 1, -1)
+	flip = np.where(Zscore.snpID.isin(Weight.snpID.values), 1, -1)
 
 	if not np.all(flip == 1):
 		Zscore['snpID'] = np.where(flip == 1, Zscore.snpID, Zscore.snpIDflip)

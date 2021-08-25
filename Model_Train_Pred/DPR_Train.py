@@ -205,7 +205,7 @@ def do_cv(target, Bimbam_df, Pheno_df, BimbamC_df, PhenoC_df, cv_train_test_id, 
 			k_fold_R2.append(cv_rsquared)
 
 		except subprocess.CalledProcessError as err:
-			print('DPR failed in CV' + str(i+1) + ' for TargetID: ' + target)
+			print('DPR failed in CV' + str(i+1))
 			k_fold_R2.append(0)
 
 	avg_r2_cv = sum(k_fold_R2) / k_folds
@@ -375,7 +375,7 @@ def thread_process(num):
 		DPR_Out = prep_call_dpr(Bimbam, Pheno, dpr_file_dir, target)
 
 	except subprocess.CalledProcessError as err:
-		print('DPR failed for TargetID: ' + target + '\n')
+		print('DPR failed for target.\n')
 		return None
 
 	# FILTER FOR SNPS WITH ES!=0
