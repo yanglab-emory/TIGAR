@@ -98,6 +98,8 @@ else:
 
 out_pred_path = args.out_dir + '/' + args.out_pred_file
 
+do_maf_diff = 0 if not args.maf_diff else 1
+
 ###############################################################
 # Print input arguments
 print(
@@ -112,13 +114,15 @@ Genotype file used for prediction is type: {genofile_type}
 Genotype data format: {data_format}
 Gene prediction region SNP inclusion window: +-{window}
 Excluding SNPs if missing rate exceeds: {missing_rate}
-Excluding SNPs matched between eQTL weight file and prediction genotype file if MAF difference exceeds: |{maf_diff}|
+{maf_diff_str1}xcluding SNPs matched between eQTL weight file and training genotype file {maf_diff_str2}
 Number of threads: {thread}
 Output directory: {out_dir}
 Output prediction results file: {out_path}
 ********************************'''.format(
 	**args.__dict__,
-	out_path = out_pred_path))
+	out_path = out_pred_path,
+	maf_diff_str1 = {0:'Not e', 1:'E'}[do_maf_diff],
+	maf_diff_str2 = {0:'by MAF difference.', 1:'if MAF difference exceeds: |' + str(args.maf_diff) + '|'}[do_maf_diff]))
 
 # tg.print_args(args)
 
@@ -132,7 +136,10 @@ print('Reading gene annotation file.')
 Gene, TargetID, n_targets = tg.read_gene_annot_exp(**args.__dict__)
 
 # get weight file info
-weight_info = tg.weight_file_info(add_cols=['MAF'], **args.__dict__)
+if do_maf_diff:
+	weight_info = tg.weight_file_info(add_cols=['MAF'], **args.__dict__)
+else:
+	weight_info = tg.weight_file_info(**args.__dict__)
 
 print('Creating output file: ' + out_pred_path + '\n')
 out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName', *sampleID]
@@ -164,8 +171,12 @@ def thread_process(num):
 		return None
 
 	print('Getting weight data for target.')
-	Weight = tg.read_tabix(start, end, target=target, **weight_info)[['snpID','ES','MAF']]
-	# Weight = Weight[['snpID', 'ES', 'MAF']]
+	Weight = tg.read_tabix(start, end, target=target, **weight_info)
+
+	if do_maf_diff:
+		Weight = Weight[['snpID', 'ES', 'MAF']]
+	else:
+		Weight = Weight[['snpID', 'ES']]
 
 	# tabix genotype file
 	print('Reading genotype data.')
@@ -217,13 +228,14 @@ def thread_process(num):
 		right_on='snpID', 
 		how='inner')
 
-	Pred['diff'] = np.abs(Pred['MAF'].astype('float') - Pred['MAF_test'].astype('float'))
-	
-	Pred = Pred[Pred['diff'] <= args.maf_diff].drop(columns=['MAF','MAF_test','diff']).reset_index(drop=True)
+	if do_maf_diff:
+		Pred['diff'] = np.abs(Pred['MAF'].astype('float') - Pred['MAF_test'].astype('float'))
+		
+		Pred = Pred[Pred['diff'] <= args.maf_diff].drop(columns=['MAF','MAF_test','diff']).reset_index(drop=True)
 
-	if Pred.empty:
-		print('All SNP MAFs for training data and testing data differ by a magnitude greater than ' + str(args.maf_diff) + ' for TargetID: ' + target + '\n')
-		return None
+		if Pred.empty:
+			print('All SNP MAFs for training data and testing data differ by a magnitude greater than |' + str(args.maf_diff) + '| for target.\n')
+			return None
 
 	print('Predicting GReX.\nN SNPs=' + str(Pred.snpID.size))
 
