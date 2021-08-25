@@ -21,7 +21,7 @@
 
 #######################################################################
 VARS=`getopt -o "" -a -l \
-chr:,weight:,gene_anno:,genofile_type:,genofile:,test_sampleID:,format:,window:,missing_rate:,maf_diff:,TIGAR_dir:,thread:,sub_dir:,out_pred_file:,log_file:,out_dir: \
+chr:,weight:,gene_anno:,genofile_type:,genofile:,test_sampleID:,format:,window:,missing_rate:,maf_diff:,TIGAR_dir:,thread:,sub_dir:,out_pred_file:,out_prefix:,log_file:,out_dir: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -48,6 +48,7 @@ do
         --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
         --thread|-thread) thread=$2; shift 2;;
         --sub_dir|-sub_dir) sub_dir=$2; shift 2;;
+        --out_prefix|-out_prefix) out_prefix=$2; shift 2;;
         --out_pred_file|-out_pred_file) out_pred_file=$2; shift 2;;
         --log_file|-log_file) log_file=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
@@ -61,8 +62,10 @@ window=${window:-$((10**6))}
 missing_rate=${missing_rate:-0.2}
 maf_diff=${maf_diff:-0.2}
 thread=${thread:-1}
-out_pred_file=${out_pred_file:-CHR${chr}_Pred_GReX}.txt
-log_file=${log_file:-CHR${chr}_Pred_log.txt}
+
+out_prefix=${out_prefix:-CHR${chr}_Pred}
+out_pred_file=${out_pred_file:-${out_prefix}_GReX.txt}
+log_file=${log_file:-${out_prefix}_log.txt}
 
 # sub_dir: whether to use subdirectory inside out_dir for output files
 sub_dir=${sub_dir:-1}
