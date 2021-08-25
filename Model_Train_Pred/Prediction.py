@@ -191,7 +191,7 @@ def thread_process(num):
 	Geno = Geno[np.any(Geno[['snpID','snpIDflip']].isin(snp_overlap), axis=1)].reset_index(drop=True)
 
 	# if not in Weight.snpIDs, assumed flipped; if flipped, 1 - MAF
-	flip = np.where(Geno.snpID.isin(Weight.snpID), True, False)
+	flip = np.where(Geno.snpID.isin(Weight.snpID.values), True, False)
 
 	if not np.all(flip):
 		# set correct snpID, MAF

@@ -260,10 +260,12 @@ def sampleid_startup(chrm=None, genofile_type=None, data_format=None, sampleid_p
 
 	## match sampleids between files
 	print('Matching sampleIDs.\n')
-	sampleID = functools.reduce(np.intersect1d, tuple(sampleid_lst))
+	sampleID = np.array(functools.reduce(np.intersect1d, tuple(sampleid_lst)))
 
 	if not sampleID.size:
 		raise SystemExit('There are no overlapped sample IDs in the input files.')
+
+	print('Running job for ' + str(sampleID.size) + ' matched sampleIDs.')
 
 	## return values
 	return_lst = [sampleID, sampleID.size]
@@ -315,7 +317,7 @@ def zscore_file_info(z_path, chrm, **kwargs):
 
 
 # read in annotation file or gene expression file
-def read_gene_annot_exp(chrm=None, geneexp_path=None, annot_path=None, cols=['CHROM','GeneStart','GeneEnd','TargetID','GeneName'], col_inds=['CHROM','GeneStart','GeneEnd','TargetID','GeneName'], dtype={'CHROM':object,'GeneStart':np.int64,'GeneEnd':np.int64,'TargetID':object,'GeneName':object}, **kwargs):
+def read_gene_annot_exp(chrm=None, geneexp_path=None, annot_path=None, cols=['CHROM','GeneStart','GeneEnd','TargetID','GeneName'], col_inds=[0,1,2,3,4], dtype={'CHROM':object,'GeneStart':np.int64,'GeneEnd':np.int64,'TargetID':object,'GeneName':object}, **kwargs):
 
 	# set the path
 	path = geneexp_path if geneexp_path is not None else annot_path
@@ -327,7 +329,7 @@ def read_gene_annot_exp(chrm=None, geneexp_path=None, annot_path=None, cols=['CH
 				sep='\t', 
 				iterator=True, 
 				chunksize=10000,
-				usecols=col_inds,
+				usecols=cols,
 				dtype=dtype)
 			Gene = pd.concat([x[x['CHROM']==chrm] for x in Gene_chunks]).reset_index(drop=True)
 		except:
@@ -335,11 +337,10 @@ def read_gene_annot_exp(chrm=None, geneexp_path=None, annot_path=None, cols=['CH
 				path, 
 				sep='\t', 
 				iterator=True, 
-				header=None,
 				chunksize=10000,
-				usecols=col_inds)
-			Gene = pd.concat([x[x[0]==chrm] for x in Gene_chunks]).reset_index(drop=True).astype(dtype)
-			Gene.columns = [cols[i] for i in Gene.columns]
+				usecols=cols)
+			Gene = pd.concat([x[x['CHROM']==chrm] for x in Gene_chunks]).reset_index(drop=True).astype(dtype)
+			# Gene.columns = [cols[i] for i in Gene.columns]
 
 		if Gene.empty:
 			raise SystemExit('There are no valid gene expression/annotation data for chromosome ' + chrm + '.\n')
@@ -348,16 +349,15 @@ def read_gene_annot_exp(chrm=None, geneexp_path=None, annot_path=None, cols=['CH
 			Gene = pd.read_csv(
 				path, 
 				sep='\t', 
-				usecols=col_inds,
+				usecols=cols,
 				dtype=dtype)
 		except:
 			Gene = pd.read_csv(
 				path, 
 				sep='\t', 
 				header=None,
-				usecols=col_inds)
-
-			Gene.columns = [cols[i] for i in Gene.columns]
+				usecols=cols).reset_index(drop=True).astype(dtype)
+			# Gene.columns = [cols[i] for i in Gene.columns]
 
 	Gene = optimize_cols(Gene)
 
@@ -369,12 +369,12 @@ def read_gene_annot_exp(chrm=None, geneexp_path=None, annot_path=None, cols=['CH
 
 ## line filter functions for read_tabix
 
-def filter_vcf_line(line: bytes, bformat, col_inds, split_multi=True):
+def filter_vcf_line(line: bytes, bformat, col_inds, split_multi_GT):
 	# split line into list
 	row = line.split(b'\t')
 	# get index of data format
 	data_fmts = row[8].split(b':')
-	# may be multiallelic; only first alt allele will be used unless split_multi; later data with bad values will be filtered out
+	# may be multiallelic; only first alt allele will be used unless split_multi_GT; later data with bad values will be filtered out
 	alt_alleles = row[4].split(b',')
 	row[4] = alt_alleles[0]
 	# filter sample columns to include only data in desired format; sampleIDs start at file column index 9; in new row sampleIDs now start at 4, ALT is column 3
@@ -385,7 +385,7 @@ def filter_vcf_line(line: bytes, bformat, col_inds, split_multi=True):
 	else:
 		row = [row[x] for x in col_inds]
 	# turn multi-allelic lines into multiple biallelic lines
-	if split_multi & (len(alt_alleles) > 1):
+	if split_multi_GT & (len(alt_alleles) > 1):
 		sample_str = b'\t'.join(row[4:])
 		line = bytearray()
 		for j in range(1, len(alt_alleles) + 1):
@@ -427,7 +427,7 @@ def filter_other_line(line: bytes, col_inds):
 	return line
 
 
-def read_tabix(start, end, sampleID, chrm, path, file_cols, col_inds, cols, dtype, genofile_type=None, data_format=None, target_ind=5, target=None, weight_threshold=0, **kwargs):
+def read_tabix(start, end, sampleID, chrm, path, file_cols, col_inds, cols, dtype, genofile_type=None, data_format=None, target_ind=5, target=None, weight_threshold=0, raise_error=True, **kwargs):
 
 	# subprocess command
 	command_str = ' '.join(['tabix', path, chrm + ':' + start + '-' + end])
@@ -444,7 +444,7 @@ def read_tabix(start, end, sampleID, chrm, path, file_cols, col_inds, cols, dtyp
 	# set correct filter function by file type
 	if genofile_type == 'vcf':
 		bformat = str.encode(data_format)
-		filter_line = functools.partial(filter_vcf_line, bformat=bformat, col_inds=col_inds)
+		filter_line = functools.partial(filter_vcf_line, bformat=bformat, col_inds=col_inds, split_multi_GT=data_format == 'GT')
 	elif genofile_type == 'weight':
 		btarget = str.encode(target)
 		filter_line = functools.partial(filter_weight_line, btarget=btarget, target_ind=target_ind, col_inds=col_inds)
@@ -461,7 +461,7 @@ def read_tabix(start, end, sampleID, chrm, path, file_cols, col_inds, cols, dtyp
 	for line in proc.stdout:
 		proc_out += filter_line(line)
 
-	if not proc_out:
+	if not proc_out and raise_error:
 		print('No tabix data for target.\n')
 		raise NoTargetDataError
 
@@ -473,6 +473,10 @@ def read_tabix(start, end, sampleID, chrm, path, file_cols, col_inds, cols, dtyp
 		header=None,
 		names=cols,
 		dtype=dtype)
+
+	# filter out rows where all sampleID values are nan
+	if len(sampleID):
+		df = df[df[sampleID].count(axis=1) != 0].reset_index(drop=True)
 
 	df = optimize_cols(df)
 
@@ -495,7 +499,7 @@ def read_tabix(start, end, sampleID, chrm, path, file_cols, col_inds, cols, dtyp
 			# filter out weights below threshold
 			df = df[operator.gt(np.abs(df['ES']), weight_threshold)].reset_index(drop=True)
 
-			if df.empty:
+			if df.empty and raise_error:
 				print('No test SNPs with cis-eQTL weights with magnitude that exceeds specified weight threshold for TargetID: ' + target + '.\n')
 				raise NoTargetDataError
 
@@ -509,7 +513,7 @@ def read_tabix(start, end, sampleID, chrm, path, file_cols, col_inds, cols, dtyp
 	if (data_format == 'GT') or (data_format == 'DS'):
 		df = reformat_sample_vals(df, data_format, sampleID)
 
-	if df.empty:
+	if df.empty and raise_error:
 		print('No valid tabix data for target.\n')
 		raise NoTargetDataError
 
@@ -745,10 +749,10 @@ def get_cols_dtype(file_cols, cols, sampleid=None, genofile_type=None, add_cols=
 	
 	return col_inds, out_dtype_dict
 
-def exp_cols_dtype(file_cols, sampleid, ret_dict=True, **kwargs):
+def exp_cols_dtype(file_cols, sampleid, ind_namekey=True, ret_dict=True, **kwargs):
 	return get_cols_dtype(file_cols, 
 		cols=['CHROM', 'GeneStart', 'GeneEnd', 'TargetID', 'GeneName'], 
-		sampleid=sampleid, ret_dict=ret_dict)
+		sampleid=sampleid, ind_namekey=ind_namekey, ret_dict=ret_dict)
 
 def genofile_cols_dtype(file_cols, genofile_type, sampleid, ind_namekey=True, ret_dict=True, **kwargs):
 	return get_cols_dtype(file_cols, 
