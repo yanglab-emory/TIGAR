@@ -55,6 +55,9 @@ parser.add_argument('--thread',type=int)
 # Output dir
 parser.add_argument('--out_dir', type=str)
 
+# output file
+parser.add_argument('--out_twas_file', type=str)
+
 args = parser.parse_args()
 
 sys.path.append(args.TIGAR_dir)
@@ -93,7 +96,9 @@ def get_burden_zscore(test_stat, get_zscore_args):
 
 #############################################################
 # Print input arguments to log
-out_twas_path = args.out_dir + '/CHR' + args.chrm + '_sumstat_assoc.txt'
+# out_twas_path = args.out_dir + '/CHR' + args.chrm + '_sumstat_assoc.txt'
+
+out_twas_path = args.out_dir + '/' + args.out_twas_file
 
 print(
 '''********************************

@@ -28,7 +28,7 @@
 
 ###############################################################
 VARS=`getopt -o "" -a -l \
-asso:,gene_exp:,gene_anno:,PED:,PED_info:,method:,Zscore:,weight:,LD:,chr:,window:,TIGAR_dir:,thread:,weight_threshold:,sub_dir:,out_dir:,sampleID:,test_stat:,test_sampleID: \
+asso:,gene_exp:,gene_anno:,PED:,PED_info:,method:,Zscore:,weight:,LD:,chr:,window:,TIGAR_dir:,thread:,weight_threshold:,sub_dir:,out_twas_file:,out_prefix:,log_file:,out_dir:,sampleID:,test_stat:,test_sampleID: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -60,6 +60,9 @@ do
         --sampleID|-sampleID) sampleID=$2; shift 2;;
         --test_sampleID|-test_sampleID) test_sampleID=$2; shift 2;;
         --sub_dir|-sub_dir) sub_dir=$2; shift 2;;
+        --out_prefix|-out_prefix) out_prefix=$2; shift 2;;
+        --out_twas_file|-out_twas_file) out_twas_file=$2; shift 2;;
+        --log_file|-log_file) log_file=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
         --) shift;break;;
         *) echo "Internal error!";exit 1;;
@@ -90,6 +93,10 @@ mkdir -p ${out_sub_dir}
 
 if [[ "$asso"x == "1"x ]];then
     echo "Conducting TWAS using individual-level GReX and phenotype data ... "
+
+    out_prefix=${out_prefix:-indv_${method}_TWAS}
+    out_twas_file=${out_twas_file:-${out_prefix}_assoc.txt}
+    log_file=${log_file:-${out_prefix}_log.txt}
 
     # Check gene expression file
     if [ ! -f "${gene_exp}" ] ; then
@@ -122,10 +129,15 @@ if [[ "$asso"x == "1"x ]];then
     --thread ${thread} \
     --TIGAR_dir ${TIGAR_dir} \
     --out_dir ${out_sub_dir} \
-    > ${out_dir}/logs/indv_${method}_TWAS_log.txt
+    --out_twas_file ${out_twas_file} \
+    > ${out_sub_dir}/logs/${log_file}
 
 elif [[ "$asso"x == "2"x ]];then
     echo "Conducting TWAS using summary-level GWAS Z-score statistics and reference LD covariance file ... "
+
+    out_prefix=${out_prefix:-CHR${chr}_sumstat_TWAS}
+    out_twas_file=${out_twas_file:-${out_prefix}_assoc.txt}
+    log_file=${log_file:-${out_prefix}_log.txt}
 
     # Check gene_annotation file
     if [ ! -f "${gene_anno}" ] ; then
@@ -149,11 +161,6 @@ elif [[ "$asso"x == "2"x ]];then
     if [ ! -f "${weight}" ] ; then
         echo Error: Gene expression file ${weight} does not exist or is empty. >&2
         exit 1
-    # else
-    #     head -n1 ${weight} > ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
-    #     tail -n+2 ${weight} | sort -nk1 -nk2  >> ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
-    #     bgzip -f ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt
-    #     tabix -f -b 2 -e 2 -S 1  ${out_dir}/TWAS_CHR${chr}/temp_CHR${chr}.weight.txt.gz
     fi
 
     if [[ ! -x  ${TIGAR_dir}/TWAS/Asso_Study_02.py ]] ; then
@@ -173,9 +180,9 @@ elif [[ "$asso"x == "2"x ]];then
     --test_stat ${test_stat} \
     --out_dir ${out_sub_dir} \
     --TIGAR_dir ${TIGAR_dir} \
-    > ${out_dir}/logs/CHR${chr}_TWAS_log.txt
+    --out_twas_file ${out_twas_file} \
+    > ${out_sub_dir}/logs/${log_file}
 
-    rm -f ${out_dir}/TWAS_CHR${chr}/temp* 
 
 fi
 

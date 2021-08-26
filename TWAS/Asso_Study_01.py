@@ -45,6 +45,10 @@ parser.add_argument('--thread' ,type=int)
 # output dir
 parser.add_argument('--out_dir' ,type=str)
 
+# output file
+parser.add_argument('--out_twas_file' ,type=str)
+
+
 args = parser.parse_args()
 
 sys.path.append(args.TIGAR_dir)
@@ -92,7 +96,8 @@ def regression_multi(X,Y,Annot_df: pd.DataFrame):
 
 ###########################################################
 # Print input arguments
-out_twas_path = args.out_dir + '/indv_' + args.method + '_assoc.txt'
+# out_twas_path = args.out_dir + '/indv_' + args.method + '_assoc.txt'
+out_twas_path = args.out_dir + '/' + args.out_twas_file
 
 print(
 '''********************************
