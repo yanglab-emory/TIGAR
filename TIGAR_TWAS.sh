@@ -130,7 +130,7 @@ if [[ "$asso"x == "1"x ]];then
     --TIGAR_dir ${TIGAR_dir} \
     --out_dir ${out_sub_dir} \
     --out_twas_file ${out_twas_file} \
-    > ${out_sub_dir}/logs/${log_file}
+    > ${out_dir}/logs/${log_file}
 
 elif [[ "$asso"x == "2"x ]];then
     echo "Conducting TWAS using summary-level GWAS Z-score statistics and reference LD covariance file ... "
@@ -181,7 +181,7 @@ elif [[ "$asso"x == "2"x ]];then
     --out_dir ${out_sub_dir} \
     --TIGAR_dir ${TIGAR_dir} \
     --out_twas_file ${out_twas_file} \
-    > ${out_sub_dir}/logs/${log_file}
+    > ${out_dir}/logs/${log_file}
 
 
 fi
