@@ -274,11 +274,15 @@ temp=${out_sub_dir}/temp_${out_weight_file}
 weight=${out_sub_dir}/${out_weight_file}
 
 echo "Sort/bgzip/tabix-ing output weight file."
-head -n1 ${temp} > ${weight}
+head -n1 ${temp} > ${weight} ; 
 
+# attempt sorting in default directory, if that fails try out_sub_dir
 tail -n+2 ${temp} | \
 sort -nk1 -nk2 >> ${weight} && \
-rm ${temp}
+rm ${temp} || \
+( tail -n+2 ${temp} | \
+sort -T ${out_sub_dir} -nk1 -nk2 >> ${weight} && \
+rm ${temp} )
 
 if [ ! -f "${temp}" ] ; then
     echo "Sort successful. Bgzip/tabix-ing."
@@ -287,6 +291,5 @@ if [ ! -f "${temp}" ] ; then
 
 else
     echo "Sort failed; Unable to bgzip/tabix output weights file."
-    exit 1
 fi
 
