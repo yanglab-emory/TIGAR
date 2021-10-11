@@ -71,10 +71,12 @@ parser.add_argument('--out_twas_file', type=str)
 args = parser.parse_args()
 
 sys.path.append(args.TIGAR_dir)
-
+sys.path.append(args.TIGAR_dir + '/TWAS')
 ###############################################################
 ## Import TIGAR functions, define other functions
 import TIGARutils as tg
+
+# from Asso_Study_02 import get_pval, get_V_cor, get_z_denom, get_spred_zscore, get_fusion_zscore, get_burden_zscore
 
 def get_pval(z): return np.format_float_scientific(1-chi2.cdf(z**2, 1), precision=15, exp_digits=0)
 
@@ -175,36 +177,57 @@ def read_bgw_weight(w_path, weight_threshold=0, **kwargs):
 	return Weight
 
 
-def read_bgw_zscore(num, w_df_info, snpIDs, **kwargs):
-	chrm = w_df_info['CHROM'][num]
-	start = w_df_info['min'][num]
-	end = w_df_info['max'][num]
+def read_bgw_zscore(chrm, snp_ids, **kwargs):
 
 	z_path = args.z_path_pre + chrm + args.z_path_suf
 	zscore_info = tg.zscore_file_info(z_path, chrm)
 
-	Zscore = tg.read_tabix(start, end, **zscore_info)
+	# Zscore = tg.read_tabix(start, end, **zscore_info)
+
+	# get region strings
+	regs_lst = list(tg.get_ld_regions_list(snp_ids))
+	N = len(regs_lst)
+
+	# get function for filtering line
+	filter_line = functools.partial(tg.filter_other_line, col_inds=zscore_info['col_inds'])
+
+	# read in specific snps
+	try:
+		regs_str = ' '.join(regs_lst)
+		proc_out = tg.call_tabix_regions(z_path, regs_str, filter_line = filter_line)
+
+	except OSError:
+		# argument may be too long for OS; if so try subset instead of getting all regions at once
+		# print('Subseting regions to tabix.')
+		n = 2500
+		while n:
+			try: 
+				regs_str_lst = [' '.join(regs_lst[i:i+n]) for i in range(0, N, n)]
+				proc_out = b''.join([tg.call_tabix_regions(z_path, regs_str, filter_line = filter_line) for regs_str in regs_str_lst])
+			except OSError:
+				n -= 500
+				pass
+			else:
+				n = 0
+
+	# read data into dataframe
+	Zscore = pd.read_csv(
+		StringIO(proc_out.decode('utf-8')),
+		sep='\t',
+		low_memory=False,
+		header=None,
+		names=zscore_info['cols'],
+		dtype=zscore_info['dtype'])
+
+	Zscore = tg.optimize_cols(Zscore)
+
+	# get snpIDs
+	Zscore['snpID'] = tg.get_snpIDs(Zscore)
+	Zscore = Zscore.drop_duplicates(['snpID'], keep='first').reset_index(drop=True)
 	Zscore['snpIDflip'] = tg.get_snpIDs(Zscore, flip=True)
 
-	snp_overlap = np.intersect1d(snpIDs, Zscore[['snpID','snpIDflip']])
-
-	if not snp_overlap.size:
-		return None
-
-	# filter out non-matching snpID rows
-	Zscore = Zscore[np.any(Zscore[['snpID','snpIDflip']].isin(snp_overlap), axis=1)].reset_index(drop=True)
-
-	# if not in snpIDs, assumed flipped; if flipped, flip Zscore sign
-	flip = np.where(Zscore.snpID.isin(snpIDs.values), 1, -1)
-
-	if not np.all(flip == 1):
-		Zscore['snpID'] = np.where(flip == 1, Zscore.snpID, Zscore.snpIDflip)
-		Zscore['Zscore'] = flip * Zscore['Zscore']
-
-	# drop unneeded columns
-	Zscore = Zscore.drop(columns=['CHROM','POS','REF','ALT','snpIDflip'])
-
 	return Zscore
+
 
 def get_chrm_ld_data(chrm, snp_ids, ld_path_pre, ld_path_suf, **kwargs):
 	ld_path = ld_path_pre + chrm + ld_path_suf
@@ -213,6 +236,35 @@ def get_chrm_ld_data(chrm, snp_ids, ld_path_pre, ld_path_suf, **kwargs):
 	return MCOV
 
 
+def get_multi_chrm_ld_matrix(MCOV, return_diag=False):
+	MCOV = MCOV.copy()
+	
+	MCOV['COV'] =  MCOV['COV'].apply(lambda x:np.fromstring(x, dtype=np.float32, sep=','))
+
+	inds = MCOV.index
+	r_inds = MCOV.row
+	n_inds = inds.size
+	V_upper = np.zeros((n_inds, n_inds))
+	
+	for i in range(n_inds):
+		cov_i = MCOV.COV.loc[inds[i]]
+		N = cov_i.size
+		
+		for j in range(i,n_inds):
+			if (MCOV.CHROM[i] == MCOV.CHROM[j]) and (r_inds[j] - r_inds[i] < N):
+				V_upper[i,j] = cov_i[(r_inds[j] - r_inds[i])]
+			else:
+				V_upper[i,j] = 0
+
+	snp_Var = V_upper.diagonal()
+	V = V_upper + V_upper.T - np.diag(snp_Var)
+	snp_sd = np.sqrt(snp_Var)
+
+	if return_diag:
+		return snp_sd, V, snp_Var
+
+	else:
+		return snp_sd, V
 
 #############################################################
 # Print input arguments to log
@@ -225,9 +277,8 @@ print(
 Input Arguments
 Gene annotation file specifying genes for TWAS: {annot_path}
 cis-eQTL weight file: {w_path_pre}[target]{w_path_suf}
-GWAS summary statistics Z-score file: {z_path}
+GWAS summary statistics Z-score file: {z_path_pre}[CHRM]{z_path_suf}
 Reference LD genotype covariance file: {ld_path_pre}[CHRM]{ld_path_suf}
-Gene training region SNP inclusion window: +-{window}
 SNP weight inclusion threshold: {weight_threshold}
 Test statistic to use: {test_stat_str}
 Number of threads: {thread}
@@ -247,9 +298,6 @@ print('Reading gene annotation file.')
 Gene, TargetID, n_targets = tg.read_gene_annot_exp(**args.__dict__)
 
 # read in headers for Weight and Zscore files; get the indices and dtypes for reading files into pandas
-print('Reading file headers.\n')
-# weight_info = tg.weight_file_info(**args.__dict__)
-# zscore_info = tg.zscore_file_info(**args.__dict__)
 
 # PREP OUTPUT - print output headers to files
 print('Creating file: ' + out_twas_path + '\n')
@@ -282,7 +330,27 @@ def thread_process(num):
 	w_df_info = Weight.groupby('CHROM')['POS'].agg(['min','max']).reset_index().astype(str)
 
 	# read in Zscore files
-	Zscore = pd.concat([read_bgw_zscore(num, w_df_info, Weight.snpID) for num in range(w_df_info.shape[0])]).reset_index(drop=True)
+	Zscore = pd.concat([read_bgw_zscore(str(chrm), Weight[Weight.CHROM == chrm].snpID.values) for chrm in np.unique(Weight.CHROM)]).reset_index(drop=True)
+
+	snp_overlap = np.intersect1d(Weight.snpID, Zscore[['snpID','snpIDflip']])
+
+	if not snp_overlap.size:
+		print('No overlapping test SNPs that have magnitude of cis-eQTL weights greater than threshold value and with GWAS Zscore for TargetID: ' + target + '.\n')
+		return None
+
+	# filter out non-matching snpID rows
+	Weight = Weight[Weight.snpID.isin(snp_overlap)]
+	Zscore = Zscore[np.any(Zscore[['snpID','snpIDflip']].isin(snp_overlap), axis=1)].reset_index(drop=True)
+
+	# if not in Weight.snpIDs, assumed flipped; if flipped, flip Zscore sign
+	flip = np.where(Zscore.snpID.isin(Weight.snpID), 1, -1)
+
+	if not np.all(flip == 1):
+		Zscore['snpID'] = np.where(flip == 1, Zscore.snpID, Zscore.snpIDflip)
+		Zscore['Zscore'] = flip * Zscore['Zscore']
+
+	# drop unneeded columns
+	Zscore = Zscore.drop(columns=['CHROM','POS','REF','ALT','snpIDflip'])
 
 	# merge Zscore and Weight dataframes on snpIDs
 	ZW = Weight.merge(Zscore[['snpID','Zscore']], 
@@ -290,23 +358,15 @@ def thread_process(num):
 		right_on='snpID', 
 		how='inner')
 
-	# snp_search_ids = ZW.snpID.values
-
 	# Read in reference covariance matrix file by snpID
 	MCOV = pd.concat([get_chrm_ld_data(str(chrm), ZW[ZW.CHROM == chrm].snpID.values, **args.__dict__) for chrm in np.unique(ZW.CHROM)]).reset_index(drop=True)
 
-
-	
-
-	# Read in reference covariance matrix file by snpID
-	MCOV = tg.get_ld_data(args.ld_path, snp_search_ids)
-
 	if MCOV.empty:
-	  print('No reference covariance information for target SNPs for TargetID: ' + target + '\n')
-	  return None
+		print('No reference covariance information for target SNPs for TargetID: ' + target + '\n')
+		return None	
 
 	# get the snp variance and covariance matrix
-	snp_sd, V_cov = tg.get_ld_matrix(MCOV)
+	snp_sd, V_cov = get_multi_chrm_ld_matrix(MCOV)
 
 	ZW = ZW[ZW.snpID.isin(MCOV.snpID)]
 	n_snps = str(ZW.snpID.size)
@@ -318,7 +378,6 @@ def thread_process(num):
 	Result['n_snps'] = n_snps
 
 	### calculate zscore(s), pvalue(s)
-	# get_zscore_args = [V_cov, ZW, snp_sd]
 	get_zscore_args = [V_cov, ZW.ES.values, ZW.Zscore.values, snp_sd]
 
 	if args.test_stat == 'both':
