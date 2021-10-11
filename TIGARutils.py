@@ -99,86 +99,6 @@ def empty_df_handler(func):
 
 	return wrapper
 	
-# def sampleid_startup(chrm=None, genofile_type=None, data_format=None, sampleid_path=None, geno_path=None, geneexp_path=None, ped_path=None, **kwargs):
-
-# 	## read in sampleids file
-# 	# sampleid file
-# 	if (sampleid_path is not None):
-# 		print('Reading sampleID file.\n')
-# 		spec_sampleids = pd.read_csv(
-# 			sampleid_path,
-# 			sep='\t',
-# 			header=None)[0].drop_duplicates()
-# 	else: 
-# 		spec_sampleids = np.empty(shape=(0, 0))
-
-# 	# ped file
-# 	if (ped_path is not None):
-# 		ped_header = get_header(ped_path)
-# 		ped_sampleids = pd.read_csv(
-# 			ped_path, 
-# 			usecols=['IND_ID'],
-# 			sep='\t')['IND_ID'].drop_duplicates()
-# 	else:
-# 		ped_sampleids = np.empty(shape=(0, 0))
-
-# 	## read in file headers
-# 	print('Reading file headers.\n')
-
-# 	# genotype file
-# 	if (geno_path is not None):
-# 		try:
-# 			geno_cols = call_tabix_header(geno_path)
-# 		except: 
-# 			geno_cols = get_header(geno_path, zipped=True)
-# 		geno_sampleids_strt_ind = {'dosage': 5, 'vcf': 9}[genofile_type]
-# 		geno_sampleids = geno_cols[geno_sampleids_strt_ind:]
-# 	else:
-# 		geno_sampleids = np.empty(shape=(0, 0))
-
-# 	# gene expression file
-# 	if (geneexp_path is not None):
-# 		exp_cols = get_header(geneexp_path)
-# 		exp_sampleids = np.array(exp_cols[5:])
-# 	else:
-# 		exp_sampleids = np.empty(shape=(0, 0))
-
-# 	## get sampleIDs to use and output
-# 	print('Matching sampleIDs.\n')
-
-# 	# Output expression, genotype file info
-# 	if (spec_sampleids.size) and (geno_sampleids.size) and (exp_sampleids.size):
-# 		sampleID = functools.reduce(np.intersect1d, (exp_sampleids, geno_sampleids, spec_sampleids))
-# 		if not sampleID.size:
-# 			raise SystemExit('There are no overlapped sample IDs between the gene expression file, genotype file, and sampleID file.')
-
-# 		## columns to read-in
-# 		exp_info = {'path': geno_path, **exp_cols_dtype(exp_cols, sampleID)}
-# 		geno_info = {'path': geno_path, 'chrm': chrm, 'genofile_type': genofile_type, 'data_format': data_format, **genofile_cols_dtype(geno_cols, genofile_type, sampleID)}
-
-# 		return sampleID, sampleID.size, geno_info, exp_info
-
-# 	# Output genotype file info
-# 	elif (spec_sampleids.size) and (geno_sampleids.size):
-# 		sampleID = np.intersect1d(geno_sampleids, spec_sampleids)
-# 		if not sampleID.size:
-# 			raise SystemExit('There are no overlapped sample IDs between the genotype file and sampleID file.')
-
-# 		## columns to read-in
-# 		geno_info = {'path': geno_path, 'chrm': chrm, 'genofile_type': genofile_type, 'data_format': data_format, **genofile_cols_dtype(geno_cols, genofile_type, sampleID)}
-
-# 		return sampleID, sampleID.size, geno_info
-
-# 	# Output expression, PED file info
-# 	elif (ped_sampleids.size) and (exp_sampleids.size):
-# 		sampleID = np.intersect1d(exp_sampleids, ped_sampleids)
-# 		if not sampleID.size:
-# 			raise SystemExit('There are no overlapped sample IDs between the expression file and PED file.')
-
-# 		exp_info = {'path': geno_path, **exp_cols_dtype(exp_cols, sampleID)}
-
-# 		return sampleID, sampleID.size, exp_info, ped_header
-
 
 def ped_startup(ped_path, pedinfo_path):
 	Asso_Info = pd.read_csv(
@@ -299,7 +219,6 @@ def weight_file_info(w_path, chrm, weight_threshold=0, add_cols=[], drop_cols=['
 		'chrm': chrm, 
 		'sampleID': [], 
 		'target_ind': info_dict['file_cols'].index('TargetID'), 
-		'ES_ind': info_dict['file_cols'].index('ES'), 
 		'data_format': 'weight', 
 		'genofile_type': 'weight', 
 		'weight_threshold': weight_threshold,
@@ -408,6 +327,17 @@ def filter_vcf_line(line: bytes, bformat, col_inds, split_multi_GT):
 	return line
 
 def filter_weight_line(line: bytes, btarget: bytes, target_ind, col_inds):
+	# split line into list
+	row = line.split(b'\t')
+	# check if row is for correct target
+	if (row[target_ind].startswith(btarget)):
+		line = b'\t'.join([row[x] for x in col_inds])
+		line += b'' if line.endswith(b'\n') else b'\n'
+		return line
+	else: 
+		return b''
+
+def filter_bgw_weight_line(line: bytes, btarget: bytes, target_ind, col_inds):
 	# split line into list
 	row = line.split(b'\t')
 	# check if row is for correct target
@@ -759,6 +689,13 @@ def genofile_cols_dtype(file_cols, genofile_type, sampleid, ind_namekey=True, re
 		cols=['CHROM','POS','REF','ALT'],
 		sampleid=sampleid, genofile_type=genofile_type, 
 		ind_namekey=ind_namekey, ret_dict=ret_dict)
+
+
+def bgw_weight_cols_dtype(file_cols, add_cols=[], drop_cols=[], get_id=True, ret_dict=True, ind_namekey=True, **kwargs):
+	return get_cols_dtype(file_cols, 
+		cols=['CHROM','POS','REF','ALT','Trans','PCP','beta'], 
+		add_cols=add_cols, drop_cols=drop_cols, 
+		get_id=get_id, ret_dict=ret_dict, ind_namekey=ind_namekey)
 
 def weight_cols_dtype(file_cols, add_cols=[], drop_cols=[], get_id=True, ret_dict=True, ind_namekey=True, **kwargs):
 	return get_cols_dtype(file_cols, 
