@@ -3,6 +3,7 @@
 ###################################################################
 # Import packages needed
 import argparse
+import functools
 import multiprocessing
 import os
 import subprocess
@@ -28,7 +29,7 @@ parser = argparse.ArgumentParser(description='Asso Study 02')
 parser.add_argument('--TIGAR_dir', type=str)
 
 # Gene annotation file path
-parser.add_argument('--gene_anno', type=str, dest='annot_path')
+parser.add_argument('--gene_list', type=str, dest='annot_path')
 
 # # chromosome number
 # parser.add_argument('--chr', type=str, dest='chrm')
@@ -38,10 +39,10 @@ parser.add_argument('--weight_prefix', type=str, dest='w_path_pre')
 parser.add_argument('--weight_suffix', type=str, dest='w_path_suf')
 
 # GWAS Z score file path
-# parser.add_argument('--Zscore', type=str, dest='z_path')
+parser.add_argument('--Zscore', type=str, dest='z_path',default='')
 
-parser.add_argument('--Zscore_prefix', type=str, dest='z_path_pre')
-parser.add_argument('--Zscore_suffix', type=str, dest='z_path_suf')
+parser.add_argument('--Zscore_prefix', type=str, dest='z_path_pre',default='')
+parser.add_argument('--Zscore_suffix', type=str, dest='z_path_suf',default='')
 
 
 # Reference covariance file path
@@ -54,13 +55,13 @@ parser.add_argument('--LD_suffix', type=str, dest='ld_path_suf')
 # parser.add_argument('--window',type=float)
 
 # Weight threshold to include SNP in TWAS
-parser.add_argument('--weight_threshold',type=float)
+parser.add_argument('--weight_threshold',type=float, default=0)
 
 # specify 'FUSION', 'SPrediXcan', or 'both': Zscore test statistic to use
-parser.add_argument('--test_stat', type=str)
+parser.add_argument('--test_stat', type=str, default='both')
 
 # Number of threads
-parser.add_argument('--thread',type=int)
+parser.add_argument('--thread',type=int, default=1)
 
 # Output dir
 parser.add_argument('--out_dir', type=str)
@@ -176,16 +177,18 @@ def read_bgw_weight(w_path, weight_threshold=0, **kwargs):
 
 	return Weight
 
+def z_path(chrm):
+	return args.z_path_pre + str(chrm) + args.z_path_suf
 
-def read_bgw_zscore(chrm, snp_ids, **kwargs):
+def read_bgw_zscore(z_path, snp_ids, **kwargs):
 
-	z_path = args.z_path_pre + chrm + args.z_path_suf
-	zscore_info = tg.zscore_file_info(z_path, chrm)
+	# z_path = args.z_path_pre + chrm + args.z_path_suf
+	zscore_info = tg.zscore_file_info(z_path, '')
 
 	# Zscore = tg.read_tabix(start, end, **zscore_info)
 
 	# get region strings
-	regs_lst = list(tg.get_ld_regions_list(snp_ids))
+	regs_lst = list(tg.get_regions_list(snp_ids))
 	N = len(regs_lst)
 
 	# get function for filtering line
@@ -198,7 +201,7 @@ def read_bgw_zscore(chrm, snp_ids, **kwargs):
 
 	except OSError:
 		# argument may be too long for OS; if so try subset instead of getting all regions at once
-		# print('Subseting regions to tabix.')
+		print('Subseting regions to tabix.')
 		n = 2500
 		while n:
 			try: 
@@ -277,8 +280,8 @@ print(
 Input Arguments
 Gene annotation file specifying genes for TWAS: {annot_path}
 cis-eQTL weight file: {w_path_pre}[target]{w_path_suf}
-GWAS summary statistics Z-score file: {z_path_pre}[CHRM]{z_path_suf}
-Reference LD genotype covariance file: {ld_path_pre}[CHRM]{ld_path_suf}
+GWAS summary statistics Z-score file: {in_z_path}
+Reference LD genotype covariance file: {ld_path_pre}[chr]{ld_path_suf}
 SNP weight inclusion threshold: {weight_threshold}
 Test statistic to use: {test_stat_str}
 Number of threads: {thread}
@@ -287,6 +290,7 @@ Output TWAS results file: {out_path}
 ********************************'''.format(
 	**args.__dict__,
 	test_stat_str = 'FUSION and SPrediXcan' if args.test_stat=='both' else args.test_stat,
+	in_z_path = args.z_path_pre + '[CHRM]' + args.z_path_suf if args.z_path == '' else args.z_path,
 	out_path = out_twas_path))
 
 # tg.print_args(args)
@@ -294,14 +298,17 @@ Output TWAS results file: {out_path}
 ###############################################################
 ### Read in gene annotation 
 print('Reading gene annotation file.')
-# Gene, TargetID, n_targets = tg.read_gene_annot_exp(args.annot_path, args.chrm)
-Gene, TargetID, n_targets = tg.read_gene_annot_exp(**args.__dict__)
+Gene = pd.read_csv(
+	args.annot_path,
+	sep='\t',
+	header=None)[0].drop_duplicates()
+n_targets = Gene.size
 
 # read in headers for Weight and Zscore files; get the indices and dtypes for reading files into pandas
 
 # PREP OUTPUT - print output headers to files
 print('Creating file: ' + out_twas_path + '\n')
-out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName','n_snps']
+out_cols = ['GeneName','n_snps','n_trans_snps']
 if args.test_stat == 'both':
 	out_cols += ['FUSION_Z','FUSION_PVAL','SPred_Z','SPred_PVAL']
 else:
@@ -318,19 +325,21 @@ pd.DataFrame(columns=out_cols).to_csv(
 # thread function
 @tg.error_handler
 def thread_process(num):
-	target = TargetID[num]
+	target = Gene[num]
 	print('num=' + str(num) + '\nTargetID=' + target)
-	Gene_Info = Gene.iloc[[num]].reset_index(drop=True)
 
 	# read weight file
 	w_path = args.w_path_pre + target + args.w_path_suf
 	Weight = read_bgw_weight(w_path, **args.__dict__)
 
 	# get start and end positions to tabix, per chromosome
-	w_df_info = Weight.groupby('CHROM')['POS'].agg(['min','max']).reset_index().astype(str)
+	# w_df_info = Weight.groupby('CHROM')['POS'].agg(['min','max']).reset_index().astype(str)
 
 	# read in Zscore files
-	Zscore = pd.concat([read_bgw_zscore(str(chrm), Weight[Weight.CHROM == chrm].snpID.values) for chrm in np.unique(Weight.CHROM)]).reset_index(drop=True)
+	if args.z_path is not '':
+		Zscore = read_bgw_zscore(args.z_path, Weight.snpID.values)
+	else:
+		Zscore = pd.concat([read_bgw_zscore(z_path(chrm), Weight[Weight.CHROM == chrm].snpID.values) for chrm in np.unique(Weight.CHROM)]).reset_index(drop=True)
 
 	snp_overlap = np.intersect1d(Weight.snpID, Zscore[['snpID','snpIDflip']])
 
@@ -370,12 +379,14 @@ def thread_process(num):
 
 	ZW = ZW[ZW.snpID.isin(MCOV.snpID)]
 	n_snps = str(ZW.snpID.size)
+	n_trans_snps = str(np.sum(ZW.Trans))
 
 	print('Running TWAS.\nN SNPs=' + n_snps)
 
 	### create output dataframe
-	Result = Gene_Info.copy()
+	Result = pd.DataFrame.from_records({'GeneName': target}, index=[0])
 	Result['n_snps'] = n_snps
+	Result['n_trans_snps'] = n_trans_snps
 
 	### calculate zscore(s), pvalue(s)
 	get_zscore_args = [V_cov, ZW.ES.values, ZW.Zscore.values, snp_sd]

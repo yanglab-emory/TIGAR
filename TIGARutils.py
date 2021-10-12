@@ -784,6 +784,20 @@ def get_ld_regions_list(snp_ids):
 		# chrm:start-end
 		yield chrm + str(y[0][1]) + '-' + str(y[-1][1])
 
+# yields formatted tabix regions strings
+def get_regions_list(snp_ids):
+
+	# split into groups by chromosome
+	for chrm, grp in groupby(snp_ids, lambda x: x.split(':')[0]):
+		# snp pos values as integers
+		pos_vals = [int(snp.split(':')[1]) for snp in grp]
+
+		# get intervals of start,end positions; convert to tabix string
+		for x, y in groupby(enumerate(pos_vals), lambda p: p[1]-p[0]):
+			y = list(y)
+
+			# chrm:start-end
+			yield chrm + ':' + str(y[0][1]) + '-' + str(y[-1][1])
 
 
 # call tabix using regions string
