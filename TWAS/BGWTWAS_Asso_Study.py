@@ -39,7 +39,7 @@ parser.add_argument('--weight_prefix', type=str, dest='w_path_pre')
 parser.add_argument('--weight_suffix', type=str, dest='w_path_suf')
 
 # GWAS Z score file path
-parser.add_argument('--Zscore', type=str, dest='z_path',default='')
+parser.add_argument('--Zscore', type=str, dest='z_path', default='')
 
 parser.add_argument('--Zscore_prefix', type=str, dest='z_path_pre',default='')
 parser.add_argument('--Zscore_suffix', type=str, dest='z_path_suf',default='')
@@ -50,6 +50,8 @@ parser.add_argument('--LD_prefix', type=str, dest='ld_path_pre')
 parser.add_argument('--LD_suffix', type=str, dest='ld_path_suf')
 
 # parser.add_argument('--LD', type=str, dest='ld_path')
+# log file name
+parser.add_argument('--log_file', type=str, default='')
 
 # window
 # parser.add_argument('--window',type=float)
@@ -66,13 +68,50 @@ parser.add_argument('--thread',type=int, default=1)
 # Output dir
 parser.add_argument('--out_dir', type=str)
 
+# output prefix
+parser.add_argument('--out_prefix', type=str, default='')
+
 # output file
-parser.add_argument('--out_twas_file', type=str)
+parser.add_argument('--out_twas_file', type=str, default='')
+
+# 'CHR' + args.chrm + '_BGWTWAS_assoc.txt'
 
 args = parser.parse_args()
 
 sys.path.append(args.TIGAR_dir)
 sys.path.append(args.TIGAR_dir + '/TWAS')
+
+###############################################################
+# set output file names
+if not args.out_prefix:
+	args.out_prefix = 'BGWTWAS'
+
+if not args.log_file:
+	args.log_file = args.out_prefix + '_log.txt'
+
+if not args.out_twas_file:
+	args.out_twas_file = args.out_prefix + '_asso.txt'
+
+# Make output, log directories
+os.makedirs(args.out_dir, exist_ok=True)
+os.makedirs(os.path.join(args.out_dir, 'logs'), exist_ok=True)
+
+# set stdout to log
+sys.stdout = open(os.path.join(args.out_dir, 'logs', args.log_file), 'w')
+
+# Check tabix command
+try:
+	subprocess.check_call(['which','tabix'], stdout=subprocess.DEVNULL)
+except:
+	raise SystemExit('Error: Required tool TABIX is not available.\n')
+
+# Check gene list file
+try:
+	os.path.isfile(args.annot_path)
+except:
+	SystemExit('Error: Gene list file does not exist.')
+
+
 ###############################################################
 ## Import TIGAR functions, define other functions
 import TIGARutils as tg
