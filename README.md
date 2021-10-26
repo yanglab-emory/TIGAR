@@ -678,7 +678,7 @@ ${TIGAR_dir}/VC_TWAS_summary.sh \
 ```
 
 
-### 6. BGTWAS 
+### 6. BGWTWAS 
 VC-TWAS with cis-eQTL effect sizes estimated from nonparametric Bayesian DPR method for Univariate phenotypes.
 
 #### Arguments for both VC-TWAS types
