@@ -99,86 +99,6 @@ def empty_df_handler(func):
 
 	return wrapper
 	
-# def sampleid_startup(chrm=None, genofile_type=None, data_format=None, sampleid_path=None, geno_path=None, geneexp_path=None, ped_path=None, **kwargs):
-
-# 	## read in sampleids file
-# 	# sampleid file
-# 	if (sampleid_path is not None):
-# 		print('Reading sampleID file.\n')
-# 		spec_sampleids = pd.read_csv(
-# 			sampleid_path,
-# 			sep='\t',
-# 			header=None)[0].drop_duplicates()
-# 	else: 
-# 		spec_sampleids = np.empty(shape=(0, 0))
-
-# 	# ped file
-# 	if (ped_path is not None):
-# 		ped_header = get_header(ped_path)
-# 		ped_sampleids = pd.read_csv(
-# 			ped_path, 
-# 			usecols=['IND_ID'],
-# 			sep='\t')['IND_ID'].drop_duplicates()
-# 	else:
-# 		ped_sampleids = np.empty(shape=(0, 0))
-
-# 	## read in file headers
-# 	print('Reading file headers.\n')
-
-# 	# genotype file
-# 	if (geno_path is not None):
-# 		try:
-# 			geno_cols = call_tabix_header(geno_path)
-# 		except: 
-# 			geno_cols = get_header(geno_path, zipped=True)
-# 		geno_sampleids_strt_ind = {'dosage': 5, 'vcf': 9}[genofile_type]
-# 		geno_sampleids = geno_cols[geno_sampleids_strt_ind:]
-# 	else:
-# 		geno_sampleids = np.empty(shape=(0, 0))
-
-# 	# gene expression file
-# 	if (geneexp_path is not None):
-# 		exp_cols = get_header(geneexp_path)
-# 		exp_sampleids = np.array(exp_cols[5:])
-# 	else:
-# 		exp_sampleids = np.empty(shape=(0, 0))
-
-# 	## get sampleIDs to use and output
-# 	print('Matching sampleIDs.\n')
-
-# 	# Output expression, genotype file info
-# 	if (spec_sampleids.size) and (geno_sampleids.size) and (exp_sampleids.size):
-# 		sampleID = functools.reduce(np.intersect1d, (exp_sampleids, geno_sampleids, spec_sampleids))
-# 		if not sampleID.size:
-# 			raise SystemExit('There are no overlapped sample IDs between the gene expression file, genotype file, and sampleID file.')
-
-# 		## columns to read-in
-# 		exp_info = {'path': geno_path, **exp_cols_dtype(exp_cols, sampleID)}
-# 		geno_info = {'path': geno_path, 'chrm': chrm, 'genofile_type': genofile_type, 'data_format': data_format, **genofile_cols_dtype(geno_cols, genofile_type, sampleID)}
-
-# 		return sampleID, sampleID.size, geno_info, exp_info
-
-# 	# Output genotype file info
-# 	elif (spec_sampleids.size) and (geno_sampleids.size):
-# 		sampleID = np.intersect1d(geno_sampleids, spec_sampleids)
-# 		if not sampleID.size:
-# 			raise SystemExit('There are no overlapped sample IDs between the genotype file and sampleID file.')
-
-# 		## columns to read-in
-# 		geno_info = {'path': geno_path, 'chrm': chrm, 'genofile_type': genofile_type, 'data_format': data_format, **genofile_cols_dtype(geno_cols, genofile_type, sampleID)}
-
-# 		return sampleID, sampleID.size, geno_info
-
-# 	# Output expression, PED file info
-# 	elif (ped_sampleids.size) and (exp_sampleids.size):
-# 		sampleID = np.intersect1d(exp_sampleids, ped_sampleids)
-# 		if not sampleID.size:
-# 			raise SystemExit('There are no overlapped sample IDs between the expression file and PED file.')
-
-# 		exp_info = {'path': geno_path, **exp_cols_dtype(exp_cols, sampleID)}
-
-# 		return sampleID, sampleID.size, exp_info, ped_header
-
 
 def ped_startup(ped_path, pedinfo_path):
 	Asso_Info = pd.read_csv(
@@ -271,11 +191,17 @@ def sampleid_startup(chrm=None, genofile_type=None, data_format=None, sampleid_p
 	return_lst = [sampleID, sampleID.size]
 
 	if geno_path:
-		geno_info = {'path': geno_path, 'chrm': chrm, 'genofile_type': genofile_type, 'data_format': data_format, **genofile_cols_dtype(geno_cols, genofile_type, sampleID)}
+		geno_info = {'path': geno_path, 'chrm': chrm, 'genofile_type': genofile_type, 'data_format': data_format, 
+			**get_cols_dtype(geno_cols, sampleid=sampleID,
+				cols=['CHROM','POS','REF','ALT'],
+				genofile_type=genofile_type, 
+				ind_namekey=True)}
 		return_lst.append(geno_info)
 
 	if geneexp_path:
-		exp_info = {'geneexp_path': geneexp_path, 'chrm': chrm, **exp_cols_dtype(exp_cols, sampleID)}
+		exp_info = {'geneexp_path': geneexp_path, 'chrm': chrm, 
+			**get_cols_dtype(exp_cols, sampleid=sampleID, 
+				cols=['CHROM','GeneStart','GeneEnd','TargetID','GeneName'])}
 		return_lst.append(exp_info)
 
 	if (ped_path and pedinfo_path):
@@ -285,7 +211,10 @@ def sampleid_startup(chrm=None, genofile_type=None, data_format=None, sampleid_p
 
 
 def gwas_file_info(gwas_path, chrm, **kwargs):
-	info_dict = gwas_cols_dtype(get_header(gwas_path, zipped=True))
+	info_dict = get_cols_dtype(
+		get_header(gwas_path, zipped=True), 
+		cols=['CHROM','POS','REF','ALT','BETA','SE'], 
+		ind_namekey=True)
 	return {'path': gwas_path, 
 		'chrm': chrm, 
 		'sampleID': [], 
@@ -293,20 +222,45 @@ def gwas_file_info(gwas_path, chrm, **kwargs):
 		'genofile_type': 'gwas', 
 		**info_dict}
 
+def bgw_weight_file_info(w_path, chrm, weight_threshold=0, add_cols=[], drop_cols=['ID'], **kwargs):
+	info_dict = get_cols_dtype(
+		get_header(w_path, zipped=True), 
+		cols=['CHROM','POS','REF','ALT','Trans','PCP','beta'], 
+		add_cols=add_cols, 
+		drop_cols=drop_cols, 
+		get_id=True,  
+		ind_namekey=True)
+	return {'path': w_path, 
+		'chrm': chrm, 
+		'sampleID': [], 
+		'target_ind': info_dict['file_cols'].index('Trans'), 
+		'data_format': 'bgw_weight', 
+		'genofile_type': 'bgw_weight', 
+		'weight_threshold': weight_threshold,
+		**info_dict}
+
 def weight_file_info(w_path, chrm, weight_threshold=0, add_cols=[], drop_cols=['ID'], **kwargs):
-	info_dict = weight_cols_dtype(get_header(w_path, zipped=True), add_cols, drop_cols)
+	info_dict = get_cols_dtype(
+		get_header(w_path, zipped=True), 
+		cols=['CHROM','POS','REF','ALT','TargetID','ES'], 
+		add_cols=add_cols, 
+		drop_cols=drop_cols, 
+		get_id=True,  
+		ind_namekey=True)
 	return {'path': w_path, 
 		'chrm': chrm, 
 		'sampleID': [], 
 		'target_ind': info_dict['file_cols'].index('TargetID'), 
-		'ES_ind': info_dict['file_cols'].index('ES'), 
 		'data_format': 'weight', 
 		'genofile_type': 'weight', 
 		'weight_threshold': weight_threshold,
 		**info_dict}
 
 def zscore_file_info(z_path, chrm, **kwargs):
-	info_dict = zscore_cols_dtype(get_header(z_path, zipped=True))
+	info_dict = get_cols_dtype(
+		get_header(z_path, zipped=True),
+		cols=['CHROM','POS','REF','ALT','Zscore'],
+		ind_namekey=True)
 	return {'path':z_path, 
 		'chrm': chrm, 
 		'sampleID': [], 
@@ -315,6 +269,11 @@ def zscore_file_info(z_path, chrm, **kwargs):
 		**info_dict}
 
 
+# def bgw_weight_cols_dtype(file_cols, add_cols=[], drop_cols=[], get_id=True, ret_dict=True, ind_namekey=True, **kwargs):
+# 	return get_cols_dtype(file_cols, 
+# 		cols=['CHROM','POS','REF','ALT','Trans','PCP','beta'], 
+# 		add_cols=add_cols, drop_cols=drop_cols, 
+# 		get_id=get_id, ret_dict=ret_dict, ind_namekey=ind_namekey)
 
 # read in annotation file or gene expression file
 def read_gene_annot_exp(chrm=None, geneexp_path=None, annot_path=None, cols=['CHROM','GeneStart','GeneEnd','TargetID','GeneName'], col_inds=[0,1,2,3,4], dtype={'CHROM':object,'GeneStart':np.int64,'GeneEnd':np.int64,'TargetID':object,'GeneName':object}, **kwargs):
@@ -418,6 +377,7 @@ def filter_weight_line(line: bytes, btarget: bytes, target_ind, col_inds):
 	else: 
 		return b''
 
+
 def filter_other_line(line: bytes, col_inds):
 	# split line into list
 	row = line.split(b'\t')
@@ -447,6 +407,9 @@ def read_tabix(start, end, sampleID, chrm, path, file_cols, col_inds, cols, dtyp
 		filter_line = functools.partial(filter_vcf_line, bformat=bformat, col_inds=col_inds, split_multi_GT=data_format == 'GT')
 	elif genofile_type == 'weight':
 		btarget = str.encode(target)
+		filter_line = functools.partial(filter_weight_line, btarget=btarget, target_ind=target_ind, col_inds=col_inds)
+	elif genofile_type == 'bgw_weight':
+		btarget = b'0'
 		filter_line = functools.partial(filter_weight_line, btarget=btarget, target_ind=target_ind, col_inds=col_inds)
 	else:
 		filter_line = functools.partial(filter_other_line, col_inds=col_inds)
@@ -492,8 +455,11 @@ def read_tabix(start, end, sampleID, chrm, path, file_cols, col_inds, cols, dtyp
 		# partial_targetids = np.unique(df['TargetID'])
 
 		# VC_TWAS uses ES = b + beta
-		if (not 'ES' in cols) and (('b' in cols) and ('beta' in cols)):
-			df['ES'] = df['b'] + df['beta']
+		if (not 'ES' in cols):
+			if (('b' in cols) and ('beta' in cols)):
+				df['ES'] = df['b'] + df['beta']
+			if (('PCP' in cols) and ('beta' in cols)):
+				df['ES'] = np.prod(df['PCP'], df['beta'])
 
 		if weight_threshold:
 			# filter out weights below threshold
@@ -679,7 +645,7 @@ def get_vcf_header(path, out='tuple'):
 	return header
 
 # determine indices of file cols to read in, dtype of each col
-def get_cols_dtype(file_cols, cols, sampleid=None, genofile_type=None, add_cols=[], drop_cols=[], get_id=False, ind_namekey=False, ret_dict=False, **kwargs):
+def get_cols_dtype(file_cols, cols, sampleid=None, genofile_type=None, add_cols=[], drop_cols=[], get_id=False, ind_namekey=False, **kwargs):
 
 	# sampleid handling
 	if sampleid is not None:
@@ -705,12 +671,14 @@ def get_cols_dtype(file_cols, cols, sampleid=None, genofile_type=None, add_cols=
 		'GeneStart': np.int64,
 		'ID': object,
 		'MAF': np.float64,
+		'PCP': np.float64,
 		'POS': np.int64,
 		'QUAL': object,
 		'REF': object,
 		'SE': np.float64,
 		'snpID': object,
 		'TargetID': object,
+		'Trans': np.int64,
 		'Zscore': np.float64,
 		**sampleid_dict}
 	
@@ -740,39 +708,39 @@ def get_cols_dtype(file_cols, cols, sampleid=None, genofile_type=None, add_cols=
 		ind_dtype_dict = {file_cols.index(x):dtype_dict[x] for x in cols}
 		out_dtype_dict = ind_dtype_dict
 
-	if ret_dict:
-		return {
-			'file_cols': file_cols,
-			'cols': [file_cols[i] for i in col_inds], 
-			'col_inds': col_inds, 
-			'dtype': out_dtype_dict}
+	# if ret_dict:
+	return {
+		'file_cols': file_cols,
+		'cols': [file_cols[i] for i in col_inds], 
+		'col_inds': col_inds, 
+		'dtype': out_dtype_dict}
 	
-	return col_inds, out_dtype_dict
+	# return col_inds, out_dtype_dict
 
-def exp_cols_dtype(file_cols, sampleid, ind_namekey=True, ret_dict=True, **kwargs):
-	return get_cols_dtype(file_cols, 
-		cols=['CHROM', 'GeneStart', 'GeneEnd', 'TargetID', 'GeneName'], 
-		sampleid=sampleid, ind_namekey=ind_namekey, ret_dict=ret_dict)
+# def exp_cols_dtype(file_cols, sampleid, ind_namekey=True, ret_dict=True, **kwargs):
+# 	return get_cols_dtype(file_cols, 
+# 		cols=['CHROM', 'GeneStart', 'GeneEnd', 'TargetID', 'GeneName'], 
+# 		sampleid=sampleid, ind_namekey=ind_namekey, ret_dict=ret_dict)
 
-def genofile_cols_dtype(file_cols, genofile_type, sampleid, ind_namekey=True, ret_dict=True, **kwargs):
-	return get_cols_dtype(file_cols, 
-		cols=['CHROM','POS','REF','ALT'],
-		sampleid=sampleid, genofile_type=genofile_type, 
-		ind_namekey=ind_namekey, ret_dict=ret_dict)
+# def genofile_cols_dtype(file_cols, genofile_type, sampleid, ind_namekey=True, ret_dict=True, **kwargs):
+# 	return get_cols_dtype(file_cols, 
+# 		cols=['CHROM','POS','REF','ALT'],
+# 		sampleid=sampleid, genofile_type=genofile_type, 
+# 		ind_namekey=ind_namekey, ret_dict=ret_dict)
 
-def weight_cols_dtype(file_cols, add_cols=[], drop_cols=[], get_id=True, ret_dict=True, ind_namekey=True, **kwargs):
-	return get_cols_dtype(file_cols, 
-		cols=['CHROM','POS','REF','ALT','TargetID','ES'], 
-		add_cols=add_cols, drop_cols=drop_cols, 
-		get_id=get_id, ret_dict=ret_dict, ind_namekey=ind_namekey)
+# def weight_cols_dtype(file_cols, add_cols=[], drop_cols=[], get_id=True, ret_dict=True, ind_namekey=True, **kwargs):
+# 	return get_cols_dtype(file_cols, 
+# 		cols=['CHROM','POS','REF','ALT','TargetID','ES'], 
+# 		add_cols=add_cols, drop_cols=drop_cols, 
+# 		get_id=get_id, ret_dict=ret_dict, ind_namekey=ind_namekey)
 
-def zscore_cols_dtype(file_cols, ret_dict=True, ind_namekey=True, **kwargs):
-	return get_cols_dtype(file_cols, 
-		cols=['CHROM','POS','REF','ALT','Zscore'], ret_dict=ret_dict, ind_namekey=ind_namekey)
+# def zscore_cols_dtype(file_cols, ret_dict=True, ind_namekey=True, **kwargs):
+# 	return get_cols_dtype(file_cols, 
+# 		cols=['CHROM','POS','REF','ALT','Zscore'], ret_dict=ret_dict, ind_namekey=ind_namekey)
 
-def gwas_cols_dtype(file_cols, ret_dict=True, ind_namekey=True, **kwargs):
+def gwas_cols_dtype(file_cols, ind_namekey=True, **kwargs):
 	return get_cols_dtype(file_cols, 
-		cols=['CHROM','POS','REF','ALT','BETA','SE'], ret_dict=ret_dict, ind_namekey=ind_namekey)
+		cols=['CHROM','POS','REF','ALT','BETA','SE'], ind_namekey=ind_namekey)
 
 def MCOV_cols_dtype(file_cols, add_cols=[], drop_cols=[], get_id=True, **kwargs):
 	return get_cols_dtype(file_cols, 
@@ -816,10 +784,24 @@ def get_ld_regions_list(snp_ids):
 		# chrm:start-end
 		yield chrm + str(y[0][1]) + '-' + str(y[-1][1])
 
+# yields formatted tabix regions strings
+def get_regions_list(snp_ids):
+
+	# split into groups by chromosome
+	for chrm, grp in groupby(snp_ids, lambda x: x.split(':')[0]):
+		# snp pos values as integers
+		pos_vals = [int(snp.split(':')[1]) for snp in grp]
+
+		# get intervals of start,end positions; convert to tabix string
+		for x, y in groupby(enumerate(pos_vals), lambda p: p[1]-p[0]):
+			y = list(y)
+
+			# chrm:start-end
+			yield chrm + ':' + str(y[0][1]) + '-' + str(y[-1][1])
 
 
 # call tabix using regions string
-def call_tabix_regions(path, regs_str):
+def call_tabix_regions(path, regs_str, filter_line = lambda x:x ):
 
 	proc = subprocess.Popen(
 		['tabix '+path+' '+regs_str],
@@ -833,11 +815,11 @@ def call_tabix_regions(path, regs_str):
 		line = proc.stdout.readline()
 		if len(line) == 0:
 			break
-		proc_out += line
+		proc_out += filter_line(line)
 
 	# leftover lines
 	for line in proc.stdout:
-		proc_out += line
+		proc_out += filter_line(line)
 
 	return proc_out
 
@@ -913,7 +895,7 @@ def get_ld_matrix(MCOV, return_diag=False):
 		
 		for j in range(i,n_inds):
 			if inds[j] - inds[i] < N:
-				V_upper[i,j] = cov_i[inds[j]-inds[i]]
+				V_upper[i,j] = cov_i[inds[j] - inds[i]]
 			else:
 				V_upper[i,j] = 0
 
