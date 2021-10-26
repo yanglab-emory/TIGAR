@@ -38,7 +38,7 @@
 	- [5. VC-TWAS](#5-vc-twas)
 		- [VC-TWAS with individual-level GWAS data](#vc-twas-using-individual-level-gwas-data)
 		- [VC-TWAS with summary-level GWAS data](#vc-twas-using-summary-level-gwas-data)
-	- [6. BGWTWAS](#6-bgwtwas)
+	- [6. BGWTWAS](#6-bgw-twas)
 - [Updates](#updates)
 - [Reference](#reference)
 
@@ -678,8 +678,8 @@ ${TIGAR_dir}/VC_TWAS_summary.sh \
 ```
 
 
-### 6. BGWTWAS 
-VC-TWAS with cis-eQTL effect sizes estimated from nonparametric Bayesian DPR method for Univariate phenotypes.
+### 6. BGW-TWAS 
+Association study using cis- and trans-eQTL effect sizes estimate by [BGW-TWAS](https://github.com/yanglab-emory/BGW-TWAS).
 
 #### Arguments for both VC-TWAS types
 - `--gene_list`: Gene list file to specify the names of genes
