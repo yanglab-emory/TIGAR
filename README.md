@@ -720,7 +720,7 @@ python ${TIGAR_dir}/TWAS/BGWTWAS_Asso_Study.py \
 	--Zscore_suffix ${Zscore_suffix} \
 	--LD_prefix ${LD_prefix} \
 	--LD_suffix ${LD_suffix} \
-	--thread ${NSLOTS:-1} \
+	--thread 1 \
 	--TIGAR_dir ${TIGAR_dir} \
 	--out_dir ${out_dir}
 ```
