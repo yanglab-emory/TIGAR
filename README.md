@@ -57,6 +57,54 @@
 	- [statsmodels](https://www.statsmodels.org/stable/index.html)
    <!-- - Python Standard Library: argparse, io, math, multiprocessing, operator, subprocess, sys, time, warnings -->
 
+#### Python Environment Setup 
+
+##### conda
+- Installation:
+```bash
+# create the environment tigarenv
+conda create --name tigarenv python=3.5 pandas numpy scipy scikit-learn statsmodels
+# deactivate the conda environment
+conda deactivate
+```
+- Activate Environment:
+```bash
+# activate the environment
+conda activate tigarenv
+# set the PYTHONPATH
+export PYTHONPATH=${CONDA_PREFIX}/lib/python3.5/site-packages/:$PYTHONPATH
+```
+After running TIGAR use `conda deactivate` to deactivate the conda environment.
+
+
+##### pip
+- Installation:
+```bash
+# install pip
+# install virtualenv
+python3 -m pip install --user virtualenv
+# cd to preferred install_directory
+cd ${install_dir}
+# create the virtual environment tigarenv in the current directory
+python3 -m virtualenv tigarenv --python=python3.5
+# activate the environment
+source ${install_dir}/tigarenv/bin/activate
+# install the packages
+python3 -m pip install numpy==1.15.2 pandas==0.23.4 scikit-learn==0.20.0 scipy==1.1.0 statsmodels==0.9.0
+# deactivate the environment
+deactivate
+```
+
+- Activate Environment:
+```bash
+# activate the environment
+source ${install_dir}/tigarenv/bin/activate
+# set the PYTHONPATH
+PYTHONPATH=${install_dir}/tigarenv/lib/python3.5/site-packages/:$PYTHONPATH
+```
+After running TIGAR use `deactivate` to deactivate the environment.
+
+
 ### 2. Make files executable
 - Make `*.sh` files in the **TIGAR** directory executable
 ```bash
