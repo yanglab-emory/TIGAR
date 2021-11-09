@@ -4,6 +4,7 @@
 # Import packages needed
 import argparse
 import multiprocessing
+import os
 import sys
 
 from time import time
@@ -24,38 +25,57 @@ start_time = time()
 # parse input arguments
 parser = argparse.ArgumentParser(description='Asso Study 01')
 
-# Specify tool directory
-parser.add_argument('--TIGAR_dir' ,type=str)
-
-# Gene annotation and Expression level file
-parser.add_argument('--gene_exp' ,type=str ,dest='geneexp_path')
-
-# PED file path 
-parser.add_argument('--PED' ,type=str ,dest='ped_path')
-
-# Association Information file path
-parser.add_argument('--PED_info' ,type=str ,dest='pedinfo_path')
-
-# Method to use for regression
-parser.add_argument('--method' ,type=str)
-
-# number of thread
-parser.add_argument('--thread' ,type=int)
-
-# output dir
-parser.add_argument('--out_dir' ,type=str)
-
-# output file
-parser.add_argument('--out_twas_file' ,type=str)
-
+parser.add_argument('--gene_exp', type=str, dest='geneexp_path', required=True)
+parser.add_argument('--log_file', type=str, default='')
+parser.add_argument('--method', type=str, choices=['OLS','Logit'], default='OLS', 
+	help='method (OLS: quantitative phenotype or multivariate phenotypes [default], Logit: dichotomous univariate phenotype')
+parser.add_argument('--out_dir', type=str, default=os.getcwd())
+parser.add_argument('--out_prefix', type=str, default='')
+parser.add_argument('--out_twas_file', type=str, default='')
+parser.add_argument('--PED', type=str, dest='ped_path', required=True)
+parser.add_argument('--PED_info', type=str, dest='pedinfo_path', required=True)
+parser.add_argument('--sub_dir', type=int, choices=[0, 1], default=1)
+parser.add_argument('--thread', type=int, default=1)
+parser.add_argument('--TIGAR_dir', type=str, help='tool directory', 
+	default=os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 args = parser.parse_args()
-
 sys.path.append(args.TIGAR_dir)
+import TIGARutils as tg
+
+##################################################
+# set output file names
+if not args.out_prefix:
+	args.out_prefix = 'indv_' + args.method + '_TWAS'
+
+if not args.log_file:
+	args.log_file = args.out_prefix + '_log.txt'
+
+if not args.out_twas_file:
+	args.out_twas_file = args.out_prefix + '_assoc.txt'
+
+# sub-directory in out directory
+if args.sub_dir:
+	out_sub_dir = os.path.join(args.out_dir, 'TWAS_indv')
+else:
+	out_sub_dir = args.out_dir
+out_sub_dir = tg.get_abs_path(out_sub_dir)
+
+# Check tabix command
+tg.check_tabix()
+
+# Check input files
+tg.check_input_files(args)
+
+# Make output, log directories
+os.makedirs(out_sub_dir, exist_ok=True)
+os.makedirs(os.path.join(args.out_dir, 'logs'), exist_ok=True)
+
+# set stdout to log
+sys.stdout = open(os.path.join(args.out_dir, 'logs', args.log_file), 'w')
 
 ##################################################
 # Import TIGAR functions, define other functions
-import TIGARutils as tg
 
 # For single phenotype
 def regression_single(method,X,Y,Annot_df: pd.DataFrame,target):
@@ -97,7 +117,9 @@ def regression_multi(X,Y,Annot_df: pd.DataFrame):
 ###########################################################
 # Print input arguments
 # out_twas_path = args.out_dir + '/indv_' + args.method + '_assoc.txt'
-out_twas_path = args.out_dir + '/' + args.out_twas_file
+out_twas_path = out_sub_dir + '/' + args.out_twas_file
+tmp_twas_path = out_sub_dir + '/tmp_' + args.out_twas_file
+
 
 print(
 '''********************************
@@ -158,7 +180,7 @@ def thread_single(num):
 	Result = regression_single('OLS',X,Y,target_annot,target)
 
 	Result.to_csv(
-		out_twas_path,
+		tmp_twas_path,
 		sep='\t',
 		header=None,
 		index=None,
@@ -178,7 +200,7 @@ def thread_multi(num):
 	Result = regression_multi(X,Y,target_annot)
 
 	Result.to_csv(
-		out_twas_path,
+		tmp_twas_path,
 		sep='\t',
 		header=None,
 		index=None,
@@ -198,7 +220,7 @@ if __name__ == '__main__':
 		out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName',
 			'R2','BETA','BETA_SE','T_STAT','PVALUE','N'] 
 		pd.DataFrame(columns=out_cols).to_csv(
-			out_twas_path,
+			tmp_twas_path,
 			sep='\t',
 			header=True,
 			index=None,
@@ -226,7 +248,7 @@ if __name__ == '__main__':
 		out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName',
 			'R2','F_STAT','PVALUE','N']   
 		pd.DataFrame(columns=out_cols).to_csv(
-			out_twas_path,
+			tmp_twas_path,
 			sep='\t',
 			header=True,
 			index=None,
@@ -238,11 +260,13 @@ if __name__ == '__main__':
 		pool.join()
 	print('Done.')
 
+	# sort output
+	tg.sort_tabix_output(tmp_twas_path, out_twas_path, do_tabix=0)
+
 ############################################################
 # time calculation
 elapsed_sec = time() - start_time
 elapsed_time = tg.format_elapsed_time(elapsed_sec)
 print('Computation time (DD:HH:MM:SS): ' + elapsed_time)
 
-
-
+sys.stdout.close()

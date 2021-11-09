@@ -3,8 +3,9 @@
 ############################################################
 # import packages needed
 import argparse
-import operator
 import multiprocessing
+import operator
+import os
 import subprocess
 import sys
 
@@ -39,62 +40,40 @@ start_time = time()
 # parse input arguments
 parser = argparse.ArgumentParser(description='VC TWAS')
 
-# Specify tool directory
-parser.add_argument('--TIGAR_dir', type=str)
-
-# Specified chromosome number
-parser.add_argument('--chr', type=str, dest='chrm')
-
-# eQTL weight file path
-parser.add_argument('--weight', type=str, dest='w_path')
-
-# Test sampleID path
-parser.add_argument('--test_sampleID', type=str, dest='sampleid_path')
-
-# Gene annotation file path
-parser.add_argument('--gene_anno', type=str, dest='annot_path')
-
-# Test genotype file path
-parser.add_argument('--genofile', type=str, dest='geno_path')
-
-# Specified input file type(vcf or dosages)
-parser.add_argument('--genofile_type', type=str)
-
-# 'DS' or 'GT' for VCF genotype file
-parser.add_argument('--format', type=str, dest='data_format')
-
-# window
-parser.add_argument('--window', type=int)
-
-# phenotype_type
-parser.add_argument('--phenotype_type', type=str)
-
-# missing rate: threshold for excluding SNPs with too many missing values
-parser.add_argument('--missing_rate', type=float)
-
-# maf threshold for seleting genotype data
-parser.add_argument('--maf', type=float)
-
-# hwe threshold for seleting genotype data
-parser.add_argument('--hwe', type=float)
-
-# weight_threshold
-parser.add_argument('--weight_threshold', type=float)
-
-# number of thread
-parser.add_argument('--thread', type=int)
-
-# PED file path
-parser.add_argument('--PED', type=str, dest='ped_path')
-
-# Association Information file
-parser.add_argument('--PED_info', type=str, dest='pedinfo_path')
-
-# output dir
-parser.add_argument('--out_dir', type=str)
+parser.add_argument('--chr', type=str, dest='chrm', required=True,
+	help='chromosome number')
+parser.add_argument('--format', type=str, dest='data_format', choices=['GT', 'DS'], default='GT', 
+	help='data format of VCF genotype data (DS, GT [default])')
+parser.add_argument('--gene_anno', type=str, dest='annot_path', required=True)
+parser.add_argument('--genofile', type=str, dest='geno_path', required=True)
+parser.add_argument('--genofile_type', type=str, choices=['vcf', 'dosage'], 
+	help='filetype of genofile (vcf, dosages)')
+parser.add_argument('--hwe', type=float, default=0.00001, 
+	help='threshold p-value for Hardy Weinberg Equilibrium exact test (default: 0.00001)')
+parser.add_argument('--log_file', type=str, default='')
+parser.add_argument('--maf', type=float, default=0.01, 
+	help='folded Minor Allele Frequency threshold; range from 0-0.5 (default: 0.01)')
+parser.add_argument('--missing_rate', type=float, default=0.2, 
+	help='missing rate threshold for excluding SNPs with too many missing values (default: 0.2)')
+parser.add_argument('--out_dir', type=str, default=os.getcwd())
+parser.add_argument('--out_prefix', type=str, default='')
+parser.add_argument('--out_twas_file', type=str, default='')
+parser.add_argument('--PED', type=str, dest='ped_path', required=True)
+parser.add_argument('--PED_info', type=str, dest='pedinfo_path', required=True)
+parser.add_argument('--phenotype_type', type=str, choices=['C','D'], 
+	help='phenotype type (C: continuous, D: dichotomous/binomial' )
+parser.add_argument('--sub_dir', type=int, choices=[0, 1], default=1)
+parser.add_argument('--test_sampleID', type=str, dest='sampleid_path', required=True)
+parser.add_argument('--thread', type=int, default=1)
+parser.add_argument('--TIGAR_dir', type=str, help='tool directory', 
+	default=os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+parser.add_argument('--weight', type=str, dest='w_path', required=True)
+parser.add_argument('--weight_threshold', type=float, default=0.0001,
+	help='weight magnitude threshold for SNP inclusion; include only SNPs with magnitude of weight greater than this value when conducting TWAS(default: 0.0001 [SNPs with |weight|>0.0001 included])')
+parser.add_argument('--window', type=int, default=1000000, 
+	help='size around gene region for selecting cis-SNPs for fitting gene expression prediction model (default: 1000000 [ie, +-1MB region around gene])')
 
 args = parser.parse_args()
-
 sys.path.append(args.TIGAR_dir)
 sys.path.append(args.TIGAR_dir + '/VC_TWAS')
 
@@ -102,6 +81,37 @@ sys.path.append(args.TIGAR_dir + '/VC_TWAS')
 # Import TIGAR functions
 import TIGARutils as tg
 import SKAT
+
+#############################################################
+# set output file names
+if not args.out_prefix:
+	args.out_prefix = 'CHR' + args.chrm + '_VCTWAS'
+
+if not args.log_file:
+	args.log_file = args.out_prefix + '_log.txt'
+
+if not args.out_twas_file:
+	args.out_twas_file = args.out_prefix + '_indv_assoc.txt'
+
+# sub-directory in out directory
+if args.sub_dir:
+	out_sub_dir = os.path.join(args.out_dir, 'VCTWAS_CHR' + args.chrm)
+else:
+	out_sub_dir = args.out_dir
+out_sub_dir = tg.get_abs_path(out_sub_dir)
+
+# Check tabix command
+tg.check_tabix()
+
+# Check input files
+tg.check_input_files(args)
+
+# Make output, log directories
+os.makedirs(out_sub_dir, exist_ok=True)
+os.makedirs(os.path.join(args.out_dir, 'logs'), exist_ok=True)
+
+# set stdout to log
+sys.stdout = open(os.path.join(args.out_dir, 'logs', args.log_file), 'w')
 
 #############################################
 # check input arguments
@@ -118,7 +128,9 @@ else:
 if (args.phenotype_type != 'C') and (args.phenotype_type != 'D'):
 	raise SystemExit('Please specify phenotype type (--phenotype_type) as either "C" for continous or "D" for dichotomous.\n')
 
-out_twas_path = args.out_dir + '/CHR' + args.chrm + '_indv_VC_TWAS.txt'
+# out_twas_path = args.out_dir + '/CHR' + args.chrm + '_indv_VC_TWAS.txt'
+tmp_twas_path = out_sub_dir + '/temp_' + args.out_twas_file
+out_twas_path = out_sub_dir + '/' + args.out_twas_file
 
 ###############################################################
 # Print input arguments
@@ -175,7 +187,7 @@ Gene, TargetID, n_targets = tg.read_gene_annot_exp(**args.__dict__)
 weight_info = tg.weight_file_info(add_cols=['MAF','b','beta'], drop_cols=['ES'], **args.__dict__)
 
 # prep output
-print('Creating file: ' + out_twas_path + '\n')
+print('Creating file: ' + tmp_twas_path + '\n')
 
 out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName','n_snps']
 
@@ -185,7 +197,7 @@ else:
 	out_cols += ['p_value']
 
 pd.DataFrame(columns=out_cols).to_csv(
-	out_twas_path,
+	tmp_twas_path,
 	sep='\t',
 	header=True,
 	index=None,
@@ -297,7 +309,7 @@ def thread_process(num):
 	Result['TargetID'] = target
 
 	Result.to_csv(
-		out_twas_path,
+		tmp_twas_path,
 		sep='\t',
 		index=None,
 		header=None,
@@ -315,8 +327,12 @@ if __name__ == '__main__':
 	pool.join()
 	print('Done.')
 
+	tg.sort_tabix_output(tmp_twas_path, out_twas_path, do_tabix=0)
+
 ############################################################
 # time calculation
 elapsed_sec = time() - start_time
 elapsed_time = tg.format_elapsed_time(elapsed_sec)
 print('Computation time (DD:HH:MM:SS): ' + elapsed_time)
+
+sys.stdout.close()

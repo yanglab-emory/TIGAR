@@ -17,69 +17,41 @@ import pandas as pd
 
 from scipy.stats import chi2
 
+### 
+TIGAR_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+# sys.path.append(TIGAR_dir)
+
 ###############################################################
 # time calculation
 start_time = time()
 
 ###############################################################
 # parse input arguments
-parser = argparse.ArgumentParser(description='Asso Study 02')
+parser = argparse.ArgumentParser(description='BGW TWAS')
 
-# Specify tool directory
-parser.add_argument('--TIGAR_dir', type=str)
-
-# Gene annotation file path
 parser.add_argument('--gene_list', type=str, dest='annot_path')
-
-# # chromosome number
-# parser.add_argument('--chr', type=str, dest='chrm')
-
-# Weight file path
+parser.add_argument('--LD_prefix', type=str, dest='ld_path_pre')
+parser.add_argument('--LD_suffix', type=str, dest='ld_path_suf')
+parser.add_argument('--log_file', type=str, default='')
+parser.add_argument('--out_dir', type=str)
+parser.add_argument('--out_prefix', type=str, default='')
+parser.add_argument('--out_twas_file', type=str, default='')
+parser.add_argument('--test_stat', type=str, choices=['both','FUSION','SPrediXcan'], default='both', 
+	help='burden Z test statistic to calculate (both [default], FUSION, SPrediXcan)')
+parser.add_argument('--thread', type=int, default=1)
+parser.add_argument('--TIGAR_dir', type=str, help='tool directory', default=TIGAR_dir)
 parser.add_argument('--weight_prefix', type=str, dest='w_path_pre')
 parser.add_argument('--weight_suffix', type=str, dest='w_path_suf')
-
-# GWAS Z score file path
+parser.add_argument('--weight_threshold', type=float, default=0, 
+	help='weight magnitude threshold for SNP inclusion; include only SNPs with magnitude of weight greater than this value when conducting TWAS(default: 0 [all SNPs included])')
 parser.add_argument('--Zscore', type=str, dest='z_path', default='')
-
 parser.add_argument('--Zscore_prefix', type=str, dest='z_path_pre',default='')
 parser.add_argument('--Zscore_suffix', type=str, dest='z_path_suf',default='')
 
-
-# Reference covariance file path
-parser.add_argument('--LD_prefix', type=str, dest='ld_path_pre')
-parser.add_argument('--LD_suffix', type=str, dest='ld_path_suf')
-
-# parser.add_argument('--LD', type=str, dest='ld_path')
-# log file name
-parser.add_argument('--log_file', type=str, default='')
-
-# window
-# parser.add_argument('--window',type=float)
-
-# Weight threshold to include SNP in TWAS
-parser.add_argument('--weight_threshold',type=float, default=0)
-
-# specify 'FUSION', 'SPrediXcan', or 'both': Zscore test statistic to use
-parser.add_argument('--test_stat', type=str, default='both')
-
-# Number of threads
-parser.add_argument('--thread',type=int, default=1)
-
-# Output dir
-parser.add_argument('--out_dir', type=str)
-
-# output prefix
-parser.add_argument('--out_prefix', type=str, default='')
-
-# output file
-parser.add_argument('--out_twas_file', type=str, default='')
-
-# 'CHR' + args.chrm + '_BGWTWAS_assoc.txt'
-
 args = parser.parse_args()
-
 sys.path.append(args.TIGAR_dir)
 sys.path.append(args.TIGAR_dir + '/TWAS')
+import TIGARutils as tg
 
 ###############################################################
 # set output file names
@@ -96,25 +68,31 @@ if not args.out_twas_file:
 os.makedirs(args.out_dir, exist_ok=True)
 os.makedirs(os.path.join(args.out_dir, 'logs'), exist_ok=True)
 
+# Check tabix command
+tg.check_tabix()
+
+# Check input files
+tg.check_input_files(args)
+
 # set stdout to log
 sys.stdout = open(os.path.join(args.out_dir, 'logs', args.log_file), 'w')
 
-# Check tabix command
-try:
-	subprocess.check_call(['which','tabix'], stdout=subprocess.DEVNULL)
-except:
-	raise SystemExit('Error: Required tool TABIX is not available.\n')
+# # Check tabix command
+# try:
+# 	subprocess.check_call(['which','tabix'], stdout=subprocess.DEVNULL)
+# except:
+# 	raise SystemExit('Error: Required tool TABIX is not available.\n')
 
-# Check gene list file
-try:
-	os.path.isfile(args.annot_path)
-except:
-	SystemExit('Error: Gene list file does not exist.')
+# # Check gene list file
+# try:
+# 	os.path.isfile(args.annot_path)
+# except:
+# 	SystemExit('Error: Gene list file does not exist.')
 
 
 ###############################################################
 ## Import TIGAR functions, define other functions
-import TIGARutils as tg
+# import TIGARutils as tg
 
 # from Asso_Study_02 import get_pval, get_V_cor, get_z_denom, get_spred_zscore, get_fusion_zscore, get_burden_zscore
 
@@ -311,7 +289,7 @@ def get_multi_chrm_ld_matrix(MCOV, return_diag=False):
 #############################################################
 # Print input arguments to log
 # out_twas_path = args.out_dir + '/CHR' + args.chrm + '_sumstat_assoc.txt'
-
+tmp_twas_path = args.out_dir + '/temp_' + args.out_twas_file
 out_twas_path = args.out_dir + '/' + args.out_twas_file
 
 print(
@@ -346,7 +324,7 @@ n_targets = Gene.size
 # read in headers for Weight and Zscore files; get the indices and dtypes for reading files into pandas
 
 # PREP OUTPUT - print output headers to files
-print('Creating file: ' + out_twas_path + '\n')
+print('Creating file: ' + tmp_twas_path + '\n')
 out_cols = ['GeneName','n_snps','n_trans_snps']
 if args.test_stat == 'both':
 	out_cols += ['FUSION_Z','FUSION_PVAL','SPred_Z','SPred_PVAL']
@@ -354,7 +332,7 @@ else:
 	out_cols += ['Zscore','PVALUE']
 
 pd.DataFrame(columns=out_cols).to_csv(
-	out_twas_path,
+	tmp_twas_path,
 	sep='\t',
 	index=None,
 	header=True,
@@ -440,7 +418,7 @@ def thread_process(num):
 
 	# write to file
 	Result.to_csv(
-		out_twas_path,
+		tmp_twas_path,
 		sep='\t',
 		index=None,
 		header=None,
@@ -458,15 +436,14 @@ if __name__ == '__main__':
 	pool.join()
 	print('Done.')
 
+	# sort output
+	tg.sort_tabix_output(tmp_twas_path, out_twas_path, do_tabix=0)
+
 ###############################################################
 # time calculation
 elapsed_sec = time()-start_time
 elapsed_time = tg.format_elapsed_time(elapsed_sec)
 print('Computation time (DD:HH:MM:SS): ' + elapsed_time)
 
-
-
-
-
-
+sys.stdout.close()
 

@@ -26,82 +26,95 @@ start_time = time()
 # parse input arguments
 parser = argparse.ArgumentParser(description='DPR Training')
 
-# Specify tool directory
-parser.add_argument('--TIGAR_dir', type=str)
-
-# for Gene annotation and Expression-level file path
-parser.add_argument('--gene_exp', type=str, dest='geneexp_path')
-
-# training genotype file sampleIDs path
-parser.add_argument('--train_sampleID', type=str, dest='sampleid_path')
-
-# specified chromosome number
-parser.add_argument('--chr', type=str, dest='chrm')
-
-# Genotype file path
-parser.add_argument('--genofile', type=str, dest='geno_path')
-
-# specified input file type (vcf or dosages)
-parser.add_argument('--genofile_type', type=str)
-
-# format of genotype data 'DS' or 'GT'
-parser.add_argument('--format', type=str, dest='data_format')
-
-# window
-parser.add_argument('--window', type=int)
-
-# missing rate: threshold for excluding SNPs with too many missing values
-parser.add_argument('--missing_rate', type=float)
-
-# maf
-parser.add_argument('--maf', type=float)
-
-# p-value for HW test
-parser.add_argument('--hwe', type=float)
-
-# cvR2
-## 0 do not run cvR2
-## 1 run cvR2 [default]
-parser.add_argument('--cvR2', type=int)
-
-# threshold cvR2 value for training (default: 0.005)
-parser.add_argument('--cvR2_threshold', type=float)
-
-# Bayesian inference algorithm used by DPR: 
-## '1' (Variational Bayesian)
-## '2' (MCMC)
-parser.add_argument('--dpr', type=str)
-
-# output effect-size
-## 'fixed' (fixed effects) [default]
-## 'additive' (fixed + random)
-parser.add_argument('--ES', type=str)
-
-# file paths
-parser.add_argument('--out_weight_file', type=str)
-parser.add_argument('--out_info_file', type=str)
-
-# suffix to directories for DPR intermmediate files
-parser.add_argument('--job_suf', type=str)
-
-# threads to use
-parser.add_argument('--thread', type=int)
-
-# output dir
-parser.add_argument('--out_dir', type=str)
+parser.add_argument('--chr', type=str, dest='chrm', required=True, 
+	help='chromosome number')
+parser.add_argument('--cvR2', type=int, choices=[0, 1], default=1, 
+	help='cvR2 (0: no CV, 1: CV)')
+parser.add_argument('--cvR2_threshold', type=float, default=0.005, 
+	help='threshold cvR2 value for training (default: 0.005)')
+parser.add_argument('--dpr', type=str, choices=['1', '2'], default=1, 
+	help='Bayesian inference algorithm used by DPR (1: Variational Bayesian [default], 2: MCMC)')
+parser.add_argument('--ES', type=str, choices=['additive', 'fixed'], default='fixed', 
+	help='output effect size (additive: fixed + random, fixed: fixed effects [default])')
+parser.add_argument('--format', type=str, dest='data_format', choices=['GT', 'DS'], default='GT')
+parser.add_argument('--gene_exp', type=str, dest='geneexp_path', required=True)
+parser.add_argument('--genofile', type=str, dest='geno_path', required=True)
+parser.add_argument('--genofile_type', type=str, choices=['vcf', 'dosage'], 
+	help='filetype of genofile (vcf, dosages)')
+parser.add_argument('--hwe', type=float, default=0.00001, 
+	help='threshold p-value for Hardy Weinberg Equilibrium exact test (default: 0.00001)')
+parser.add_argument('--job_suf', type=str, default='', help=
+	'suffix added to temp directories for DPR intermmediate files (default: out_prefix value)')
+parser.add_argument('--log_file', type=str, default='')
+parser.add_argument('--maf', type=float, default=0.01, 
+	help='folded Minor Allele Frequency threshold; range from 0-0.5 (default: 0.01)')
+parser.add_argument('--missing_rate', type=float, default=0.2, 
+	help='missing rate threshold for excluding SNPs with too many missing values (default: 0.2)')
+parser.add_argument('--out_dir', type=str, default=os.getcwd())
+parser.add_argument('--out_info_file', type=str, default='')
+parser.add_argument('--out_prefix', type=str, default='')
+parser.add_argument('--out_weight_file', type=str, default='')
+parser.add_argument('--sub_dir', type=int, choices=[0, 1], default=1)
+parser.add_argument('--thread', type=int, default=1)
+parser.add_argument('--TIGAR_dir', type=str, help='tool directory', 
+	default=os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+parser.add_argument('--train_sampleID', type=str, dest='sampleid_path', required=True)
+parser.add_argument('--window', type=int, default=1000000, 
+	help='size around gene region for selecting cis-SNPs for fitting gene expression prediction model (default: 1000000 [ie, +-1MB region around gene])')
 
 args = parser.parse_args()
-
 sys.path.append(args.TIGAR_dir)
+import TIGARutils as tg
+
+#############################################################
+# set output file names
+if not args.out_prefix:
+	args.out_prefix = 'CHR' + args.chrm + '_DPR_train'
+
+if not args.log_file:
+	args.log_file = args.out_prefix + '_log.txt'
+
+if not args.out_info_file:
+	args.out_info_file = args.out_prefix + '_GeneInfo.txt'
+
+if not args.out_weight_file:
+	args.out_weight_file = args.out_prefix + '_eQTLweights.txt'
+
+if not args.job_suf:
+	args.job_suf = args.out_prefix
+
+# sub-directory in out directory
+if args.sub_dir:
+	out_sub_dir = os.path.join(args.out_dir, 'DPR_CHR' + args.chrm)
+else:
+	out_sub_dir = args.out_dir
+out_sub_dir = tg.get_abs_path(out_sub_dir)
+
+# Check tabix command
+tg.check_tabix()
+
+# Check input files
+tg.check_input_files(args)
+
+# Make output, log directories
+os.makedirs(out_sub_dir, exist_ok=True)
+os.makedirs(os.path.join(args.out_dir, 'logs'), exist_ok=True)
+## Store files for DPR training
+os.makedirs(os.path.join(out_sub_dir, 'DPR_Files' + args.job_suf), exist_ok=True)
+## Store Cross Validation DPR files
+if args.cvR2:
+	os.makedirs(os.path.join(out_sub_dir, 'CV_Files' + args.job_suf), exist_ok=True)
+
+# set stdout to log
+sys.stdout = open(os.path.join(args.out_dir, 'logs', args.log_file), 'w')
 
 #############################################################
 # DEFINE, IMPORT FUNCTIONS
-import TIGARutils as tg
+# import TIGARutils as tg
 
 # directory for temporary output files; need to be defined here for some functions
-abs_out_dir = tg.get_abs_path(args.out_dir)
-dpr_file_dir = abs_out_dir + '/DPR_Files' + args.job_suf + '/'
-dpr_file_dir_cv = abs_out_dir + '/CV_Files' + args.job_suf + '/'
+dpr_file_dir = out_sub_dir + '/DPR_Files' + args.job_suf + '/'
+dpr_file_dir_cv = out_sub_dir + '/CV_Files' + args.job_suf + '/'
 
 # preps dpr input files, runs DPR, reads in dpr output
 def prep_call_dpr(Bimbam_df, Pheno_df, dpr_file_dir, targetid):
@@ -126,7 +139,8 @@ def prep_call_dpr(Bimbam_df, Pheno_df, dpr_file_dir, targetid):
 		subprocess.check_call(
 			DPR_call_args,
 			cwd=dpr_file_dir,
-			stdout=subprocess.DEVNULL)
+			stdout=subprocess.DEVNULL,
+			stderr=subprocess.DEVNULL)
 
 	except subprocess.CalledProcessError as err:
 		raise err
@@ -213,10 +227,21 @@ def do_cv(target, Bimbam_df, Pheno_df, BimbamC_df, PhenoC_df, cv_train_test_id, 
 	# RETURN R2 RESULT
 	return avg_r2_cv
 
+def remove_dir(path):
+	try:
+		call_args = ['rm', '-rf', tg.get_abs_path(path)]
+		subprocess.check_call(
+			call_args,
+			cwd=tg.get_abs_path(os.path.join(path, '..')),
+			stdout=subprocess.DEVNULL)
+	except subprocess.CalledProcessError as err:
+		raise err
+
 
 #############################################################
 # set absolute paths
-DPR_path = tg.get_abs_path(args.TIGAR_dir) + '/Model_Train_Pred/DPR'
+# DPR_path = tg.get_abs_path(args.TIGAR_dir) + '/Model_Train_Pred/DPR'
+DPR_path = TIGAR_dir + '/Model_Train_Pred/DPR'
 
 # check input arguments
 if args.genofile_type == 'vcf':
@@ -229,8 +254,9 @@ elif args.genofile_type == 'dosage':
 else:
 	raise SystemExit('Please specify the type input genotype file type (--genofile_type) as either "vcf" or "dosage".\n')
 
-out_weight_path = args.out_dir + '/temp_' + args.out_weight_file
-out_info_path = args.out_dir + '/' +  args.out_info_file
+tmp_weight_path = out_sub_dir + '/temp_' + args.out_weight_file
+out_weight_path = out_sub_dir + '/' + args.out_weight_file
+out_info_path = out_sub_dir + '/' +  args.out_info_file
 
 #############################################################
 # Print input arguments to log
@@ -291,10 +317,10 @@ else:
 	print('Skipping splitting samples for 5-fold cross validation...\n')
 
 # PREP OUTPUT - print output headers to files
-print('Creating file: ' + out_weight_path + '\n')
+print('Creating file: ' + tmp_weight_path + '\n')
 weight_cols = ['CHROM','POS', 'snpID', 'REF','ALT','TargetID','MAF','p_HWE','ES','b','beta']
 pd.DataFrame(columns=weight_cols).to_csv(
-	out_weight_path,
+	tmp_weight_path,
 	sep='\t',
 	header=True,
 	index=None,
@@ -400,7 +426,7 @@ def thread_process(num):
 		how='inner')[weight_cols]
 
 	Weight.to_csv(
-		out_weight_path,
+		tmp_weight_path,
 		sep='\t',
 		header=None,
 		index=None,
@@ -435,18 +461,29 @@ def thread_process(num):
 	# args.thread = (int(len(EXP)/100)+1)*100
 
 if __name__ == '__main__':
-	print('Starting DPR training for ' + str(n_targets) + ' target genes.\n')
-	pool = multiprocessing.Pool(args.thread)
-	pool.imap(thread_process,[num for num in range(n_targets)])
-	pool.close()
-	pool.join()
-	print('Done.')
+	try:
+		print('Starting DPR training for ' + str(n_targets) + ' target genes.\n')
+		pool = multiprocessing.Pool(args.thread)
+		pool.imap(thread_process,[num for num in range(n_targets)])
+		pool.close()
+		pool.join()
+		print('Done.')
+
+		# sort tabix output
+		tg.sort_tabix_output(tmp_weight_path, out_weight_path)
+
+	finally:
+		# remove DPR file directories
+		remove_dir(os.path.join(out_sub_dir, 'DPR_Files' + args.job_suf))
+
+		if args.cvR2:
+			remove_dir(os.path.join(out_sub_dir, 'CV_Files' + args.job_suf))		
 
 
 ############################################################
 # time calculation
-elapsed_sec = time()-start_time
+elapsed_sec = time() - start_time
 elapsed_time = tg.format_elapsed_time(elapsed_sec)
 print('Computation time (DD:HH:MM:SS): ' + elapsed_time)
 
-
+sys.stdout.close()

@@ -15,39 +15,18 @@ from itertools import groupby
 import pandas as pd
 import numpy as np
 #########################################################
-## FUNCTIONS:
 
-# error_handler
-
-# calc_maf
-# call_tabix
-# call_tabix_header
-# format_elapsed_time
-# get_header
-
-# exp_cols_dtype
-# genofile_cols_dtype
-# weight_cols_dtype
-# zscore_cols_dtype
-# gwas_cols_dtype
-# MCOV_cols_dtype
-
-## Handling covariance files:
-# ld_cols
-# get_ld_regions_list
-# call_tabix_regions
-# get_ld_regions_data
-# get_ld_data
-# get_ld_matrix
-
-# get_snpIDs
-# optimize_cols
-# reformat_sample_vals
-# reformat_vcf
-# check_prep_vcf
-# substr_in_strarray
 
 #########################################################
+# returns absolute path
+def get_abs_path(x): return os.path.abspath(os.path.expanduser(os.path.expandvars(x)))
+
+TIGAR_dir = get_abs_path(os.path.dirname( __file__ ))
+
+def print_tigarutils_path():
+	# path = os.path.dirname(os.path.abspath(sys.argv[0]))
+	path = TIGAR_dir
+	print(path)
 
 # used to catch exceptions that dont require a traceback
 class NoTargetDataError(Exception):
@@ -76,10 +55,6 @@ def error_handler(func):
 			sys.stdout.flush()
 
 	return wrapper
-
-
-# returns absolute path
-def get_abs_path(x): return os.path.abspath(os.path.expanduser(os.path.expandvars(x)))
 
 
 # wrapper for genotype functions; adds error handling for when an empty dataframe is read in during concatenation
@@ -385,6 +360,73 @@ def filter_other_line(line: bytes, col_inds):
 	line = b'\t'.join([row[x] for x in col_inds])
 	line += b'' if line.endswith(b'\n') else b'\n'
 	return line
+
+
+# def sort_tabix_output(temp_path, out_path, TIGAR_dir, out_dir, **kwargs):
+# 	try:
+# 		call_args = [
+# 			tg.get_abs_path(TIGAR_dir) + '/sort_tabix_output.sh', 
+# 			temp_path, 
+# 			out_path]
+
+# 		subprocess.check_call(
+# 			call_args,
+# 			cwd=tg.get_abs_path(out_dir),
+# 			stdout=subprocess.DEVNULL)
+
+# 	except subprocess.CalledProcessError as err:
+# 		raise err
+
+
+def check_tabix():
+	try:
+		subprocess.check_call(['which','tabix'], stdout=subprocess.DEVNULL)
+	except:
+		raise SystemExit('Error: Required tool TABIX is not available.\n')
+
+def check_input_files(args):
+	for key, value in args.__dict__.items():
+		if key.endswith('path') and (not os.path.isfile(value)):
+			raise SystemExit('Error: file "' + value + '" does not exist.')
+
+# def check_input_files(args):
+# 	for key, value in args.__dict__.items():
+# 		if key.endswith('path'):
+# 			try:
+# 				if not os.path.isfile(value): 
+# 					raise SystemExit('Error: file "' + value + '" does not exist.')
+# 			except:
+# 				raise SystemExit('Error: file "' + value + '" does not exist.')
+
+
+# def print_args(args):
+# 	for key, value in args.__dict__.items():
+# 		if isinstance(value, str):
+# 			print('args.', key, ' = \'', value, '\'', sep='')
+# 		else:
+# 			print('args.', key, ' = ', value, sep='')
+# 	print('\n')
+
+
+
+def sort_tabix_output(temp_file, out_file, tabix_str='-b2 -e2 -S1', do_sort=1, do_tabix=1):
+	try:
+		out_dir = get_abs_path(os.path.dirname(out_file))
+
+		call_args = [
+			TIGAR_dir + '/sort_tabix_output.sh', 
+			get_abs_path(temp_file), 
+			get_abs_path(out_file), 
+			tabix_str, str(do_sort), str(do_tabix)]
+
+		subprocess.check_call(
+			call_args,
+			cwd=out_dir,
+			stdout=subprocess.DEVNULL,
+			stderr=subprocess.DEVNULL)
+
+	except subprocess.CalledProcessError as err:
+		raise err
 
 
 def read_tabix(start, end, sampleID, chrm, path, file_cols, col_inds, cols, dtype, genofile_type=None, data_format=None, target_ind=5, target=None, weight_threshold=0, raise_error=True, **kwargs):
@@ -877,7 +919,9 @@ def get_ld_data(path, snp_ids):
 			else:
 				n = 0
 
-	return cov_data.set_index('row')
+	cov_data = cov_data.drop_duplicates(['snpID'], keep='first').set_index('row')
+
+	return cov_data
 
 
 def get_ld_matrix(MCOV, return_diag=False):
@@ -1017,7 +1061,7 @@ def calc_maf(df: pd.DataFrame, sampleID, maf, filter=True, op=operator.gt):
 	sample_MAF = np.apply_along_axis(row_maf_impute, 1, vals)
 
 	# re combine dataframe (faster than editing in place)
-	df = pd.concat([df.drop(columns=sampleID), pd.DataFrame(sample_MAF, columns=[*sampleID, 'MAF'])], axis=1)	
+	df = pd.concat([df.drop(columns=sampleID), pd.DataFrame(sample_MAF, columns=[*sampleID, 'MAF'])], axis=1)
 
 	if filter:
 		df = df[op(df.MAF, maf)].reset_index(drop=True)
