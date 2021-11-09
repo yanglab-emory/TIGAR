@@ -40,7 +40,9 @@ start_time = time()
 # parse input arguments
 parser = argparse.ArgumentParser(description='VC TWAS')
 
-parser.add_argument('--chr', type=str, dest='chrm', required=True,
+parser.add_argument('--chr', type=str, dest='chrm', 
+	choices=[str(i + 1) for i in range(22)],
+	required=True, 
 	help='chromosome number')
 parser.add_argument('--format', type=str, dest='data_format', choices=['GT', 'DS'], default='GT', 
 	help='data format of VCF genotype data (DS, GT [default])')
@@ -114,21 +116,6 @@ os.makedirs(os.path.join(args.out_dir, 'logs'), exist_ok=True)
 sys.stdout = open(os.path.join(args.out_dir, 'logs', args.log_file), 'w')
 
 #############################################
-# check input arguments
-if args.genofile_type == 'vcf':
-	if (args.data_format != 'GT') and (args.data_format != 'DS'):
-		raise SystemExit('Please specify the genotype data format used by the vcf file (--format ) as either "GT" or "DS".\n')
-
-elif args.genofile_type == 'dosage':
-	args.data_format = 'DS'
-
-else:
-	raise SystemExit('Please specify the type input genotype file type (--genofile_type) as either "vcf" or "dosage".\n')
-
-if (args.phenotype_type != 'C') and (args.phenotype_type != 'D'):
-	raise SystemExit('Please specify phenotype type (--phenotype_type) as either "C" for continous or "D" for dichotomous.\n')
-
-# out_twas_path = args.out_dir + '/CHR' + args.chrm + '_indv_VC_TWAS.txt'
 tmp_twas_path = out_sub_dir + '/temp_' + args.out_twas_file
 out_twas_path = out_sub_dir + '/' + args.out_twas_file
 

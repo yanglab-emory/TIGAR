@@ -23,7 +23,9 @@ start_time = time()
 # parse input arguments
 parser = argparse.ArgumentParser(description='Asso Study 02')
 
-parser.add_argument('--chr', type=str, dest='chrm', required=True, 
+parser.add_argument('--chr', type=str, dest='chrm', 
+	choices=[str(i + 1) for i in range(22)],
+	required=True, 
 	help='chromosome number')
 parser.add_argument('--gene_anno', type=str, dest='annot_path', required=True)
 parser.add_argument('--LD', type=str, dest='ld_path', required=True, 
@@ -83,9 +85,8 @@ os.makedirs(os.path.join(args.out_dir, 'logs'), exist_ok=True)
 sys.stdout = open(os.path.join(args.out_dir, 'logs', args.log_file), 'w')
 
 
-###############################################################
-## Import TIGAR functions, define other functions
-# import TIGARutils as tg
+#############################################################
+## define other functions
 
 def get_pval(z): return np.format_float_scientific(1-chi2.cdf(z**2, 1), precision=15, exp_digits=0)
 
@@ -144,7 +145,6 @@ Output TWAS results file: {out_path}
 ###############################################################
 ### Read in gene annotation 
 print('Reading gene annotation file.')
-# Gene, TargetID, n_targets = tg.read_gene_annot_exp(args.annot_path, args.chrm)
 Gene, TargetID, n_targets = tg.read_gene_annot_exp(**args.__dict__)
 
 # read in headers for Weight and Zscore files; get the indices and dtypes for reading files into pandas
@@ -215,16 +215,6 @@ def thread_process(num):
 	# drop unneeded columns
 	Zscore = Zscore.drop(columns=['CHROM','POS','REF','ALT','snpIDflip'])
 
-	# # filter remaining by snpIDs
-	# snp_overlap = np.intersect1d(Weight.snpID, Zscore.snpID)
-
-	# if not snp_overlap.size:
-	# 	print('No overlapping test SNPs that have magnitude of cis-eQTL weights greater than threshold value and with GWAS Zscore for TargetID: ' + target + '\n')
-	# 	return None
-
-	# Weight = Weight[Weight.snpID.isin(snp_overlap)]
-	# Zscore = Zscore[Zscore.snpID.isin(snp_overlap)]
-
 	# merge Zscore and Weight dataframes on snpIDs
 	ZW = Weight.merge(Zscore[['snpID','Zscore']], 
 		left_on='snpID', 
@@ -253,7 +243,6 @@ def thread_process(num):
 	Result['n_snps'] = n_snps
 
 	### calculate zscore(s), pvalue(s)
-	# get_zscore_args = [V_cov, ZW, snp_sd]
 	get_zscore_args = [V_cov, ZW.ES.values, ZW.Zscore.values, snp_sd]
 
 	if args.test_stat == 'both':

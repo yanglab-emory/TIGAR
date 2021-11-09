@@ -37,7 +37,9 @@ parser = argparse.ArgumentParser(description='Elastic Net Training')
 
 parser.add_argument('--alpha', type=float, default=0.5, 
 	help='ratio of L1 and L2 for EN model training (default: 0.5)')
-parser.add_argument('--chr', type=str, dest='chrm', required=True, 
+parser.add_argument('--chr', type=str, dest='chrm', 
+	choices=[str(i + 1) for i in range(22)],
+	required=True, 
 	help='chromosome number')
 parser.add_argument('--cv', type=int, default=5, 
 	help='k for k-fold cross validation for EN model training (default: 5)')
@@ -114,7 +116,6 @@ sys.stdout = open(os.path.join(args.out_dir, 'logs', args.log_file), 'w')
 
 ###############################################################
 # DEFINE, IMPORT FUNCTIONS
-# import TIGARutils as tg
 
 ### Elastic Net
 ### Input: 
@@ -183,18 +184,7 @@ def do_cv(i, Geno_Exp_df, cv_trainID, cv_testID):
 	cv_rsquared = elastic_net(train_geno_exp, test_geno_exp)
 	return cv_rsquared
 
-###############################################################
-# check input arguments
-if args.genofile_type == 'vcf':
-	if (args.data_format != 'GT') and (args.data_format != 'DS'):
-		raise SystemExit('Please specify the genotype data format used by the vcf file (--format ) as either "GT" or "DS".\n')
-		
-elif args.genofile_type == 'dosage':
-	args.data_format = 'DS'
-
-else:
-	raise SystemExit('Please specify the type input genotype file type (--genofile_type) as either "vcf" or "dosage".\n')
-	
+###############################################################	
 tmp_weight_path = out_sub_dir + '/temp_' + args.out_weight_file
 out_weight_path = out_sub_dir + '/' + args.out_weight_file
 out_info_path = out_sub_dir + '/' +  args.out_info_file

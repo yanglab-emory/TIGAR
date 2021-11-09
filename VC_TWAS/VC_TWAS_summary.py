@@ -20,9 +20,12 @@ start_time = time()
 # parse input arguments
 parser = argparse.ArgumentParser(description='VC_TWAS summary statistics')
 
-parser.add_argument('--gene_anno', type=str, dest='annot_path', required=True)
-parser.add_argument('--chr', type=str, dest='chrm', required=True, 
+
+parser.add_argument('--chr', type=str, dest='chrm', 
+	choices=[str(i + 1) for i in range(22)],
+	required=True, 
 	help='chromosome number')
+parser.add_argument('--gene_anno', type=str, dest='annot_path', required=True)
 parser.add_argument('--GWAS_result', type=str, dest='gwas_path', required=True)
 parser.add_argument('--LD', type=str, dest='ld_path', required=True)
 parser.add_argument('--log_file', type=str, default='')
@@ -82,8 +85,6 @@ sys.stdout = open(os.path.join(args.out_dir, 'logs', args.log_file), 'w')
 
 #############################################################
 # Print input arguments to log
-
-# out_twas_path = args.out_dir + '/CHR' + args.chrm + '_sum_VC_TWAS.txt'
 tmp_twas_path = out_sub_dir + '/temp_' + args.out_twas_file
 out_twas_path = out_sub_dir + '/' + args.out_twas_file
 

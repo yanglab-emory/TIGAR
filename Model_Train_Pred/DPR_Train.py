@@ -26,7 +26,9 @@ start_time = time()
 # parse input arguments
 parser = argparse.ArgumentParser(description='DPR Training')
 
-parser.add_argument('--chr', type=str, dest='chrm', required=True, 
+parser.add_argument('--chr', type=str, dest='chrm', 
+	choices=[str(i + 1) for i in range(22)],
+	required=True, 
 	help='chromosome number')
 parser.add_argument('--cvR2', type=int, choices=[0, 1], default=1, 
 	help='cvR2 (0: no CV, 1: CV)')
@@ -36,7 +38,7 @@ parser.add_argument('--dpr', type=str, choices=['1', '2'], default=1,
 	help='Bayesian inference algorithm used by DPR (1: Variational Bayesian [default], 2: MCMC)')
 parser.add_argument('--ES', type=str, choices=['additive', 'fixed'], default='fixed', 
 	help='output effect size (additive: fixed + random, fixed: fixed effects [default])')
-parser.add_argument('--format', type=str, dest='data_format', choices=['GT', 'DS'], default='GT')
+parser.add_argument('--format', type=str, dest='data_format', choices=['DS','GT'], default='GT')
 parser.add_argument('--gene_exp', type=str, dest='geneexp_path', required=True)
 parser.add_argument('--genofile', type=str, dest='geno_path', required=True)
 parser.add_argument('--genofile_type', type=str, choices=['vcf', 'dosage'], 
@@ -240,19 +242,8 @@ def remove_dir(path):
 
 #############################################################
 # set absolute paths
-# DPR_path = tg.get_abs_path(args.TIGAR_dir) + '/Model_Train_Pred/DPR'
-DPR_path = TIGAR_dir + '/Model_Train_Pred/DPR'
-
-# check input arguments
-if args.genofile_type == 'vcf':
-	if (args.data_format != 'GT') and (args.data_format != 'DS'):
-		raise SystemExit('Please specify the genotype data format used by the vcf file (--format ) as either "GT" or "DS".\n')
-
-elif args.genofile_type == 'dosage':
-	args.data_format = 'DS'
-
-else:
-	raise SystemExit('Please specify the type input genotype file type (--genofile_type) as either "vcf" or "dosage".\n')
+DPR_path = tg.get_abs_path(args.TIGAR_dir) + '/Model_Train_Pred/DPR'
+# DPR_path = TIGAR_dir + '/Model_Train_Pred/DPR'
 
 tmp_weight_path = out_sub_dir + '/temp_' + args.out_weight_file
 out_weight_path = out_sub_dir + '/' + args.out_weight_file

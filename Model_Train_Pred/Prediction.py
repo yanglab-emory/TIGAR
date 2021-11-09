@@ -22,7 +22,9 @@ start_time=time()
 # parse input arguments
 parser = argparse.ArgumentParser(description='Prediction')
 
-parser.add_argument('--chr', type=str, dest='chrm', required=True,
+parser.add_argument('--chr', type=str, dest='chrm', 
+	choices=[str(i + 1) for i in range(22)],
+	required=True, 
 	help='chromosome number')
 parser.add_argument('--format', type=str, dest='data_format', choices=['GT', 'DS'], default='GT')
 parser.add_argument('--gene_anno', type=str, dest='annot_path', required=True)
@@ -99,21 +101,9 @@ sys.stdout = open(os.path.join(args.out_dir, 'logs', args.log_file), 'w')
 # --out_dir: Output directory (will be created if not exist)
 
 ###############################################################
-# check input arguments
-if args.genofile_type == 'vcf':
-	if (args.data_format != 'GT') and (args.data_format != 'DS'):
-		raise SystemExit('Please specify the genotype data format used by the vcf file (--format ) as either "GT" or "DS".\n')
-		
-elif args.genofile_type == 'dosage':
-	args.data_format = 'DS'
-
-else:
-	raise SystemExit('Please specify the type input genotype file type (--genofile_type) as either "vcf" or "dosage".\n')
 
 tmp_pred_path = out_sub_dir + '/temp_' + args.out_pred_file
 out_pred_path = out_sub_dir + '/' + args.out_pred_file
-
-do_maf_diff = 0 if not args.maf_diff else 1
 
 ###############################################################
 # Print input arguments
@@ -136,8 +126,8 @@ Output prediction results file: {out_path}
 ********************************'''.format(
 	**args.__dict__,
 	out_path = out_pred_path,
-	maf_diff_str1 = {0:'Not e', 1:'E'}[do_maf_diff],
-	maf_diff_str2 = {0:'by MAF difference.', 1:'if MAF difference exceeds: |' + str(args.maf_diff) + '|'}[do_maf_diff]))
+	maf_diff_str1 = {0:'Not e', 1:'E'}[args.maf_diff > 0],
+	maf_diff_str2 = {0:'by MAF difference.', 1:'if MAF difference exceeds: |' + str(args.maf_diff) + '|'}[args.maf_diff > 0]))
 
 # tg.print_args(args)
 
@@ -151,7 +141,7 @@ print('Reading gene annotation file.')
 Gene, TargetID, n_targets = tg.read_gene_annot_exp(**args.__dict__)
 
 # get weight file info
-if do_maf_diff:
+if args.maf_diff:
 	weight_info = tg.weight_file_info(add_cols=['MAF'], **args.__dict__)
 else:
 	weight_info = tg.weight_file_info(**args.__dict__)
@@ -188,7 +178,7 @@ def thread_process(num):
 	print('Getting weight data for target.')
 	Weight = tg.read_tabix(start, end, target=target, **weight_info)
 
-	if do_maf_diff:
+	if args.maf_diff:
 		Weight = Weight[['snpID', 'ES', 'MAF']]
 	else:
 		Weight = Weight[['snpID', 'ES']]
@@ -243,7 +233,7 @@ def thread_process(num):
 		right_on='snpID', 
 		how='inner')
 
-	if do_maf_diff:
+	if args.maf_diff:
 		Pred['diff'] = np.abs(Pred['MAF'].astype('float') - Pred['MAF_test'].astype('float'))
 		
 		Pred = Pred[Pred['diff'] <= args.maf_diff].drop(columns=['MAF','MAF_test','diff']).reset_index(drop=True)
@@ -275,7 +265,7 @@ def thread_process(num):
 if __name__ == '__main__':
 	print('Starting prediction for ' + str(n_targets) + ' target genes.\n')
 	pool = multiprocessing.Pool(args.thread)
-	pool.imap(thread_process,[num for num in range(n_targets)])
+	pool.imap(thread_process, [num for num in range(n_targets)])
 	pool.close()
 	pool.join()
 	print('Done.')
