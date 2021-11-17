@@ -66,11 +66,11 @@ def regression_single(method,X,Y,Annot_df: pd.DataFrame,target):
 	
 	# regression
 	if method=='OLS':
-		lm = sm.OLS(Y,newX).fit()
+		lm = sm.OLS(Y,newX).fit(disp=0)
 		Result['R2'] = lm.rsquared
 		
 	elif method=='Logit':
-		lm = sm.Logit(Y-1,newX).fit()
+		lm = sm.Logit(Y,newX).fit(disp=0)
 		Result['R2'] = lm.prsquared
 
 	Result['BETA'] = lm.params.get(target)
@@ -85,7 +85,7 @@ def regression_single(method,X,Y,Annot_df: pd.DataFrame,target):
 def regression_multi(X,Y,Annot_df: pd.DataFrame):
 	Result = Annot_df.copy()
 
-	lm = sm.OLS(Y,X).fit()
+	lm = sm.OLS(Y,X).fit(disp=0)
 
 	Result['R2'] = lm.rsquared
 	Result['F_STAT'] = lm.fvalue
@@ -155,7 +155,7 @@ def thread_single(num):
 	X = target_data[[*cov, target]]
 	Y = target_data[pheno]
 
-	Result = regression_single('OLS',X,Y,target_annot,target)
+	Result = regression_single(args.method,X,Y,target_annot,target)
 
 	Result.to_csv(
 		out_twas_path,
