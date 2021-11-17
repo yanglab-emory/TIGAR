@@ -86,10 +86,8 @@ def check_tabix():
 
 def check_input_files(args):
 	for key, value in args.__dict__.items():
-		if key.endswith('path') and (not os.path.isfile(value)):
+		if key.endswith('path') and (not os.path.isfile(value)) and (not 'out' in key):
 			raise SystemExit('Error: file "' + value + '" does not exist.\n')
-
-
 
 # used to catch exceptions that dont require a traceback
 class NoTargetDataError(Exception):
@@ -223,7 +221,7 @@ def sampleid_startup(chrm=None, genofile_type=None, data_format=None, sampleid_p
 	if not sampleID.size:
 		raise SystemExit('There are no overlapped sample IDs in the input files.')
 
-	print('Running job for ' + str(sampleID.size) + ' matched sampleIDs.')
+	print('Running job for ' + str(sampleID.size) + ' matched sampleIDs.\n')
 
 	## return values
 	return_lst = [sampleID, sampleID.size]
@@ -1226,3 +1224,5 @@ def sort_tabix_output(temp_file, out_file, tabix_str='-b2 -e2 -S1', do_sort=1, d
 
 	except subprocess.CalledProcessError as err:
 		raise err
+
+
