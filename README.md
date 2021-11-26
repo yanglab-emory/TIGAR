@@ -57,9 +57,9 @@
 	- [statsmodels](https://www.statsmodels.org/stable/index.html)
    <!-- - Python Standard Library: argparse, io, math, multiprocessing, operator, subprocess, sys, time, warnings -->
 
-#### Python Environment Setup 
+#### Python Environment Setup (using conda or pip)
 
-##### conda
+##### Using conda
 - Installation:
 ```bash
 # create the environment tigarenv
@@ -77,7 +77,7 @@ export PYTHONPATH=${CONDA_PREFIX}/lib/python3.5/site-packages/:$PYTHONPATH
 After running TIGAR use `conda deactivate` to deactivate the conda environment.
 
 
-##### pip
+##### Using pip
 - Installation:
 ```bash
 # install pip
