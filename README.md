@@ -1,13 +1,15 @@
 # TIGAR
-**TIGAR** stands for **Transcriptome-Integrated Genetic Association Resource**, which is developed using *Python* and *BASH* scripts for conducting **Transcriptome-Wide Association Studies (TWAS)** by training gene expression imputation models by **nonparametric Bayesian Dirichlet Process Regression (DPR)** method with reference dataset. 
+**TIGAR** stands for **Transcriptome-Integrated Genetic Association Resource**, which is developed using *Python* and *BASH* scripts for conducting **Transcriptome-Wide Association Studies (TWAS)** by training gene expression imputation models by **nonparametric Bayesian Dirichlet Process Regression (DPR)** and **Elastic-Net (PrediXcan)** methods with reference transcriptomic panels. 
 
 1. **TIGAR** can train gene expression imputation models by both **nonparametric Bayesian DPR** and **Elastic-Net (PrediXcan)** methods with reference dataset that contain transcriptomic and genetic data of the same samples.
-2. Impute **Genetically Regulated gene eXpression (GReX)** from *Individual-level* genetic data
-3. Conduct **TWAS** using both *Individual-level* and *Summary-level* GWAS data for studying *Univariate* and *Multivariate* phenotypes.
-4. Conduct **VC-TWAS** using *Individual-level* GWAS data and *Summary-level* GWAS data using cis-eQTL effect sizes estimated from **nonparametric Bayesian DPR** methods for *Univariate* phenotypes.
-5. **Note:** please use our most recently updated scripts to conduct TWAS.
-6. Please cite our TIGAR paper:
->[*TIGAR: An Improved Bayesian Tool for Transcriptomic Data Imputation Enhances Gene Mapping of Complex Traits.* 2019 AJHG.](https://www.cell.com/ajhg/fulltext/S0002-9297(19)30205-8)
+2. Impute **Genetically Regulated gene eXpression (GReX)** from *Individual-level* genetic data.
+3. Conduct **TWAS** using both *Individual-level* and *Summary-level* GWAS data for studying *Univariate* and *Multivariate* phenotypes. Both *FUSION* and *S-PrediXcan* Z-score test statistics will calculated in the TWAS results.
+4. Conduct **VC-TWAS** using *Individual-level* and *Summary-level* GWAS data using cis-eQTL effect sizes estimated from reference panels for *Univariate* phenotypes.
+5. **Note:** please use our most recently updated scripts on Github to conduct TWAS.
+6. *Cis-eQTL Effect Sizes* (i.e., weights) estimated from GTEx V8 reference data of 48 tissue types by *Nonparametric Bayesian DPR* method, and *Reference LD Files* from GTEx V8 EUR samples, are available from [Synapse:syn16804296](https://www.synapse.org/#!Synapse:syn16804296/wiki/611467).
+7. Please cite our TIGAR papers:
+	- [*TIGAR: An Improved Bayesian Tool for Transcriptomic Data Imputation Enhances Gene Mapping of Complex Traits.* AJHG, 2019. Volume 105, ISSUE 2, P267-282.](https://www.cell.com/ajhg/fulltext/S0002-9297(19)30205-8)
+	- [*TIGAR-V2: Efficient TWAS tool with nonparametric Bayesian eQTL weights of 49 tissue types from GTEx V8.* HGG Advances, 2022. Volume 3, Issue 1.](https://doi.org/10.1016/j.xhgg.2021.100068)
 
 ---
 
