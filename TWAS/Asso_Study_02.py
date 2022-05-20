@@ -224,6 +224,7 @@ def thread_process(num):
 	snp_sd, V_cov = tg.get_ld_matrix(MCOV)
 
 	ZW = ZW[ZW.snpID.isin(MCOV.snpID)]
+	ZW = ZW.drop_duplicates(['snpID'], keep='first').reset_index(drop=True)
 	n_snps = str(ZW.snpID.size)
 
 	print('Running TWAS.\nN SNPs=' + n_snps)

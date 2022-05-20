@@ -443,10 +443,12 @@ def read_tabix(start, end, sampleID, chrm, path, file_cols, col_inds, cols, dtyp
 
 	df = optimize_cols(df)
 
-	# get snpID, filter out duplicates
+	# get snpID
 	if (genofile_type != 'weight') or (not 'snpID' in cols):
 		df['snpID'] = get_snpIDs(df)
-		df = df.drop_duplicates(['snpID'], keep='first').reset_index(drop=True)
+
+	# filter out duplicated snpIDs
+	df = df.drop_duplicates(['snpID'], keep='first').reset_index(drop=True)
 
 	# weight file handling
 	if (genofile_type == 'weight'):
