@@ -329,42 +329,45 @@ def read_gene_annot_exp(chrm=None, geneexp_path=None, annot_path=None, cols=['CH
 ## line filter functions for read_tabix
 
 def filter_vcf_line(line: bytes, bformat, col_inds, split_multi_GT):
-	# split line into list
-	row = line.split(b'\t')
-	# get index of data format
-	data_fmts = row[8].split(b':')
-	# may be multiallelic; only first alt allele will be used unless split_multi_GT; later data with bad values will be filtered out
-	alt_alleles = row[4].split(b',')
-	row[4] = alt_alleles[0]
-	# filter sample columns to include only data in desired format; sampleIDs start at file column index 9; in new row sampleIDs now start at 4, ALT is column 3
-	if (len(data_fmts) > 1):
-		data_ind = data_fmts.index(bformat)
-		row[8] = bformat
-		row = [row[x] if x <= 8 else row[x].split(b':')[data_ind] for x in col_inds]
-	else:
-		row = [row[x] for x in col_inds]
-	# turn multi-allelic lines into multiple biallelic lines
-	if split_multi_GT & (len(alt_alleles) > 1):
-		sample_str = b'\t'.join(row[4:])
-		line = bytearray()
-		for j in range(1, len(alt_alleles) + 1):
-			str_j = sample_str
-			for k in range(1, len(alt_alleles) + 1):
-				# substitute alt alleles besides the jth one with missing
-				str_j = re.sub(str(k).encode(), b'.', str_j) if (k != j) else str_j
-			# set jth alt allele to 1
-			str_j = re.sub(str(j).encode(), b'1', str_j)
-			# join row info information
-			line_j = b'\t'.join([*row[0:3], alt_alleles[j-1], str_j])
+	try:
+		# split line into list
+		row = line.split(b'\t')
+		# get index of data format
+		data_fmts = row[8].split(b':')
+		# may be multiallelic; only first alt allele will be used unless split_multi_GT; later data with bad values will be filtered out
+		alt_alleles = row[4].split(b',')
+		row[4] = alt_alleles[0]
+		# filter sample columns to include only data in desired format; sampleIDs start at file column index 9; in new row sampleIDs now start at 4, ALT is column 3
+		if (len(data_fmts) > 1):
+			data_ind = data_fmts.index(bformat)
+			row[8] = bformat
+			row = [row[x] if x <= 8 else row[x].split(b':')[data_ind] for x in col_inds]
+		else:
+			row = [row[x] for x in col_inds]
+		# turn multi-allelic lines into multiple biallelic lines
+		if split_multi_GT & (len(alt_alleles) > 1):
+			sample_str = b'\t'.join(row[4:])
+			line = bytearray()
+			for j in range(1, len(alt_alleles) + 1):
+				str_j = sample_str
+				for k in range(1, len(alt_alleles) + 1):
+					# substitute alt alleles besides the jth one with missing
+					str_j = re.sub(str(k).encode(), b'.', str_j) if (k != j) else str_j
+				# set jth alt allele to 1
+				str_j = re.sub(str(j).encode(), b'1', str_j)
+				# join row info information
+				line_j = b'\t'.join([*row[0:3], alt_alleles[j-1], str_j])
+				# append linebreak if needed
+				line_j = line_j if line_j.endswith(b'\n') else line_j + b'\n'
+				line += line_j
+		else:
+			# row to bytestring
+			line = b'\t'.join(row)
 			# append linebreak if needed
-			line_j = line_j if line_j.endswith(b'\n') else line_j + b'\n'
-			line += line_j
-	else:
-		# row to bytestring
-		line = b'\t'.join(row)
-		# append linebreak if needed
-		line += b'' if line.endswith(b'\n') else b'\n'
-	return line
+			line += b'' if line.endswith(b'\n') else b'\n'
+		return line
+	except:
+		return b''
 
 def filter_weight_line(line: bytes, btarget: bytes, target_ind, col_inds):
 	# split line into list
