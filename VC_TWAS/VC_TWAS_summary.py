@@ -1,5 +1,5 @@
 # %%
-#!/usr/bin/env python
+#! /bin/env python
 
 ###################################################################
 # Import packages needed

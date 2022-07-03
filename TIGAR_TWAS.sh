@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#! /bin/bash
 
 #######################################################################
 ### Input Arguments for TWAS
@@ -17,8 +17,8 @@
 
 ############### Variables for asso=2 ###############
 # --gene_anno : Path for gene annotation file to specify a list of gene for GReX prediction
-# --chr: Chromosome number need to be specified 
-# --weight: Path for SNP weight (eQTL effect size) file 
+# --chr: Chromosome number need to be specified
+# --weight: Path for SNP weight (eQTL effect size) file
 # --Zscore : Path for GWAS summary Zscore statistics
 # --LD : Path for reference LD (SNP genotype covariance matrix) that should be bgzipped and tabixed. Can be generated using our `covar_calculation.py` script
 # --window: Window size around gene region for selecting cis-SNPs for fitting gene expression prediction model (default 1000000 for +- 1MB region around gene)
@@ -36,7 +36,7 @@ then
     echo "Terminating....." >&2
     exit 1
 fi
- 
+
 eval set -- "$VARS"
 
 while true
@@ -84,7 +84,7 @@ else
     out_sub_dir=${out_dir}
 fi
 
-############# TWAS 
+############# TWAS
 
 ## make output directory
 mkdir -p ${out_dir}

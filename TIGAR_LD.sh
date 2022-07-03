@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#! /bin/bash
 
 #######################################################################
 ### Input Arguments for GReX Prediction
@@ -6,7 +6,7 @@
 
 ###
 # genom_block : Genome segmentation block annotation based on LD
-# --genofile: Path for the reference genotype file (bgzipped and tabixed) 
+# --genofile: Path for the reference genotype file (bgzipped and tabixed)
 # --genofile_type: Genotype file type: "vcf" or "dosage"
 # --format: Genotype format in VCF file that should be used: "GT" (default) for genotype data or "DS" for dosage data, only required if the input genotype file is of VCF file
 # --chr: Chromosome number need to be specified with respect to the genotype input data
@@ -25,7 +25,7 @@ then
     echo "Terminating....." >&2
     exit 1
 fi
- 
+
 eval set -- "$VARS"
 
 while true
@@ -79,7 +79,7 @@ if [ ! -x "$(command -v tabix)" ]; then
     exit 1
 fi
 
-# Check genotype file 
+# Check genotype file
 if [ ! -f "${genofile}" ] ; then
     echo Error: Reference genotype file ${genofile} does not exist or is empty. >&2
     exit 1
@@ -110,7 +110,7 @@ python ${TIGAR_dir}/TWAS/Get_LD.py \
 
 
 ### 2. TABIX output file
-# Check ld file 
+# Check ld file
 if [ ! -f ${out_sub_dir}/${out_ld_file}.txt ] ; then
     echo Error: Reference LD covariance file ${out_sub_dir}/${out_ld_file}.txt was not generated successfully. >&2
     exit 1
@@ -164,16 +164,13 @@ else
     echo 'Tabix-ing output LD file.'
     # tabix
     tabix -f -s3 -b4 -e4 -S1 ${out_sub_dir}/${out_ld_file}.txt.gz
-fi    
+fi
 
 
 # Check tabix file
 if [ ! -f ${out_sub_dir}/${out_ld_file}.txt.gz.tbi ] ; then
     echo Error: Tabix reference LD covariance file ${out_sub_dir}/${out_ld_file}.txt.gz failed. >&2
     exit 1
-else 
+else
     echo Successfully generated reference LD covariance file: ${out_sub_dir}/${out_ld_file}.txt.gz
 fi
-
-
-

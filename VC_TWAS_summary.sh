@@ -1,13 +1,13 @@
-#!/usr/bin/bash
+#! /bin/bash
 
 #######################################################################
 ### Input Arguments for VC_TWAS with summary stat
 #######################################################################
 
 # --chr: Chromosome number need to be specified with respect to the genotype input data
-# --weight: Path for SNP weight (eQTL effect size) file 
+# --weight: Path for SNP weight (eQTL effect size) file
 # --gene_anno: Path for gene annotation file to specify a list of gene for GReX prediction
-# --GWAS_result: Path to GWAS result file 
+# --GWAS_result: Path to GWAS result file
 # --sample_size: Sample size of summary-level GWAS data
 # --LD: Path to Reference LD genotype covariance file
 # --window: Window size around gene transcription starting sites (TSS) for selecting cis-SNPs for fitting gene expression prediction model (default 1000000 for +- 1MB region around TSS)
@@ -27,7 +27,7 @@ then
     echo "Terminating....." >&2
     exit 1
 fi
- 
+
 eval set -- "$VARS"
 
 while true
@@ -79,7 +79,7 @@ if [ ! -x "$(command -v tabix)" ]; then
     exit 1
 fi
 
-# Check weight file 
+# Check weight file
 if [ ! -f "${weight}" ] ; then
     echo Error: Training genotype file ${weight} does not exist or is empty. >&2
     exit 1
@@ -118,4 +118,3 @@ python ${TIGAR_dir}/VC_TWAS/VC_TWAS_summary.py \
 
 
 echo "Completed VC-TWAS."
-

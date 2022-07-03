@@ -1,5 +1,5 @@
 # %%
-#!/usr/bin/env python
+#! /bin/env python
 # -*- coding: utf-8 -*-
 ##########################################################################################
 # import packages needed

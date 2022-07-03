@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#! /bin/bash
 
 #########################################################
 #### Required software
@@ -12,7 +12,7 @@
 # --model: Gene expression prediction model: "elastic_net" or "DPR"
 # --gene_exp: Path for Gene annotation and Expression file
 # --train_sampleID: Path for a file with sampleIDs that will be used for training
-# --genofile: Path for the training genotype file (bgzipped and tabixed) 
+# --genofile: Path for the training genotype file (bgzipped and tabixed)
 # --chr: Chromosome number need to be specified with respect to the genotype input data
 # --genofile_type: Genotype file type: "vcf" or "dosage"
 # --format: Genotype format in VCF file that should be used: "GT" (default) for genotype data or "DS" for dosage data, only required if the input genotype file is of VCF file
@@ -44,7 +44,7 @@ then
     echo "Please provide input files. Terminating....." >&2
     exit 1
 fi
- 
+
 eval set -- "$VARS"
 
 while true
@@ -85,7 +85,7 @@ done
 
 
 ##########################################
-# Setting Default Input Argument Values 
+# Setting Default Input Argument Values
 ##########################################
 
 thread=${thread:-1}
@@ -105,8 +105,8 @@ format=${format:-"GT"}
 sub_dir=${sub_dir:-1}
 
 #### Create output directory if not existed
-mkdir -p ${out_dir}
-mkdir -p ${out_dir}/logs
+mkdir -p -m777 ${out_dir}
+mkdir -p -m777 ${out_dir}/logs
 
 # check tabix command
 if [ ! -x "$(command -v tabix)" ]; then
@@ -126,7 +126,7 @@ if [ ! -f "${train_sampleID}" ]; then
     exit 1
 fi
 
-# Check genotype file 
+# Check genotype file
 if [ ! -f "${genofile}" ]; then
     echo Error: Training genotype file ${genofile} does not exist or is empty. >&2
     exit 1
@@ -134,7 +134,7 @@ fi
 
 
 ####################################
-# 1. Model Training 
+# 1. Model Training
 ####################################
 
 if [[ "$model"x == "elastic_net"x ]];then
@@ -157,7 +157,7 @@ if [[ "$model"x == "elastic_net"x ]];then
     out_info_file=${out_info_file:-${out_prefix}_GeneInfo.txt}
     log_file=${log_file:-${out_prefix}_log.txt}
 
-    mkdir -p ${out_sub_dir}
+    mkdir -p -m777 ${out_sub_dir}
 
     python ${TIGAR_dir}/Model_Train_Pred/Elastic_Net_Train.py \
     --gene_exp ${gene_exp} \
@@ -203,14 +203,14 @@ elif [[ "$model"x == "DPR"x ]]; then
     log_file=${log_file:-${out_prefix}_log.txt}
 
     ### Store DPR Results
-    mkdir -p ${out_sub_dir}
+    mkdir -p -m777 ${out_sub_dir}
 
     ### Store files for DPR under DPR_Files
-    mkdir -p ${out_sub_dir}/DPR_Files${job_suf}
+    mkdir -p -m777 ${out_sub_dir}/DPR_Files${job_suf}
 
     ### Store Cross Validation DPR input files and outputs
     if [ ${cvR2} == "1" ] ; then
-        mkdir -p ${out_sub_dir}/CV_Files${job_suf}
+        mkdir -p -m777 ${out_sub_dir}/CV_Files${job_suf}
         echo "Running 5-fold cross validation to evaluate DPR model."
     else
         echo "Skipping 5-fold CV."
@@ -274,7 +274,7 @@ temp=${out_sub_dir}/temp_${out_weight_file}
 weight=${out_sub_dir}/${out_weight_file}
 
 echo "Sort/bgzip/tabix-ing output weight file."
-head -n1 ${temp} > ${weight} ; 
+head -n1 ${temp} > ${weight} ;
 
 # attempt sorting in default directory, if that fails try out_sub_dir
 tail -n+2 ${temp} | \
@@ -292,4 +292,3 @@ if [ ! -f "${temp}" ] ; then
 else
     echo "Sort failed; Unable to bgzip/tabix output weights file."
 fi
-

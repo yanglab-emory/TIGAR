@@ -1,15 +1,15 @@
-#!/usr/bin/bash
+#! /bin/bash
 
 #######################################################################
 ### Input Arguments for GReX Prediction
 #######################################################################
 
 # --chr: Chromosome number need to be specified with respect to the genotype input data
-# --weight: Path for SNP weight (eQTL effect size) file 
+# --weight: Path for SNP weight (eQTL effect size) file
 # --gene_anno : Path for gene annotation file to specify a list of gene for GReX prediction
 # `--gene_anno`: Gene annotation file to specify the list of genes, which is of the same format as the first five columsn of gene expression file
 # --test_sampleID: Path for a file with sampleIDs that should be contained in the genotype file
-# --genofile: Path for the training genotype file (bgzipped and tabixed) 
+# --genofile: Path for the training genotype file (bgzipped and tabixed)
 # --genofile_tye: Genotype file type: "vcf" or "dosage"
 # --format: Genotype format in VCF file that should be used: "GT" (default) for genotype data or "DS" for dosage data, only required if the input genotype file is of VCF file
 # --window: Window size around gene region for selecting cis-SNPs for fitting gene expression prediction model (default 1000000 for +- 1MB region around gene)
@@ -29,7 +29,7 @@ then
     echo "Terminating....." >&2
     exit 1
 fi
- 
+
 eval set -- "$VARS"
 
 while true
@@ -90,7 +90,7 @@ if [ ! -x "$(command -v tabix)" ]; then
     exit 1
 fi
 
-# Check genotype file 
+# Check genotype file
 if [ ! -f "${genofile}" ] ; then
     echo Error: Training genotype file ${genofile} does not exist or is empty. >&2
     exit 1
@@ -139,8 +139,3 @@ python ${TIGAR_dir}/Model_Train_Pred/Prediction.py \
 > ${out_dir}/logs/${log_file}
 
 echo Completed prediction.
-
-
-
-
-
