@@ -83,7 +83,6 @@ do
 done
 
 
-
 ##########################################
 # Setting Default Input Argument Values
 ##########################################
@@ -181,7 +180,6 @@ if [[ "$model"x == "elastic_net"x ]];then
     --TIGAR_dir ${TIGAR_dir} \
     --out_dir ${out_sub_dir} \
     > ${out_dir}/logs/${log_file}
-
 
 elif [[ "$model"x == "DPR"x ]]; then
     echo "Training gene expression imputation models using Nonparametric Bayesian DPR method..."
