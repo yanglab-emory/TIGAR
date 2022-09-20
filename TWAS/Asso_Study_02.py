@@ -66,7 +66,7 @@ sys.path.append(args.TIGAR_dir)
 ## Import TIGAR functions, define other functions
 import TIGARutils as tg
 
-def get_pval(z): return np.format_float_scientific(1-chi2.cdf(z**2, 1), precision=15, exp_digits=0)
+def get_pval(z): return np.format_float_scientific(chi2.sf(z**2, 1), precision=15, exp_digits=0)
 
 def get_V_cor(V_cov):
 	V_cov = V_cov.copy()
