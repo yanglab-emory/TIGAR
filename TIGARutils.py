@@ -77,6 +77,31 @@ def error_handler(func):
 
 	return wrapper
 
+def fatal_error_handler(func):
+	@functools.wraps(func)
+	def wrapper(num, *args, **kwargs):     
+		try:
+			return func(num, *args, **kwargs)
+
+		except NoTargetDataError:
+			return None
+
+		except Exception as e:
+			e_info = sys.exc_info()
+			e_type = e_info[0].__name__
+			
+			# don't print traceback info for wrapper
+			e_tracebk = ''.join(traceback.format_tb(e_info[2])[1:])
+
+			print('Caught an exception for num={}:\n  {}: {}\nTraceback:\n{}'.format(num, e_type, e, e_tracebk))
+
+			sys.exit()
+
+		finally:
+			sys.stdout.flush()
+
+	return wrapper
+
 
 # returns absolute path
 def get_abs_path(x): return os.path.abspath(os.path.expanduser(os.path.expandvars(x)))

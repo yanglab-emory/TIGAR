@@ -62,6 +62,10 @@ sys.path.append(args.TIGAR_dir)
 # DEFINE, IMPORT FUNCTIONS
 import TIGARutils as tg
 
+def block_error(e):
+	print('Fatal error in block LD calculation.\n')
+	pool.terminate()
+
 # limit to 4 decimal places max, strip trailing 0s
 def cov_fmt(x): return ('%.4f' % x).rstrip('0').rstrip('.')
 
@@ -140,7 +144,7 @@ pd.DataFrame(columns=out_cols).to_csv(
 print('********************************\n')
 
 ###############################################################
-@tg.error_handler
+@tg.fatal_error_handler
 def thread_process(num):
 	Block = Blocks.loc[num]
 	print('num=' + str(num))
@@ -167,12 +171,15 @@ def thread_process(num):
 
 	print('Block LD calculation completed for block.\n')
 
+
 ##################################################################
 # thread process
 if __name__ == '__main__':
 	print('Starting LD calculation for ' + str(n_blocks) + ' blocks.\n')
+	global pool
 	pool = multiprocessing.Pool(args.thread)
-	pool.imap(thread_process,[num for num in range(n_blocks)])
+	# pool.imap(thread_process,[num for num in range(n_blocks)])
+	pool.map_async(thread_process,[num for num in range(n_blocks)], error_callback=block_error)
 	pool.close()
 	pool.join()
 	print('Done.')
