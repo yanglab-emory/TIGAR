@@ -153,7 +153,7 @@ def thread_process(num):
 	Geno = tg.read_tabix(Block.Start, Block.End, sampleID, **geno_info)
 
 	# calculate, filter maf
-	Geno = tg.calc_maf(Geno, sampleID, args.maf)
+	Geno = tg.calc_maf(Geno, sampleID, args.maf, filter_bid=True)
 
 	# get upper covariance matrix
 	mcovar = np.triu(np.cov(Geno[sampleID].values)).tolist()
