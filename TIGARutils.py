@@ -1014,7 +1014,7 @@ def row_maf_impute(x):
 	x[np.where(np.isnan(x))] = 2 * MAF_val
 	return np.append(x, MAF_val)
 
-def calc_maf(df: pd.DataFrame, sampleID, maf, filter=True, op=operator.gt):
+def calc_maf(df: pd.DataFrame, sampleID, maf, filter=True, op=operator.gt, filter_bid=False):
 	df = df.reset_index(drop=True).copy()
 	vals = df[sampleID].values
 
@@ -1026,6 +1026,8 @@ def calc_maf(df: pd.DataFrame, sampleID, maf, filter=True, op=operator.gt):
 
 	if filter:
 		df = df[op(df.MAF, maf)].reset_index(drop=True)
+		if filter_bid:
+			df = df[op(1 - df.MAF, maf)].reset_index(drop=True)
 
 	return df
 
