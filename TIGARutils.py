@@ -423,8 +423,9 @@ def read_tabix(start, end, sampleID, chrm, path, file_cols, col_inds, cols, dtyp
 	proc = subprocess.Popen(
 		[command_str],
 		shell=True,
-		stdout=subprocess.PIPE,
-		bufsize=1)
+		stdout=subprocess.PIPE#,
+		# bufsize=1
+		)
 
 	# initialize bytearray
 	proc_out = bytearray()
@@ -521,8 +522,9 @@ def tabix_query_files(start, end, chrm, geno_path=None, gwas_path=None, w_path=N
 	reg_str = ' ' + chrm + ':' + start + '-' + end
 	# for each path test if length of first line != 0
 	return np.all([len(subprocess.Popen(['tabix '+path+reg_str],
-		shell=True, stdout=subprocess.PIPE,
-		bufsize=1).stdout.readline()) > 0  for path in paths])
+		shell=True, stdout=subprocess.PIPE#,
+		# bufsize=1
+		).stdout.readline()) > 0  for path in paths])
 
 
 # Call tabix, read in lines into byte array
@@ -536,8 +538,9 @@ def call_tabix(path, chrm, start, end, add_command_str = ''):
 	proc = subprocess.Popen(
 		[command_str],
 		shell=True,
-		stdout=subprocess.PIPE,
-		bufsize=1)
+		stdout=subprocess.PIPE#,
+		# bufsize=1
+		)
 
 	proc_out = bytearray()
 
@@ -565,8 +568,9 @@ def call_tabix_header(path, out='tuple', rename={}):
 	proc = subprocess.Popen(
 		['tabix -H ' + path],
 		shell=True,
-		stdout=subprocess.PIPE,
-		bufsize=1)
+		stdout=subprocess.PIPE#,
+		# bufsize=1
+		)
 
 	proc_out = bytearray()
 
@@ -587,7 +591,9 @@ def call_tabix_header(path, out='tuple', rename={}):
 	header = pd.read_csv(
 		StringIO(proc_out.decode('utf-8')),
 		sep='\t',
-		error_bad_lines=False).rename(columns=rename)
+		#error_bad_lines=False
+		on_bad_lines='warn'
+		).rename(columns=rename)
 
 	if out=='tuple':
 		return tuple(header)
@@ -648,8 +654,9 @@ def get_vcf_header(path, out='tuple'):
 	proc = subprocess.Popen(
 		["zgrep -m1 -E 'CHROM' "+path],
 		shell=True,
-		stdout=subprocess.PIPE,
-		bufsize=1)
+		stdout=subprocess.PIPE#,
+		# bufsize=1
+		)
 
 	proc_out = bytearray()
 	while proc.poll() is None:
@@ -664,7 +671,9 @@ def get_vcf_header(path, out='tuple'):
 	header = pd.read_csv(
 		StringIO(proc_out.decode('utf-8')),
 		sep='\t',
-		error_bad_lines=False).rename(columns={'#CHROM':'CHROM'})   
+		#error_bad_lines=False
+		on_bad_lines='warn'
+		).rename(columns={'#CHROM':'CHROM'})   
 
 	if out=='tuple':
 		return tuple(header)
@@ -836,8 +845,9 @@ def call_tabix_regions(path, regs_str, filter_line = lambda x:x ):
 	proc = subprocess.Popen(
 		['tabix '+path+' '+regs_str],
 		shell=True,
-		stdout=subprocess.PIPE,
-		bufsize=1)
+		stdout=subprocess.PIPE#,
+		# bufsize=1
+		)
 	proc_out = bytearray()
 
 	# process while subprocesses running
