@@ -28,7 +28,7 @@
 
 #######################################################################
 VARS=`getopt -o "" -a -l \
-chr:,weight:,test_sampleID:,gene_anno:,genofile:,genofile_type:,format:,window:,phenotype_type:,missing_rate:,maf:,hwe:,weight_threshold:,PED:,PED_info:,TIGAR_dir:,thread:,sub_dir:,log_file:,out_dir: \
+chr:,weight:,test_sampleID:,gene_anno:,genofile:,genofile_type:,format:,window:,phenotype_type:,missing_rate:,maf:,hwe:,weight_threshold:,PED:,PED_info:,TIGAR_dir:,thread:,sub_dir:,log_file:,in_dir:,out_dir: \
 -- "$@"`
 
 echo "Conducting VC-TWAS using individual-level GReX and phenotype data ... "
@@ -64,6 +64,7 @@ do
         --sub_dir|-sub_dir) sub_dir=$2; shift 2;;
         --log_file|-log_file) log_file=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
+				--in_dir|-in_dir) in_dir=$2; shift 2;;
         --) shift;break;;
         *) echo "Internal error!";exit 1;;
         esac
@@ -79,6 +80,15 @@ log_file=${log_file:-CHR${chr}_VCTWAS_log.txt}
 
 # sub_dir: whether to use subdirectory inside out_dir for output files
 sub_dir=${sub_dir:-1}
+
+# check if user submitted in_dir
+if [[ "$in_dir"x != ""x ]];then
+	# if yes, check if in_dir var ends with a backslash
+  if [[ "$in_dir"x != */x ]];then
+  	# if it doesn't, add backslash
+    in_dir=$in_dir"/"
+  fi
+fi
 
 #### Create output directory if not existed
 mkdir -p ${out_dir}
@@ -102,26 +112,26 @@ if [ ! -x "$(command -v tabix)" ]; then
 fi
 
 # Check genotype file 
-if [ ! -f "${genofile}" ]; then
-    echo Error: Training genotype file ${genofile} does not exist or is empty. >&2
+if [ ! -f "${in_dir}${genofile}" ]; then
+    echo Error: Training genotype file ${in_dir}${genofile} does not exist or is empty. >&2
     exit 1
 fi
 
 # Check training sample ID file
-if [ ! -f "${test_sampleID_file}" ]; then
-    echo Error: Test sample ID file ${test_sampleID_file} does not exist or is empty. >&2
+if [ ! -f "${in_dir}${test_sampleID_file}" ]; then
+    echo Error: Test sample ID file ${in_dir}${test_sampleID_file} does not exist or is empty. >&2
     exit 1
 fi
 
 # Check eQTL weight file
-if [ ! -f "${weight_file}" ]; then
-    echo Error: eQTL weight file ${weight_file} does not exist or is empty. >&2
+if [ ! -f "${in_dir}${weight_file}" ]; then
+    echo Error: eQTL weight file ${in_dir}${weight_file} does not exist or is empty. >&2
     exit 1
 fi
 
 # Check gene annotation file
-if [ ! -f "${gene_anno}" ]; then
-    echo Error: eQTL weight file ${gene_anno} does not exist or is empty. >&2
+if [ ! -f "${in_dir}${gene_anno}" ]; then
+    echo Error: eQTL weight file ${in_dir}${gene_anno} does not exist or is empty. >&2
     exit 1
 fi
 
@@ -137,10 +147,10 @@ fi
 
 python ${TIGAR_dir}/VC_TWAS/VC_TWAS.py \
 --chr ${chr} \
---weight ${weight_file} \
---test_sampleID ${test_sampleID_file} \
---gene_anno ${gene_anno} \
---genofile ${genofile} \
+--weight ${in_dir}${weight_file} \
+--test_sampleID ${in_dir}${test_sampleID_file} \
+--gene_anno ${in_dir}${gene_anno} \
+--genofile ${in_dir}${genofile} \
 --genofile_type ${genofile_type} \
 --format ${format} \
 --window ${window} \
@@ -150,8 +160,8 @@ python ${TIGAR_dir}/VC_TWAS/VC_TWAS.py \
 --hwe ${hwe} \
 --weight_threshold ${weight_threshold} \
 --thread ${thread} \
---PED ${PED} \
---PED_info ${PED_info} \
+--PED ${in_dir}${PED} \
+--PED_info ${in_dir}${PED_info} \
 --TIGAR_dir ${TIGAR_dir} \
 --out_dir ${out_sub_dir} \
 > ${out_dir}/logs/${log_file}
