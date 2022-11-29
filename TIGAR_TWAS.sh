@@ -28,7 +28,7 @@
 
 ###############################################################
 VARS=`getopt -o "" -a -l \
-asso:,gene_exp:,gene_anno:,PED:,PED_info:,method:,Zscore:,weight:,LD:,chr:,window:,TIGAR_dir:,thread:,weight_threshold:,sub_dir:,out_twas_file:,out_prefix:,log_file:,out_dir:,sampleID:,test_stat:,test_sampleID: \
+asso:,gene_exp:,gene_anno:,PED:,PED_info:,method:,Zscore:,weight:,LD:,chr:,window:,TIGAR_dir:,thread:,weight_threshold:,sub_dir:,out_twas_file:,out_prefix:,log_file:,in_dir:,out_dir:,sampleID:,test_stat:,test_sampleID: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -44,7 +44,7 @@ do
     case "$1" in
         --asso|-asso) asso=$2; shift 2;;
         --gene_exp|-gene_exp) gene_exp=$2; shift 2;;
-		--gene_anno|-gene_anno) gene_anno=$2; shift 2;;
+				--gene_anno|-gene_anno) gene_anno=$2; shift 2;;
         --PED|-PED) PED=$2; shift 2;;
         --PED_info|-PED_info) PED_info=$2; shift 2;;
         --method|-method) method=$2; shift 2;;
@@ -64,6 +64,7 @@ do
         --out_twas_file|-out_twas_file) out_twas_file=$2; shift 2;;
         --log_file|-log_file) log_file=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
+				--in_dir|-in_dir) in_dir=$2; shift 2;;
         --) shift;break;;
         *) echo "Internal error!";exit 1;;
         esac
@@ -76,6 +77,15 @@ method=${method:-'OLS'}
 weight_threshold=${weight_threshold:-0}
 test_stat=${test_stat:-'both'}
 sub_dir=${sub_dir:-1}
+
+# check if user submitted in_dir
+if [[ "$in_dir"x != ""x ]];then
+	# if yes, check if in_dir var ends with a backslash
+  if [[ "$in_dir"x != */x ]];then
+  	# if it doesn't, add backslash
+    in_dir=$in_dir"/"
+  fi
+fi
 
 # sub directory in out directory
 if [[ "$sub_dir"x == "1"x ]];then
@@ -99,20 +109,20 @@ if [[ "$asso"x == "1"x ]];then
     log_file=${log_file:-${out_prefix}_log.txt}
 
     # Check gene expression file
-    if [ ! -f "${gene_exp}" ] ; then
-        echo Error: Gene expression file ${gene_exp} does not exist or is empty. >&2
+    if [ ! -f "${in_dir}${gene_exp}" ] ; then
+        echo Error: Gene expression file ${in_dir}${gene_exp} does not exist or is empty. >&2
         exit 1
     fi
 
     # Check PED file
-    if [ ! -f "${PED}" ] ; then
-        echo Error: PED file ${PED} does not exist or is empty. >&2
+    if [ ! -f "${in_dir}${PED}" ] ; then
+        echo Error: PED file ${in_dir}${PED} does not exist or is empty. >&2
         exit 1
     fi
 
     # Check PED_info file
-    if [ ! -f "${PED_info}" ] ; then
-        echo Error: PED information file ${PED_info} does not exist or is empty. >&2
+    if [ ! -f "${in_dir}${PED_info}" ] ; then
+        echo Error: PED information file ${in_dir}${PED_info} does not exist or is empty. >&2
         exit 1
     fi
 
@@ -122,9 +132,9 @@ if [[ "$asso"x == "1"x ]];then
     fi
 
     ${TIGAR_dir}/TWAS/Asso_Study_01.py \
-    --gene_exp ${gene_exp} \
-    --PED ${PED} \
-    --PED_info ${PED_info} \
+    --gene_exp ${in_dir}${gene_exp} \
+    --PED ${in_dir}${PED} \
+    --PED_info ${in_dir}${PED_info} \
     --method ${method} \
     --thread ${thread} \
     --TIGAR_dir ${TIGAR_dir} \
@@ -140,26 +150,26 @@ elif [[ "$asso"x == "2"x ]];then
     log_file=${log_file:-${out_prefix}_log.txt}
 
     # Check gene_annotation file
-    if [ ! -f "${gene_anno}" ] ; then
-        echo Error: Gene annotation file ${gene_anno} does not exist or is empty. >&2
+    if [ ! -f "${in_dir}${gene_anno}" ] ; then
+        echo Error: Gene annotation file ${in_dir}${gene_anno} does not exist or is empty. >&2
         exit 1
     fi
 
     # Check LD file
-    if [ ! -f "${LD}" ] ; then
-        echo Error: Reference LD genotype covariance file ${LD} does not exist or is empty. >&2
+    if [ ! -f "${in_dir}${LD}" ] ; then
+        echo Error: Reference LD genotype covariance file ${in_dir}${LD} does not exist or is empty. >&2
         exit 1
     fi
 
     # Check Zscore file
-    if [ ! -f "${Zscore}" ] ; then
-        echo Error: Gene expression file ${Zscore} does not exist or is empty. >&2
+    if [ ! -f "${in_dir}${Zscore}" ] ; then
+        echo Error: Gene expression file ${in_dir}${Zscore} does not exist or is empty. >&2
         exit 1
     fi
 
     # Check weight file and tabix weight file
-    if [ ! -f "${weight}" ] ; then
-        echo Error: Gene expression file ${weight} does not exist or is empty. >&2
+    if [ ! -f "${in_dir}${weight}" ] ; then
+        echo Error: Gene expression file ${in_dir}${weight} does not exist or is empty. >&2
         exit 1
     fi
 
@@ -169,10 +179,10 @@ elif [[ "$asso"x == "2"x ]];then
 
     ## TWAS
     python ${TIGAR_dir}/TWAS/Asso_Study_02.py \
-    --gene_anno ${gene_anno} \
-    --Zscore ${Zscore} \
-    --weight ${weight} \
-    --LD ${LD} \
+    --gene_anno ${in_dir}${gene_anno} \
+    --Zscore ${in_dir}${Zscore} \
+    --weight ${in_dir}${weight} \
+    --LD ${in_dir}${LD} \
     --chr ${chr} \
     --window ${window} \
     --thread ${thread} \

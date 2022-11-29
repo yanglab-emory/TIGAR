@@ -21,7 +21,7 @@
 
 #######################################################################
 VARS=`getopt -o "" -a -l \
-chr:,weight:,gene_anno:,genofile_type:,genofile:,test_sampleID:,format:,window:,missing_rate:,maf_diff:,TIGAR_dir:,thread:,sub_dir:,out_pred_file:,out_prefix:,log_file:,out_dir: \
+chr:,weight:,gene_anno:,genofile_type:,genofile:,test_sampleID:,format:,window:,missing_rate:,maf_diff:,TIGAR_dir:,thread:,sub_dir:,out_pred_file:,out_prefix:,log_file:,in_dir:,out_dir: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -52,6 +52,7 @@ do
         --out_pred_file|-out_pred_file) out_pred_file=$2; shift 2;;
         --log_file|-log_file) log_file=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
+				--in_dir|-in_dir) in_dir=$2; shift 2;;
         --) shift;break;;
         *) echo "Internal error!";exit 1;;
         esac
@@ -69,6 +70,15 @@ log_file=${log_file:-${out_prefix}_log.txt}
 
 # sub_dir: whether to use subdirectory inside out_dir for output files
 sub_dir=${sub_dir:-1}
+
+# check if user submitted in_dir
+if [[ "$in_dir"x != ""x ]];then
+	# if yes, check if in_dir var ends with a backslash
+  if [[ "$in_dir"x != */x ]];then
+  	# if it doesn't, add backslash
+    in_dir=$in_dir"/"
+  fi
+fi
 
 #### Create output directory if not existed
 mkdir -p ${out_dir}
@@ -91,26 +101,26 @@ if [ ! -x "$(command -v tabix)" ]; then
 fi
 
 # Check genotype file 
-if [ ! -f "${genofile}" ] ; then
-    echo Error: Training genotype file ${genofile} does not exist or is empty. >&2
+if [ ! -f "${in_dir}${genofile}" ] ; then
+    echo Error: Training genotype file ${in_dir}${genofile} does not exist or is empty. >&2
     exit 1
 fi
 
 # Check training sample ID file
-if [ ! -f "${test_sampleID_file}" ] ; then
-    echo Error: Test sample ID file ${test_sampleID_file} does not exist or is empty. >&2
+if [ ! -f "${in_dir}${test_sampleID_file}" ] ; then
+    echo Error: Test sample ID file ${in_dir}${test_sampleID_file} does not exist or is empty. >&2
     exit 1
 fi
 
 # Check eQTL weight file
-if [ ! -f "${weight_file}" ] ; then
-    echo Error: eQTL weight file ${weight_file} does not exist or is empty. >&2
+if [ ! -f "${in_dir}${weight_file}" ] ; then
+    echo Error: eQTL weight file ${in_dir}${weight_file} does not exist or is empty. >&2
     exit 1
 fi
 
 # Check gene annotation file
-if [ ! -f "${gene_anno}" ] ; then
-    echo Error: gene info file ${gene_anno} does not exist or is empty. >&2
+if [ ! -f "${in_dir}${gene_anno}" ] ; then
+    echo Error: gene info file ${in_dir}${gene_anno} does not exist or is empty. >&2
     exit 1
 fi
 
@@ -123,12 +133,12 @@ echo Predicting gene expression.
 
 python ${TIGAR_dir}/Model_Train_Pred/Prediction.py \
 --chr ${chr} \
---weight ${weight_file} \
---genofile ${genofile} \
---test_sampleID ${test_sampleID_file} \
+--weight ${in_dir}${weight_file} \
+--genofile ${in_dir}${genofile} \
+--test_sampleID ${in_dir}${test_sampleID_file} \
 --format ${format} \
 --genofile_type ${genofile_type} \
---gene_anno ${gene_anno} \
+--gene_anno ${in_dir}${gene_anno} \
 --window ${window} \
 --thread ${thread} \
 --maf_diff ${maf_diff} \

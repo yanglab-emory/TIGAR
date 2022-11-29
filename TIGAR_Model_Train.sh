@@ -78,6 +78,7 @@ do
         --job_suf|-job_suf) job_suf=$2; shift 2;;
 				--in_dir|-out_dir) out_dir=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
+				--in_dir|-in_dir) in_dir=$2; shift 2;;
         --) shift;break;;
         *) echo "Wrong input arguments!";exit 1;;
         esac
@@ -105,6 +106,16 @@ format=${format:-"GT"}
 # sub_dir: whether to use subdirectory inside out_dir for output files
 sub_dir=${sub_dir:-1}
 
+
+# check if user submitted in_dir
+if [[ "$in_dir"x != ""x ]];then
+	# if yes, check if in_dir var ends with a backslash
+  if [[ "$in_dir"x != */x ]];then
+  	# if it doesn't, add backslash
+    in_dir=$in_dir"/"
+  fi
+fi
+
 #### Create output directory if not existed
 mkdir -p ${out_dir}
 mkdir -p ${out_dir}/logs
@@ -116,20 +127,20 @@ if [ ! -x "$(command -v tabix)" ]; then
 fi
 
 # Check gene expression file
-if [ ! -f "${in_dir}/${gene_exp}" ]; then
-    echo Error: Gene expression file ${in_dir}/${gene_exp} does not exist or is empty. >&2
+if [ ! -f "${in_dir}${gene_exp}" ]; then
+    echo Error: Gene expression file ${in_dir}${gene_exp} does not exist or is empty. >&2
     exit 1
 fi
 
 # Check training sample ID file
-if [ ! -f "${in_dir}/${train_sampleID}" ]; then
-    echo Error: Training sample ID file ${in_dir}/${train_sampleID} does not exist or is empty. >&2
+if [ ! -f "${in_dir}${train_sampleID}" ]; then
+    echo Error: Training sample ID file ${in_dir}${train_sampleID} does not exist or is empty. >&2
     exit 1
 fi
 
 # Check genotype file 
-if [ ! -f "${in_dir}/${genofile}" ]; then
-    echo Error: Training genotype file ${in_dir}/${genofile} does not exist or is empty. >&2
+if [ ! -f "${in_dir}${genofile}" ]; then
+    echo Error: Training genotype file ${in_dir}${genofile} does not exist or is empty. >&2
     exit 1
 fi
 
@@ -160,11 +171,11 @@ if [[ "$model"x == "elastic_net"x ]];then
 
     mkdir -p ${out_sub_dir}
 
-    python ${TIGAR_dir}/Model_Train_Pred/Elastic_Net_Train.py \
-    --gene_exp ${in_dir}/${gene_exp} \
-    --train_sampleID ${in_dir}/${train_sampleID} \
+    python3 ${TIGAR_dir}/Model_Train_Pred/Elastic_Net_Train.py \
+    --gene_exp ${in_dir}${gene_exp} \
+    --train_sampleID ${in_dir}${train_sampleID} \
     --chr ${chr} \
-    --genofile ${in_dir}/${genofile} \
+    --genofile ${in_dir}${genofile} \
     --genofile_type ${genofile_type} \
     --format ${format} \
     --missing_rate ${missing_rate} \
@@ -228,10 +239,10 @@ elif [[ "$model"x == "DPR"x ]]; then
     fi
 
     python3 ${TIGAR_dir}/Model_Train_Pred/DPR_Train.py \
-    --gene_exp ${in_dir}/${gene_exp} \
-    --train_sampleID ${in_dir}/${train_sampleID} \
+    --gene_exp ${in_dir}${gene_exp} \
+    --train_sampleID ${in_dir}${train_sampleID} \
     --chr ${chr} \
-    --genofile ${in_dir}/${genofile} \
+    --genofile ${in_dir}${genofile} \
     --genofile_type ${genofile_type} \
     --format ${format} \
     --hwe ${hwe} \

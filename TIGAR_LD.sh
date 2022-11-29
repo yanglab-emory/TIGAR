@@ -17,7 +17,7 @@
 ###
 
 VARS=`getopt -o "" -a -l \
-genome_block:,genofile:,genofile_type:,chr:,format:,maf:,TIGAR_dir:,thread:,sub_dir:,log_file:,out_dir:,out_ld_file:,sampleID: \
+genome_block:,genofile:,genofile_type:,chr:,format:,maf:,TIGAR_dir:,thread:,sub_dir:,log_file:,in_dir:,out_dir:,out_ld_file:,sampleID: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -42,6 +42,7 @@ do
         --sub_dir|-sub_dir) sub_dir=$2; shift 2;;
         --log_file|-log_file) log_file=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
+				--in_dir|-in_dir) in_dir=$2; shift 2;;
         --out_ld_file|-out_ld_file) out_ld_file=$2; shift 2;;
         --sampleID|-sampleID) sampleID=$2; shift 2;;
         --) shift;break;;
@@ -57,6 +58,15 @@ out_ld_file=${out_ld_file:-CHR${chr}_reference_cov}
 
 # sub_dir: whether to use subdirectory inside out_dir for output files
 sub_dir=${sub_dir:-1}
+
+# if user submitted in_dir, add backslash to string as needed
+if [[ "$in_dir"x != ""x ]];then
+	# if yes, check if in_dir var ends with a backslash
+  if [[ "$in_dir"x != */x ]];then
+  	# if it doesn't, add backslash
+    in_dir=$in_dir"/"
+  fi
+fi
 
 #### Create output directory if not existed
 mkdir -p ${out_dir}
@@ -80,8 +90,8 @@ if [ ! -x "$(command -v tabix)" ]; then
 fi
 
 # Check genotype file 
-if [ ! -f "${genofile}" ] ; then
-    echo Error: Reference genotype file ${genofile} does not exist or is empty. >&2
+if [ ! -f "${in_dir}/${genofile}" ] ; then
+    echo Error: Reference genotype file ${in_dir}/${genofile} does not exist or is empty. >&2
     exit 1
 fi
 
@@ -95,8 +105,8 @@ if [[ ! -x ${TIGAR_dir}/TWAS/Get_LD.py ]] ; then
 fi
 
 python ${TIGAR_dir}/TWAS/Get_LD.py \
---genome_block ${genome_block} \
---genofile ${genofile} \
+--genome_block ${in_dir}/${genome_block} \
+--genofile ${in_dir}/${genofile} \
 --genofile_type ${genofile_type} \
 --chr ${chr} \
 --format ${format} \
@@ -104,7 +114,7 @@ python ${TIGAR_dir}/TWAS/Get_LD.py \
 --thread ${thread} \
 --out_dir ${out_sub_dir} \
 --out_ld_file ${out_ld_file} \
---sampleID ${sampleID} \
+--sampleID ${in_dir}/${sampleID} \
 --TIGAR_dir ${TIGAR_dir} \
 > ${out_dir}/logs/${log_file}
 
