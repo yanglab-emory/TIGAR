@@ -637,7 +637,8 @@ def get_header(path, out='tuple', zipped=False, rename={}):
 		header=0,
 		compression=compress_type,
 		low_memory=False,
-		nrows=0).rename(columns=rename)
+		nrows=0,
+		encoding_errors='ignore').rename(columns=rename)
 
 	if out=='tuple':
 		return tuple(header)

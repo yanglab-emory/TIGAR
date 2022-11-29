@@ -6,6 +6,14 @@ import argparse
 import multiprocessing
 import operator
 import os
+
+
+# raise SystemExit("PYTHONPATH: " + os.environ.get('PYTHONPATH') + '\n PATH: ' + os.environ.get('PATH'))
+
+# # print("PYTHONPATH:", os.environ.get('PYTHONPATH'))
+# # print("PATH:", os.environ.get('PATH'))
+
+
 import subprocess
 import sys
 

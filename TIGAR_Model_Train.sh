@@ -227,11 +227,11 @@ elif [[ "$model"x == "DPR"x ]]; then
         chmod 755 ${TIGAR_dir}/Model_Train_Pred/DPR_Train.py
     fi
 
-    python ${TIGAR_dir}/Model_Train_Pred/DPR_Train.py \
-    --gene_exp ${gene_exp} \
-    --train_sampleID ${train_sampleID} \
+    python3 ${TIGAR_dir}/Model_Train_Pred/DPR_Train.py \
+    --gene_exp ${in_dir}/${gene_exp} \
+    --train_sampleID ${in_dir}/${train_sampleID} \
     --chr ${chr} \
-    --genofile ${genofile} \
+    --genofile ${in_dir}/${genofile} \
     --genofile_type ${genofile_type} \
     --format ${format} \
     --hwe ${hwe} \
