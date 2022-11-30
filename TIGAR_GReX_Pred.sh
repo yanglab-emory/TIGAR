@@ -131,7 +131,7 @@ fi
 
 echo Predicting gene expression.
 
-python ${TIGAR_dir}/Model_Train_Pred/Prediction.py \
+python3 ${TIGAR_dir}/Model_Train_Pred/Prediction.py \
 --chr ${chr} \
 --weight ${in_dir}${weight_file} \
 --genofile ${in_dir}${genofile} \
