@@ -1199,3 +1199,75 @@ def print_args(args):
 		else:
 			print('args.', key, ' = ', value, sep='')
 	print('\n')
+
+
+
+
+
+#------------------
+def pos_def_matrix(mat):
+    """ convert the input matrix to the cloest positive definite matrix"""
+    # Make sure the ld is positive definite matrix
+    _, s, v = linalg.svd(mat)
+    h = np.dot(v.T, np.dot(np.diag(s), v))
+    mat_pos_def = (mat+h)/2
+
+    return mat_pos_def
+
+
+def plink_LD_cmd(bim_dir, sst_df, out_file, work_dir, convert=None):
+
+	target_snplist = sst_df['snpID']
+	target_snplist_path = os.path.join(work_dir, 'snplist.txt')
+
+	target_snplist.to_csv(target_snplist_path,
+						  sep='\t',
+						  index=None,
+						  header=None,
+						  mode='w')
+
+	cmd = ["plink --bfile " + bim_dir +
+			" --keep-allele-order" +
+			" --extract " + 'snplist.txt' +
+			" --r square" +
+			" --out " + out_file +
+			" --memory 2000 "]
+
+	try:
+			ld_proc = subprocess.check_call(cmd,
+											stdout=subprocess.PIPE,
+											cwd=work_dir,
+											shell=True)
+			# print('LD calculation completed.')
+	except subprocess.CalledProcessError:
+			print('LD calculation failed. \n')
+			return None, None
+
+	ld_dir = os.path.join(work_dir, out_file + '.ld')
+
+	ld_chunks = pd.read_csv(ld_dir, sep='\t',
+							low_memory=False,
+							header=None,
+							iterator=True,
+							chunksize=1000)
+
+	ld = pd.concat([chunk for chunk in ld_chunks]).reset_index(drop=True)
+	# The .ld file is large, delete it after using it.
+	os.remove(ld_dir)
+
+	# print('Start formatting PRS-CS LD.')
+	V = ld.to_numpy()
+	# PLINK return nan when all mutually-nonmissing set is homozygous major
+	# We set nan = 0 here 
+	V = np.nan_to_num(V)
+
+	if convert:
+		# PLINK rounds to 6 decimal points, which sometimes makes the correlation matrix become not positive definite
+		# convert it to be positive definite
+		V = pos_def_matrix(V)
+
+	blk_size = len(V)
+
+	return V, blk_size
+
+	
