@@ -134,7 +134,7 @@ if [[ "$asso"x == "1"x ]];then
         chmod 755  ${TIGAR_dir}/TWAS/Asso_Study_01.py
     fi
 
-    ${TIGAR_dir}/TWAS/Asso_Study_01.py \
+    python ${TIGAR_dir}/TWAS/Asso_Study_01.py \
     --gene_exp ${in_dir}${gene_exp} \
     --PED ${in_dir}${PED} \
     --PED_info ${in_dir}${PED_info} \
