@@ -192,7 +192,7 @@ elif [[ "$asso"x == "2"x ]];then
     fi
 
     ## TWAS
-    python ${TIGAR_dir}/TWAS/Asso_Study_02.py \
+    python3 ${TIGAR_dir}/TWAS/Asso_Study_02.py \
     --gene_anno ${in_dir}${gene_anno} \
     --Zscore ${in_dir}${Zscore} \
     --weight ${in_dir}${weight} \
