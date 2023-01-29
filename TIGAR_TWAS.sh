@@ -52,7 +52,7 @@ do
         --Zscore|-Zscore) Zscore=$2; shift 2;;
         --weight|-weight) weight=$2; shift 2;;
         --LD|-LD) LD=$2; shift 2;;
-				--LD_type|-LD_type) LD_type=$2, shift 2;;
+				--LD_type|-LD_type) LD_type=$2; shift 2;;
         --chr|-chr) chr=$2; shift 2;;
         --window|-window) window=$2; shift 2;;
         --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
@@ -79,7 +79,7 @@ method=${method:-'OLS'}
 weight_threshold=${weight_threshold:-0}
 test_stat=${test_stat:-'both'}
 sub_dir=${sub_dir:-1}
-LD_type=${LD_type:''}
+LD_type=${LD_type:-0}
 
 # check if user submitted in_dir
 if [[ "$in_dir"x != ""x ]];then
@@ -159,10 +159,21 @@ elif [[ "$asso"x == "2"x ]];then
     fi
 
     # Check LD file
-    if [ ! -f "${in_dir}${LD}" ] ; then
-        echo Error: Reference LD genotype covariance file ${in_dir}${LD} does not exist or is empty. >&2
+    if [[ "$LD_type"x == "TIGAR"x ]];then
+	    if [ ! -f "${in_dir}${LD}" ] ; then
+	        echo Error: Reference LD genotype covariance file ${in_dir}${LD} does not exist or is empty. >&2
+	        exit 1
+	    fi
+
+	  elif [[ "$LD_type"x == "plink"x ]];then
+	    if [ ! -f "${in_dir}${LD}.bed" ] ; then
+	        echo Error: Reference LD genotype covariance file ${in_dir}${LD}.bed does not exist or is empty. >&2
+	        exit 1
+	    fi
+	  else
+        echo Error: Must specify LD_type. >&2
         exit 1
-    fi
+	  fi
 
     # Check Zscore file
     if [ ! -f "${in_dir}${Zscore}" ] ; then
@@ -202,4 +213,6 @@ fi
 
 echo "Completed TWAS."
 
-# ALSO TRY MOVING FINAL TWAS FILE DIRECTLY TO OUT DIRECTORY INSTEAD OF HAVING A WHOLE FOLDER FOR 1 FILE?
+## ALSO TRY MOVING FINAL TWAS FILE DIRECTLY TO OUT DIRECTORY INSTEAD OF HAVING A WHOLE FOLDER FOR 1 FILE?
+
+
