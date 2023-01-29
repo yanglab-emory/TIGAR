@@ -76,6 +76,7 @@ do
         --out_prefix|-out_prefix) out_prefix=$2; shift 2;;
         --log_file|-log_file) log_file=$2; shift 2;;
         --job_suf|-job_suf) job_suf=$2; shift 2;;
+				--in_dir|-out_dir) out_dir=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
 				--in_dir|-in_dir) in_dir=$2; shift 2;;
         --) shift;break;;
@@ -170,7 +171,7 @@ if [[ "$model"x == "elastic_net"x ]];then
 
     mkdir -p ${out_sub_dir}
 
-    python ${TIGAR_dir}/Model_Train_Pred/Elastic_Net_Train.py \
+    python3 ${TIGAR_dir}/Model_Train_Pred/Elastic_Net_Train.py \
     --gene_exp ${in_dir}${gene_exp} \
     --train_sampleID ${in_dir}${train_sampleID} \
     --chr ${chr} \
@@ -237,7 +238,7 @@ elif [[ "$model"x == "DPR"x ]]; then
         chmod 755 ${TIGAR_dir}/Model_Train_Pred/DPR_Train.py
     fi
 
-    python ${TIGAR_dir}/Model_Train_Pred/DPR_Train.py \
+    python3 ${TIGAR_dir}/Model_Train_Pred/DPR_Train.py \
     --gene_exp ${in_dir}${gene_exp} \
     --train_sampleID ${in_dir}${train_sampleID} \
     --chr ${chr} \
