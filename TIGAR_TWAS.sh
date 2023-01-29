@@ -28,7 +28,7 @@
 
 ###############################################################
 VARS=`getopt -o "" -a -l \
-asso:,gene_exp:,gene_anno:,PED:,PED_info:,method:,Zscore:,weight:,LD:,chr:,window:,TIGAR_dir:,thread:,weight_threshold:,sub_dir:,out_twas_file:,out_prefix:,log_file:,in_dir:,out_dir:,sampleID:,test_stat:,test_sampleID: \
+asso:,gene_exp:,gene_anno:,PED:,PED_info:,method:,Zscore:,weight:,LD:,chr:,window:,TIGAR_dir:,thread:,weight_threshold:,sub_dir:,out_twas_file:,out_prefix:,log_file:,in_dir:,out_dir:,sampleID:,test_stat:,test_sampleID:,LD_type: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -51,6 +51,7 @@ do
         --Zscore|-Zscore) Zscore=$2; shift 2;;
         --weight|-weight) weight=$2; shift 2;;
         --LD|-LD) LD=$2; shift 2;;
+				--LD_type|-LD_type) LD_type=$2, shift 2;;
         --chr|-chr) chr=$2; shift 2;;
         --window|-window) window=$2; shift 2;;
         --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
@@ -77,6 +78,7 @@ method=${method:-'OLS'}
 weight_threshold=${weight_threshold:-0}
 test_stat=${test_stat:-'both'}
 sub_dir=${sub_dir:-1}
+LD_type=${LD_type:''}
 
 # check if user submitted in_dir
 if [[ "$in_dir"x != ""x ]];then
@@ -183,6 +185,7 @@ elif [[ "$asso"x == "2"x ]];then
     --Zscore ${in_dir}${Zscore} \
     --weight ${in_dir}${weight} \
     --LD ${in_dir}${LD} \
+    --LD_type ${LD_type} \
     --chr ${chr} \
     --window ${window} \
     --thread ${thread} \
