@@ -1153,16 +1153,16 @@ def HWE(obs_hets, obs_hom1, obs_hom2):
 	for i in range(0,rare_copies + 1):
 		het_probs[i] /= sum_het_probs
 
-	#alternate p-value calculation for p_hi/p_lo
-	p_hi = float(het_probs[obs_hets])
-	for i in range(obs_hets,rare_copies+1):
-		p_hi += het_probs[i]
+	# #alternate p-value calculation for p_hi/p_lo
+	# p_hi = float(het_probs[obs_hets])
+	# for i in range(obs_hets,rare_copies+1):
+	# 	p_hi += het_probs[i]
 
-	p_lo = float(het_probs[obs_hets])
-	for i in range(obs_hets-1,-1,-1):
-		p_lo += het_probs[i]
+	# p_lo = float(het_probs[obs_hets])
+	# for i in range(obs_hets-1,-1,-1):
+	# 	p_lo += het_probs[i]
 
-	p_hi_lo = 2.0 * p_hi if p_hi < p_lo else 2.0 * p_lo
+	# p_hi_lo = 2.0 * p_hi if p_hi < p_lo else 2.0 * p_lo
 
 	p_hwe = 0.0
 	#  p-value calculation for p_hwe
