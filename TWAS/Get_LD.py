@@ -183,7 +183,7 @@ if __name__ == '__main__':
 	# pool.map_async(thread_process,[num for num in range(n_blocks)], error_callback=block_error)
 	# pool.close()
 	# pool.join()
-	Parallel(n_jobs=args.threads)(delayed(thread_process)(num) for num in range(n_blocks))
+	Parallel(n_jobs=args.thread)(delayed(thread_process)(num) for num in range(n_blocks))
 	print('Done.')
 
 ################################################################
