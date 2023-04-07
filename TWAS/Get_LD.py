@@ -3,6 +3,7 @@
 ###############################################################
 # Import packages needed
 import argparse
+from joblib import Parallel, delayed
 import multiprocessing
 import operator
 import subprocess
@@ -176,12 +177,13 @@ def thread_process(num):
 # thread process
 if __name__ == '__main__':
 	print('Starting LD calculation for ' + str(n_blocks) + ' blocks.\n')
-	global pool
-	pool = multiprocessing.Pool(args.thread)
-	# pool.imap(thread_process,[num for num in range(n_blocks)])
-	pool.map_async(thread_process,[num for num in range(n_blocks)], error_callback=block_error)
-	pool.close()
-	pool.join()
+	# global pool
+	# pool = multiprocessing.Pool(args.thread)
+	# # pool.imap(thread_process,[num for num in range(n_blocks)])
+	# pool.map_async(thread_process,[num for num in range(n_blocks)], error_callback=block_error)
+	# pool.close()
+	# pool.join()
+	Parallel(n_jobs=args.threads)(delayed(thread_process)(num) for num in range(n_blocks))
 	print('Done.')
 
 ################################################################
