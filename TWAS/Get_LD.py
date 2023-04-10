@@ -74,7 +74,7 @@ def cov_fmt(x):
     return ("%.4f" % x).rstrip("0").rstrip(".")
 
 
-# trim array by positionin matrix (length should be rownumber:total for each row);
+# trim array by position in matrix (length should be rownumber:total for each row);
 # format each element in each row, join all together separated by comma
 def cov_str(cov_lst):
     return [
@@ -167,7 +167,7 @@ def thread_process(num):
     Geno = tg.calc_maf(Geno, sampleID, args.maf, filter_bid=True)
 
     # get upper covariance matrix
-    mcovar = np.triu(np.cov(Geno[sampleID].values)).tolist()
+    mcovar = np.triu(np.cov(Geno[sampleID].values))
 
     # output values
     Geno = Geno[["snpID", "CHROM", "POS"]]
@@ -189,7 +189,7 @@ def thread_process(num):
 if __name__ == "__main__":
     print("Starting LD calculation for " + str(n_blocks) + " blocks.\n")
     with multiprocessing.Pool(args.thread) as pool:
-        res = pool.map_async(thread_process, range(n_blocks), chunksize=1)  # , error_callback=block_error
+        res = pool.map_async(thread_process, range(n_blocks))  # , error_callback=block_error
         pool.close()
         pool.join()
 
