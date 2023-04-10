@@ -189,7 +189,7 @@ def thread_process(num):
 if __name__ == "__main__":
     print("Starting LD calculation for " + str(n_blocks) + " blocks.\n")
     with multiprocessing.Pool(args.thread) as pool:
-        pool.map_async(thread_process, range(n_blocks), error_callback=block_error)
+        pool.map_async(thread_process, list(range(n_blocks)), error_callback=block_error)
 
     # global pool
     # pool = multiprocessing.Pool(args.thread)
