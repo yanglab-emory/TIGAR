@@ -280,7 +280,9 @@ def thread_process(num):
 if __name__ == "__main__":
     print("Starting TWAS for " + str(n_targets) + " target genes.\n")
     with multiprocessing.Pool(args.thread) as pool:
-        pool.imap(thread_process, range(n_targets))
+        res = pool.imap(thread_process, range(n_targets))
+        pool.close()
+        pool.join()
     # pool = multiprocessing.Pool(args.thread)
     # pool.imap(thread_process,[num for num in range(n_targets)])
     # pool.close()
