@@ -190,6 +190,8 @@ if __name__ == "__main__":
     print("Starting LD calculation for " + str(n_blocks) + " blocks.\n")
     with multiprocessing.Pool(args.thread) as pool:
         res = pool.imap(thread_process, range(n_blocks), chunksize=1)  # , error_callback=block_error
+        pool.close()
+        pool.join()
 
     # res.get()
     # global pool
