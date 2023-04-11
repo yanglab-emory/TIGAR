@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 from scipy.stats import chi2
+from joblib import Parallel, delayed
 
 ###############################################################
 # time calculation
@@ -273,16 +274,19 @@ def thread_process(num):
     Result.to_csv(out_twas_path, sep="\t", index=None, header=None, mode="a")
 
     print("Target TWAS completed.\n")
+    return Result
 
 
 ###############################################################
 # thread process
 if __name__ == "__main__":
     print("Starting TWAS for " + str(n_targets) + " target genes.\n")
-    with multiprocessing.Pool(args.thread) as pool:
-        res = pool.imap(thread_process, range(n_targets))
-        pool.close()
-        pool.join()
+    Parallel(n_jobs=args.thread)(delayed(thread_process)(num) for num in range(n_targets))
+
+    # with multiprocessing.Pool(args.thread) as pool:
+    #     res = pool.imap(thread_process, range(n_targets))
+    #     pool.close()
+    #     pool.join()
     # pool = multiprocessing.Pool(args.thread)
     # pool.imap(thread_process,[num for num in range(n_targets)])
     # pool.close()
