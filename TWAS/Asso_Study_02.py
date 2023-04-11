@@ -283,8 +283,7 @@ if __name__ == "__main__":
     print("Starting TWAS for " + str(n_targets) + " target genes.\n")
     res = Parallel(n_jobs=args.thread)(delayed(thread_process)(num) for num in range(n_targets))
 
-    res_df = pd.DataFrame(res)
-    res_df.to_csv(
+    pd.concat(res).to_csv(
         out_twas_path, sep="\t", index=None, header=True, mode="w"
     )
 
