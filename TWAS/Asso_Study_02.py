@@ -153,9 +153,9 @@ if args.test_stat == "both":
 else:
     out_cols += ["Zscore", "PVALUE"]
 
-pd.DataFrame(columns=out_cols).to_csv(
-    out_twas_path, sep="\t", index=None, header=True, mode="w"
-)
+# pd.DataFrame(columns=out_cols).to_csv(
+#     out_twas_path, sep="\t", index=None, header=True, mode="w"
+# )
 
 ###############################################################
 # thread function
@@ -271,7 +271,7 @@ def thread_process(num):
         )
 
     # write to file
-    Result.to_csv(out_twas_path, sep="\t", index=None, header=None, mode="a")
+    # Result.to_csv(out_twas_path, sep="\t", index=None, header=None, mode="a")
 
     print("Target TWAS completed.\n")
     return Result
@@ -281,7 +281,12 @@ def thread_process(num):
 # thread process
 if __name__ == "__main__":
     print("Starting TWAS for " + str(n_targets) + " target genes.\n")
-    Parallel(n_jobs=args.thread)(delayed(thread_process)(num) for num in range(n_targets))
+    res = Parallel(n_jobs=args.thread)(delayed(thread_process)(num) for num in range(n_targets))
+
+    res_df = pd.DataFrame(res)
+    res_df.to_csv(
+        out_twas_path, sep="\t", index=None, header=True, mode="w"
+    )
 
     # with multiprocessing.Pool(args.thread) as pool:
     #     res = pool.imap(thread_process, range(n_targets))
