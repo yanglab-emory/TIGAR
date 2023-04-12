@@ -113,7 +113,6 @@ def main():
     weight_info = tg.weight_file_info(**args.__dict__)
     zscore_info = tg.zscore_file_info(**args.__dict__)
 
-    return
     # PREP OUTPUT - print output headers to files
     # print("Creating file: " + out_twas_path + "\n")
     # out_cols = ["CHROM", "GeneStart", "GeneEnd", "TargetID", "GeneName", "n_snps"]
@@ -144,10 +143,10 @@ def main():
             return None
 
         # read in weight data for target, filtered by weight_threshold
-        Weight = tg.read_tabix(start, end, target=target, **weight_info)
+        Weight = tg.read_tabix(start, end, target=target, semaphore_key="w", **weight_info)
 
         # read in Zscore data
-        Zscore = tg.read_tabix(start, end, **zscore_info)
+        Zscore = tg.read_tabix(start, end, semaphore_key="z", **zscore_info)
 
         # get flipped snpIDs
         Zscore["snpIDflip"] = tg.get_snpIDs(Zscore, flip=True)
