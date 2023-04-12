@@ -14,7 +14,6 @@ import pandas as pd
 
 from scipy.stats import chi2
 from joblib import Parallel, delayed
-import TIGARutils as tg
 
 
 def get_pval(z):
@@ -76,6 +75,7 @@ def main():
     args = parser.parse_args()
 
     sys.path.append(args.TIGAR_dir)
+    import TIGARutils as tg
 
     out_twas_path = args.out_dir + "/" + args.out_twas_file
     print(
