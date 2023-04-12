@@ -53,7 +53,7 @@ import numpy as np
 
 semaphores = {key: threading.Semaphore(1) for key in ["geno", "gwas", "w", "z", "ld"]}
 
-# used to catch exceptions that dont require a traceback
+# used to catch exceptions that don't require a traceback
 class NoTargetDataError(Exception):
     pass
 
