@@ -80,7 +80,7 @@ def main():
     def write_to_file(stuff, pid):
         storage_client = storage.Client("rome-repeat-genetics")
         bucket = storage_client.bucket("rome-repeat-genetics")
-        blob = bucket.blob(f"output_logs.{args.chr}.{n}.{pid}.txt")
+        blob = bucket.blob(f"output_logs.{args.chrm}.{n}.{pid}.txt")
         with blob.open("w") as f:
             f.write(f"{stuff}\n")
 
