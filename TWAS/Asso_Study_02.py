@@ -80,7 +80,8 @@ def main():
 
     out_twas_path = args.out_dir + "/" + args.out_twas_file
     print(
-        """********************************
+        """
+        ********************************
         Input Arguments
         Gene annotation file specifying genes for TWAS: {annot_path}
         Chromosome: {chrm}

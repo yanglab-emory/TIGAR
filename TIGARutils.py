@@ -53,7 +53,7 @@ import numpy as np
 
 semaphores = {key: threading.Semaphore(1) for key in ["geno", "gwas", "w", "z", "ld"]}
 USE_SEMAPHORE = False
-USE_SHELL = False
+USE_SHELL = True
 
 # used to catch exceptions that don't require a traceback
 class NoTargetDataError(Exception):
@@ -522,7 +522,7 @@ def read_tabix(
         semaphores[semaphore_key].acquire()
 
     proc = subprocess.Popen(
-        [command_str], shell=USE_SHELL, stdout=subprocess.PIPE, bufsize=1
+        [command_str], shell=USE_SHELL, stdout=subprocess.PIPE
     )
 
     # initialize bytearray
@@ -670,7 +670,6 @@ def tabix_query_files(
                     [f"tabix {path} {chrm}:{start}-{end}"],
                     shell=USE_SHELL,
                     stdout=subprocess.PIPE,
-                    bufsize=1,
                 ).stdout.readline()
             )
             > 0
@@ -692,7 +691,7 @@ def call_tabix(path, chrm, start, end, add_command_str=""):
     # ["tabix " + path + " " + chrm + ":" + start + "-" + end]
 
     proc = subprocess.Popen(
-        [command_str], shell=USE_SHELL, stdout=subprocess.PIPE, bufsize=1
+        [command_str], shell=USE_SHELL, stdout=subprocess.PIPE
     )
 
     proc_out = bytearray()
@@ -719,7 +718,7 @@ def call_tabix_header(path, out="tuple", rename={}):
     rename = {**{"#CHROM": "CHROM"}, **rename}
 
     proc = subprocess.Popen(
-        ["tabix -H " + path], shell=USE_SHELL, stdout=subprocess.PIPE, bufsize=1
+        ["tabix -H " + path], shell=USE_SHELL, stdout=subprocess.PIPE
     )
 
     proc_out = bytearray()
@@ -795,7 +794,7 @@ def get_header(path, out="tuple", zipped=False, rename={}):
 def get_vcf_header(path, out="tuple"):
 
     proc = subprocess.Popen(
-        ["zgrep -m1 -E 'CHROM' " + path], shell=USE_SHELL, stdout=subprocess.PIPE, bufsize=1
+        ["zgrep -m1 -E 'CHROM' " + path], shell=USE_SHELL, stdout=subprocess.PIPE
     )
 
     proc_out = bytearray()
@@ -989,7 +988,6 @@ def call_tabix_regions(path, regs_str, filter_line=lambda x: x):
         ["tabix " + path + " " + regs_str],
         shell=USE_SHELL,
         stdout=subprocess.PIPE,
-        bufsize=1,
     )
     proc_out = bytearray()
 
