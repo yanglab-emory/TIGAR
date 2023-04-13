@@ -52,7 +52,7 @@ import numpy as np
 #########################################################
 
 semaphores = {key: threading.Semaphore(1) for key in ["geno", "gwas", "w", "z", "ld"]}
-USE_SEMAPHORE = False
+USE_SEMAPHORE = True
 USE_SHELL = True
 
 # used to catch exceptions that don't require a traceback
