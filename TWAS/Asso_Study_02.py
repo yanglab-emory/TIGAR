@@ -129,8 +129,8 @@ def main():
         Gene_Info = Gene.iloc[[num]].reset_index(drop=True)
 
         # get start and end positions to tabix
-        start = str(max(int(Gene_Info.GeneStart) - args.window, 0))
-        end = str(int(Gene_Info.GeneEnd) + args.window)
+        start = str(max(int(Gene_Info.GeneStart.iloc[0]) - args.window, 0))
+        end = str(int(Gene_Info.GeneEnd.iloc[0]) + args.window)
 
         # check that both files have data for target
         tabix_query = tg.tabix_query_files(start, end, **args.__dict__)
