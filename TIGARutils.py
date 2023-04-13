@@ -52,6 +52,7 @@ import numpy as np
 #########################################################
 
 semaphores = {key: threading.Semaphore(1) for key in ["geno", "gwas", "w", "z", "ld"]}
+USE_SEMAPHORE = False
 USE_SHELL = False
 
 # used to catch exceptions that don't require a traceback
@@ -517,7 +518,7 @@ def read_tabix(
     # subprocess command
     command_str = " ".join(["tabix", path, chrm + ":" + start + "-" + end])
 
-    if semaphore_key is not None:
+    if semaphore_key is not None and USE_SEMAPHORE:
         semaphores[semaphore_key].acquire()
 
     proc = subprocess.Popen(
@@ -579,7 +580,7 @@ def read_tabix(
         dtype=dtype,
     )
 
-    if semaphore_key is not None:
+    if semaphore_key is not None and USE_SEMAPHORE:
         semaphores[semaphore_key].release()
 
     # filter out rows where all sampleID values are nan
@@ -657,8 +658,9 @@ def tabix_query_files(
         path for path in [geno_path, gwas_path, w_path, z_path] if path is not None
     ]
     # reg_str = ' ' + chrm + ':' + start + '-' + end
-    for semaphore_key in ["geno", "gwas", "w", "z"]:
-        semaphores[semaphore_key].acquire()
+    if USE_SEMAPHORE:
+        for semaphore_key in ["geno", "gwas", "w", "z"]:
+            semaphores[semaphore_key].acquire()
 
     vals = []
     for path in paths:
@@ -674,8 +676,9 @@ def tabix_query_files(
             > 0
         )
 
-    for semaphore in semaphores.values():
-        semaphore.release()
+    if USE_SEMAPHORE:
+        for semaphore in semaphores.values():
+            semaphore.release()
 
     return np.all(vals)
 
@@ -1028,9 +1031,11 @@ def get_ld_regions_data(regs_str, path, snp_ids, ld_cols, ld_cols_ind):
 def get_ld_data(path, snp_ids):
 
     # get columns names, indices for ld file
-    semaphores["ld"].acquire()
+    if USE_SEMAPHORE:
+        semaphores["ld"].acquire()
     ld_cols, ld_cols_ind = get_ld_cols(path)
-    semaphores["ld"].release()
+    if USE_SEMAPHORE:
+        semaphores["ld"].release()
 
     # format tabix regions from snp_ids; 'chrm:start-end'
     regs_lst = list(get_ld_regions_list(snp_ids))
