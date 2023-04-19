@@ -564,8 +564,11 @@ def read_tabix(
                 break
             proc_out += filter_line(line)
         # read in lines still remaining after subprocess completes
-        for line in proc.stdout:
+        stdout, stderr = proc.communicate()
+        for line in stdout:
             proc_out += filter_line(line)
+        print(f"{stderr=}")
+        proc.wait()
 
     if not proc_out and raise_error:
         print("No tabix data for target.\n")
