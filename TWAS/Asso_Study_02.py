@@ -127,11 +127,14 @@ def main():
     def thread_process(num):
         target = TargetID[num]
         print("num=" + str(num) + "\nTargetID=" + target)
-        Gene_Info = Gene.iloc[[num]].reset_index(drop=True)
+        # Gene_Info = Gene.iloc[[num]].reset_index(drop=True)
+        Result = Gene.iloc[num].copy()  # .reset_index(drop=True)
 
         # get start and end positions to tabix
-        start = str(max(int(Gene_Info.GeneStart.iloc[0]) - args.window, 0))
-        end = str(int(Gene_Info.GeneEnd.iloc[0]) + args.window)
+        # start = str(max(int(Gene_Info.GeneStart.iloc[0]) - args.window, 0))
+        # end = str(int(Gene_Info.GeneEnd.iloc[0]) + args.window)
+        start = str(max(int(Result.GeneStart) - args.window, 0))
+        end = str(int(Result.GeneEnd) + args.window)
 
         # check that both files have data for target
         tabix_query = tg.tabix_query_files(start, end, **args.__dict__)
@@ -145,14 +148,18 @@ def main():
             return None
 
         # read in weight data for target, filtered by weight_threshold
+        print("Reading weight data")
         Weight = tg.read_tabix(start, end, target=target, semaphore_key="w", **weight_info)
 
         # read in Zscore data
+        print("Reading sumstats data")
         Zscore = tg.read_tabix(start, end, semaphore_key="z", **zscore_info)
 
         # get flipped snpIDs
+        print("Reading SNP data")
         Zscore["snpIDflip"] = tg.get_snpIDs(Zscore, flip=True)
 
+        print("Calculating heritability")
         snp_overlap = np.intersect1d(Weight.snpID, Zscore[["snpID", "snpIDflip"]])
 
         if not snp_overlap.size:
@@ -187,6 +194,7 @@ def main():
         snp_search_ids = ZW.snpID.values
 
         # Read in reference covariance matrix file by snpID
+        print("Reading cov data")
         MCOV = tg.get_ld_data(args.ld_path, snp_search_ids)
 
         if MCOV.empty:
@@ -198,6 +206,7 @@ def main():
             return None
 
         # get the snp variance and covariance matrix
+        print("Calculating LD mat")
         snp_sd, V_cov = tg.get_ld_matrix(MCOV)
 
         ZW = ZW[ZW.snpID.isin(MCOV.snpID)]
@@ -207,7 +216,8 @@ def main():
         print("Running TWAS.\nN SNPs=" + n_snps)
 
         ### create output dataframe
-        Result = Gene_Info.copy()
+        # Result = Gene_Info.copy()
+        # Result = pd.DataFrame([Gene_Info])
         Result["n_snps"] = n_snps
 
         ### calculate zscore(s), pvalue(s)
@@ -239,7 +249,7 @@ def main():
     #     pool.close()
     #     pool.join()
 
-    pd.concat(res).to_csv(
+    pd.DataFrame(res).to_csv(
         out_twas_path, sep="\t", index=None, header=True, mode="w"
     )
     # pool = multiprocessing.Pool(args.thread)
