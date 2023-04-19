@@ -52,7 +52,7 @@ import numpy as np
 #########################################################
 
 semaphores = {key: threading.Semaphore(1) for key in ["geno", "gwas", "w", "z", "ld"]}
-USE_SEMAPHORE = True
+USE_SEMAPHORE = False
 USE_SHELL = True
 
 # used to catch exceptions that don't require a traceback
@@ -518,16 +518,6 @@ def read_tabix(
     # subprocess command
     command_str = " ".join(["tabix", path, chrm + ":" + start + "-" + end])
 
-    if semaphore_key is not None and USE_SEMAPHORE:
-        semaphores[semaphore_key].acquire()
-
-    proc = subprocess.Popen(
-        [command_str], shell=USE_SHELL, stdout=subprocess.PIPE
-    )
-
-    # initialize bytearray
-    proc_out = bytearray()
-
     # set correct filter function by file type
     if genofile_type == "vcf":
         bformat = str.encode(data_format)
@@ -556,19 +546,33 @@ def read_tabix(
     else:
         filter_line = functools.partial(filter_other_line, col_inds=col_inds)
 
-    # while subprocesses running, read lines into byte array
-    while proc.poll() is None:
-        line = proc.stdout.readline()
-        if len(line) == 0:
-            break
-        proc_out += filter_line(line)
-    # read in lines still remaining after subprocess completes
-    for line in proc.stdout:
-        proc_out += filter_line(line)
+    # initialize bytearray
+    proc_out = bytearray()
+
+    if semaphore_key is not None and USE_SEMAPHORE:
+        semaphores[semaphore_key].acquire()
+
+    with subprocess.Popen(
+        [command_str], shell=USE_SHELL, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    ) as proc:
+
+        # TODO: Maybe just do `for line in proc.stdout:`
+        # while subprocesses running, read lines into byte array
+        while proc.poll() is None:
+            line = proc.stdout.readline()
+            if len(line) == 0:
+                break
+            proc_out += filter_line(line)
+        # read in lines still remaining after subprocess completes
+        for line in proc.stdout:
+            proc_out += filter_line(line)
 
     if not proc_out and raise_error:
         print("No tabix data for target.\n")
         raise NoTargetDataError
+
+    if semaphore_key is not None and USE_SEMAPHORE:
+        semaphores[semaphore_key].release()
 
     # read data into dataframe
     df = pd.read_csv(
@@ -579,9 +583,6 @@ def read_tabix(
         names=cols,
         dtype=dtype,
     )
-
-    if semaphore_key is not None and USE_SEMAPHORE:
-        semaphores[semaphore_key].release()
 
     # filter out rows where all sampleID values are nan
     if len(sampleID):
