@@ -565,8 +565,12 @@ def read_tabix(
             proc_out += filter_line(line)
         # read in lines still remaining after subprocess completes
         stdout, stderr = proc.communicate()
-        for line in stdout:
-            proc_out += filter_line(line)
+        try:
+            for line in stdout:
+                proc_out += filter_line(line)
+        except AttributeError:
+            print(f"{command_str=}")
+            sys.exit()
         print(f"{stderr=}")
         proc.wait()
 
