@@ -475,18 +475,33 @@ def filter_vcf_line(line: bytes, bformat, col_inds, split_multi_GT):
 
 
 def filter_weight_line(line: bytes, btarget: bytes, target_ind, col_inds):
+    """
+    Determines whether some bytes line is for the correct target (e.g., Gene)
+    :param line: line taken from tabix (bytes)
+    :param btarget: bytes of target name
+    :param target_ind: columnar index of where to find the target
+    :param col_inds: columnar indices we want to return
+    :return: bytes string
+    """
     # split line into list
     row = line.split(b"\t")
     # check if row is for correct target
-    if row[target_ind].startswith(btarget):
-        line = b"\t".join([row[x] for x in col_inds])
-        line += b"" if line.endswith(b"\n") else b"\n"
+    # if (len(row) > max(col_inds)) and row[target_ind].startswith(btarget):
+    if row[target_ind].starts
+        with(btarget):
+        try:
+            line = b"\t".join([row[x] for x in col_inds])
+            line += b"" if line.endswith(b"\n") else b"\n"
+        except:
+            import ipdb
+            ipdb.set_trace()
         return line
     else:
         return b""
 
 
 def filter_other_line(line: bytes, col_inds):
+    """Used for Zscore sumstats"""
     # split line into list
     row = line.split(b"\t")
     # filter out unneeded columns
@@ -575,16 +590,7 @@ def read_tabix(
                     break
                 proc_out += filter_line(line)
         except AttributeError:
-
             ipdb.set_trace()
-            """
-            num=14
-            TargetID=ENSG00000007306
-            Reading weight data
-            command_str='tabix CHR19_DPR_train_eQTLweights.txt.gz 19:40673303.0-42706976.0'
-            stderr=b'[W::hts_idx_load3] The index file is older than the data file: CHR19_DPR_train_eQTLweights.txt.gz.tbi\n'
-            line=54
-            """
             print(f"{command_str=}\n{stderr=}\n{line=}")
             sys.exit()
         print(f"{stderr=}")
