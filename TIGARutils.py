@@ -484,15 +484,18 @@ def filter_weight_line(line: bytes, btarget: bytes, target_ind, col_inds):
     :return: bytes string
     """
     # split line into list
+    import ipdb
     row = line.split(b"\t")
     # check if row is for correct target
     # if (len(row) > max(col_inds)) and row[target_ind].startswith(btarget):
+    if len(row) < target_ind:
+        print(row)
+        ipdb.set_trace()
     if row[target_ind].startswith(btarget):
         try:
             line = b"\t".join([row[x] for x in col_inds])
             line += b"" if line.endswith(b"\n") else b"\n"
         except:
-            import ipdb
             ipdb.set_trace()
         return line
     else:
