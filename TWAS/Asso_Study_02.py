@@ -240,7 +240,10 @@ def main():
         return Result
 
     print("Starting TWAS for " + str(n_targets) + " target genes.\n")
-    res = Parallel(n_jobs=args.thread)(delayed(thread_process)(num) for num in range(n_targets))
+    if args.multiprocess:
+        res = Parallel(n_jobs=args.thread)(delayed(thread_process)(num) for num in range(n_targets))
+    else:
+        res = [thread_process(num) for num in range(n_targets)]
 
     # with multiprocessing.Pool(args.thread) as pool:
     #     # res = pool.imap(thread_process, range(n_targets))

@@ -569,6 +569,16 @@ def read_tabix(
             for line in stdout:
                 proc_out += filter_line(line)
         except AttributeError:
+            import ipdb
+            ipdb.set_trace()
+            """
+            num=14
+            TargetID=ENSG00000007306
+            Reading weight data
+            command_str='tabix CHR19_DPR_train_eQTLweights.txt.gz 19:40673303.0-42706976.0'
+            stderr=b'[W::hts_idx_load3] The index file is older than the data file: CHR19_DPR_train_eQTLweights.txt.gz.tbi\n'
+            line=54
+            """
             print(f"{command_str=}\n{stderr=}\n{line=}")
             sys.exit()
         print(f"{stderr=}")
