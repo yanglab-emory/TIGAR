@@ -569,7 +569,7 @@ def read_tabix(
             for line in stdout:
                 proc_out += filter_line(line)
         except AttributeError:
-            print(f"{command_str=}\n{stderr=}")
+            print(f"{command_str=}\n{stderr=}\n{line.decode()=}")
             sys.exit()
         print(f"{stderr=}")
         proc.wait()
