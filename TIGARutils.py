@@ -574,6 +574,9 @@ def read_tabix(
         print(f"{stderr=}")
         proc.wait()
 
+    if proc_out:
+        print(f"Successfully finished {command_str=}")
+
     if not proc_out and raise_error:
         print("No tabix data for target.\n")
         raise NoTargetDataError
