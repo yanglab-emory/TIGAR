@@ -70,6 +70,7 @@ def main():
     parser.add_argument("--weight_threshold", type=float, help="Weight threshold to include SNP in TWAS")
     parser.add_argument("--test_stat", type=str, help="specify 'FUSION', 'SPrediXcan', or 'both': Zscore test statistic to use")
     parser.add_argument("--thread", type=int)
+    parser.add_argument("--no-multiprocess", action="store_true")
     parser.add_argument("--out_dir", type=str)
     parser.add_argument("--out_twas_file", type=str)
 
@@ -240,10 +241,10 @@ def main():
         return Result
 
     print("Starting TWAS for " + str(n_targets) + " target genes.\n")
-    if args.multiprocess:
-        res = Parallel(n_jobs=args.thread)(delayed(thread_process)(num) for num in range(n_targets))
-    else:
+    if args.no_multiprocess:
         res = [thread_process(num) for num in range(n_targets)]
+    else:
+        res = Parallel(n_jobs=args.thread)(delayed(thread_process)(num) for num in range(n_targets))
 
     # with multiprocessing.Pool(args.thread) as pool:
     #     # res = pool.imap(thread_process, range(n_targets))
@@ -260,7 +261,6 @@ def main():
     # pool.close()
     # pool.join()
     print("Done.")
-
 
     ###############################################################
     # time calculation
