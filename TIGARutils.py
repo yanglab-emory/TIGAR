@@ -570,7 +570,9 @@ def read_tabix(
         stdout, stderr = proc.communicate()
         ipdb.set_trace()
         try:
-            for line in stdout:
+            for line in stdout.split(b'\n'):
+                if len(line) == 0:
+                    break
                 proc_out += filter_line(line)
         except AttributeError:
 
