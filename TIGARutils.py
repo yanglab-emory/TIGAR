@@ -561,13 +561,14 @@ def read_tabix(
         # TODO: Maybe just do `for line in proc.stdout:`
         # while subprocesses running, read lines into byte array
         while proc.poll() is None:
-            ipdb.set_trace()
+            # ipdb.set_trace()
             line = proc.stdout.readline()
             if len(line) == 0:
                 break
             proc_out += filter_line(line)
         # read in lines still remaining after subprocess completes
         stdout, stderr = proc.communicate()
+        ipdb.set_trace()
         try:
             for line in stdout:
                 proc_out += filter_line(line)
