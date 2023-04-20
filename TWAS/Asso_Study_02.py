@@ -70,7 +70,7 @@ def main():
     parser.add_argument("--weight_threshold", type=float, help="Weight threshold to include SNP in TWAS")
     parser.add_argument("--test_stat", type=str, help="specify 'FUSION', 'SPrediXcan', or 'both': Zscore test statistic to use")
     parser.add_argument("--thread", type=int)
-    parser.add_argument("--no-multiprocess", default=True, action="store_false")
+    # parser.add_argument("--no-multiprocess", default=True, action="store_false")
     parser.add_argument("--out_dir", type=str)
     parser.add_argument("--out_twas_file", type=str)
 
@@ -149,18 +149,18 @@ def main():
             return None
 
         # read in weight data for target, filtered by weight_threshold
-        print("Reading weight data")
+        # print("Reading weight data")
         Weight = tg.read_tabix(start, end, target=target, semaphore_key="w", **weight_info)
 
         # read in Zscore data
-        print("Reading sumstats data")
+        # print("Reading sumstats data")
         Zscore = tg.read_tabix(start, end, semaphore_key="z", **zscore_info)
 
         # get flipped snpIDs
-        print("Reading SNP data")
+        # print("Reading SNP data")
         Zscore["snpIDflip"] = tg.get_snpIDs(Zscore, flip=True)
 
-        print("Calculating heritability")
+        # print("Calculating heritability")
         snp_overlap = np.intersect1d(Weight.snpID, Zscore[["snpID", "snpIDflip"]])
 
         if not snp_overlap.size:
@@ -195,7 +195,7 @@ def main():
         snp_search_ids = ZW.snpID.values
 
         # Read in reference covariance matrix file by snpID
-        print("Reading cov data")
+        # print("Reading cov data")
         MCOV = tg.get_ld_data(args.ld_path, snp_search_ids)
 
         if MCOV.empty:
@@ -207,7 +207,7 @@ def main():
             return None
 
         # get the snp variance and covariance matrix
-        print("Calculating LD mat")
+        # print("Calculating LD mat")
         snp_sd, V_cov = tg.get_ld_matrix(MCOV)
 
         ZW = ZW[ZW.snpID.isin(MCOV.snpID)]
@@ -241,12 +241,12 @@ def main():
         return Result
 
     print("Starting TWAS for " + str(n_targets) + " target genes.\n")
-    if args.no_multiprocess:
-        print("Not using multiprocessing")
-        res = [thread_process(num) for num in range(n_targets)]
-    else:
-        print("Using multiprocessing")
-        res = Parallel(n_jobs=args.thread)(delayed(thread_process)(num) for num in range(n_targets))
+    # if args.no_multiprocess:
+    #     print("Not using multiprocessing")
+    #     res = [thread_process(num) for num in range(n_targets)]
+    # else:
+    # print("Using multiprocessing")
+    res = Parallel(n_jobs=args.thread)(delayed(thread_process)(num) for num in range(n_targets))
 
     # with multiprocessing.Pool(args.thread) as pool:
     #     # res = pool.imap(thread_process, range(n_targets))
