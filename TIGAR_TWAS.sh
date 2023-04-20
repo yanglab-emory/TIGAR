@@ -168,6 +168,7 @@ elif [[ "$asso"x == "2"x ]];then
     fi
 
     ## TWAS
+    echo $weight_threshold $test_stat $out_twas_file
     python ${TIGAR_dir}/TWAS/Asso_Study_02.py \
     --gene_anno ${gene_anno} \
     --Zscore ${Zscore} \
