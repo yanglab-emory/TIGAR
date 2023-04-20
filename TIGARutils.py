@@ -586,6 +586,7 @@ def read_tabix(
         # while subprocesses running, read lines into byte array
         while proc.poll() is None:
             # ipdb.set_trace()
+
             line = proc.stdout.readline()
             if (len(line.split(b'\t')) != 11) and (semaphore_key == 'w'):
                 ipdb.set_trace()
@@ -597,10 +598,10 @@ def read_tabix(
         stdout, stderr = proc.communicate()
         # ipdb.set_trace()
         try:
-            for line in stdout.split(b'\n'):
-                if len(line) == 0:
+            for line2 in stdout.split(b'\n'):
+                if len(line2) == 0:
                     break
-                proc_out += filter_line(line)
+                proc_out += filter_line(line2)
         except AttributeError:
             ipdb.set_trace()
             print(f"{command_str=}\n{stderr=}\n{line=}")
