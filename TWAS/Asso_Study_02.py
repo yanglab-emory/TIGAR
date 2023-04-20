@@ -70,7 +70,7 @@ def main():
     parser.add_argument("--weight_threshold", type=float, help="Weight threshold to include SNP in TWAS")
     parser.add_argument("--test_stat", type=str, help="specify 'FUSION', 'SPrediXcan', or 'both': Zscore test statistic to use")
     parser.add_argument("--thread", type=int)
-    parser.add_argument("--no-multiprocess", action="store_true")
+    parser.add_argument("--no-multiprocess", default=True, action="store_false")
     parser.add_argument("--out_dir", type=str)
     parser.add_argument("--out_twas_file", type=str)
 
