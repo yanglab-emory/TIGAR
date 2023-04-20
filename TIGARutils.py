@@ -552,6 +552,8 @@ def read_tabix(
     if semaphore_key is not None and USE_SEMAPHORE:
         semaphores[semaphore_key].acquire()
 
+    import ipdb
+
     with subprocess.Popen(
         [command_str], shell=USE_SHELL, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     ) as proc:
@@ -559,6 +561,7 @@ def read_tabix(
         # TODO: Maybe just do `for line in proc.stdout:`
         # while subprocesses running, read lines into byte array
         while proc.poll() is None:
+            ipdb.set_trace()
             line = proc.stdout.readline()
             if len(line) == 0:
                 break
@@ -569,7 +572,7 @@ def read_tabix(
             for line in stdout:
                 proc_out += filter_line(line)
         except AttributeError:
-            import ipdb
+
             ipdb.set_trace()
             """
             num=14
