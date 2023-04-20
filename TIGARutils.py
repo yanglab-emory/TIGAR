@@ -575,6 +575,9 @@ def read_tabix(
 
     import ipdb
 
+    # tabix /home/jupyter/gcs_data/pipe/work/53/321e6d4c0b9d4c7edd95512fecd782/out/DPR_CHR19/CHR19_DPR_train_eQTLweights.txt.gz 19:34754566.0-36758079.0
+    # giving the line [b'6', b'3.385509e-05', b'0.0005520786', b'3.385509e-05']
+
     with subprocess.Popen(
         [command_str], shell=USE_SHELL, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     ) as proc:
@@ -584,6 +587,8 @@ def read_tabix(
         while proc.poll() is None:
             # ipdb.set_trace()
             line = proc.stdout.readline()
+            if not len(line.split(b'\t')) == 11:
+                ipdb.set_trace()
             if len(line) == 0:
                 break
             proc_out += filter_line(line)
