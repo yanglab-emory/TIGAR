@@ -487,8 +487,7 @@ def filter_weight_line(line: bytes, btarget: bytes, target_ind, col_inds):
     row = line.split(b"\t")
     # check if row is for correct target
     # if (len(row) > max(col_inds)) and row[target_ind].startswith(btarget):
-    if row[target_ind].starts
-        with(btarget):
+    if row[target_ind].startswith(btarget):
         try:
             line = b"\t".join([row[x] for x in col_inds])
             line += b"" if line.endswith(b"\n") else b"\n"
@@ -505,8 +504,12 @@ def filter_other_line(line: bytes, col_inds):
     # split line into list
     row = line.split(b"\t")
     # filter out unneeded columns
-    line = b"\t".join([row[x] for x in col_inds])
-    line += b"" if line.endswith(b"\n") else b"\n"
+    try:
+        line = b"\t".join([row[x] for x in col_inds])
+        line += b"" if line.endswith(b"\n") else b"\n"
+    except:
+        import ipdb
+        ipdb.set_trace()
     return line
 
 
