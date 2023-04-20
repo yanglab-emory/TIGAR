@@ -586,7 +586,7 @@ def read_tabix(
             proc_out += filter_line(line)
         # read in lines still remaining after subprocess completes
         stdout, stderr = proc.communicate()
-        ipdb.set_trace()
+        # ipdb.set_trace()
         try:
             for line in stdout.split(b'\n'):
                 if len(line) == 0:
