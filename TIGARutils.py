@@ -587,7 +587,7 @@ def read_tabix(
         while proc.poll() is None:
             # ipdb.set_trace()
             line = proc.stdout.readline()
-            if not len(line.split(b'\t')) == 11:
+            if (len(line.split(b'\t')) != 11) and (semaphore_key == 'w'):
                 ipdb.set_trace()
             if len(line) == 0:
                 break
