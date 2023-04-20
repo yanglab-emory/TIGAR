@@ -484,19 +484,19 @@ def filter_weight_line(line: bytes, btarget: bytes, target_ind, col_inds):
     :return: bytes string
     """
     # split line into list
-    import ipdb
+    # import ipdb
     row = line.split(b"\t")
     # check if row is for correct target
     # if (len(row) > max(col_inds)) and row[target_ind].startswith(btarget):
-    if len(row) < target_ind:
-        print(row)
-        ipdb.set_trace()
-    if row[target_ind].startswith(btarget):
-        try:
-            line = b"\t".join([row[x] for x in col_inds])
-            line += b"" if line.endswith(b"\n") else b"\n"
-        except:
-            ipdb.set_trace()
+    # if len(row) < target_ind:
+    #     print(row)
+    #     ipdb.set_trace([])
+    if (len(row) > max(col_inds)) and (row[target_ind].startswith(btarget)):
+        # try:
+        line = b"\t".join([row[x] for x in col_inds])
+        line += b"" if line.endswith(b"\n") else b"\n"
+        # except:
+        #     ipdb.set_trace()
         return line
     else:
         return b""
@@ -507,12 +507,14 @@ def filter_other_line(line: bytes, col_inds):
     # split line into list
     row = line.split(b"\t")
     # filter out unneeded columns
-    try:
+    if (len(row) > max(col_inds)):
         line = b"\t".join([row[x] for x in col_inds])
         line += b"" if line.endswith(b"\n") else b"\n"
-    except:
-        import ipdb
-        ipdb.set_trace()
+    else:
+        line = b""
+    # except:
+    #     import ipdb
+    #     ipdb.set_trace()
     return line
 
 
@@ -573,7 +575,7 @@ def read_tabix(
     if semaphore_key is not None and USE_SEMAPHORE:
         semaphores[semaphore_key].acquire()
 
-    import ipdb
+    # import ipdb
 
     # tabix /home/jupyter/gcs_data/pipe/work/53/321e6d4c0b9d4c7edd95512fecd782/out/DPR_CHR19/CHR19_DPR_train_eQTLweights.txt.gz 19:34754566.0-36758079.0
     # giving the line [b'6', b'3.385509e-05', b'0.0005520786', b'3.385509e-05']
@@ -587,8 +589,8 @@ def read_tabix(
         while proc.poll() is None:
             # ipdb.set_trace()
             line = proc.stdout.readline()
-            if (len(line.split(b'\t')) != 11) and (semaphore_key == 'w'):
-                ipdb.set_trace()
+            # if (len(line.split(b'\t')) != 11) and (semaphore_key == 'w'):
+            #     ipdb.set_trace()
             if len(line) == 0:
                 break
             filtered_line = filter_line(line)
@@ -596,16 +598,16 @@ def read_tabix(
         # read in lines still remaining after subprocess completes
         # stdout, stderr = proc.communicate()
         # ipdb.set_trace()
-        try:
-            # for line2 in stdout.split(b'\n'):
-            for line2 in proc.stdout:
-                if len(line2) == 0:
-                    break
-                proc_out += filter_line(line2)
-        except AttributeError:
-            ipdb.set_trace()
-            # print(f"{command_str=}\n{stderr=}\n{line=}")
-            sys.exit()
+        # try:
+        #     for line2 in stdout.split(b'\n'):
+        for line2 in proc.stdout:
+            if len(line2) == 0:
+                break
+            proc_out += filter_line(line2)
+        # except AttributeError:
+        #     # ipdb.set_trace()
+        #     # print(f"{command_str=}\n{stderr=}\n{line=}")
+        #     sys.exit()
         # print(f"{stderr=}")
         proc.wait()
 
