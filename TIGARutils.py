@@ -584,7 +584,7 @@ def read_tabix(
     # tabix /home/jupyter/gcs_data/pipe/work/53/321e6d4c0b9d4c7edd95512fecd782/out/DPR_CHR19/CHR19_DPR_train_eQTLweights.txt.gz 19:34754566.0-36758079.0
     # giving the line [b'6', b'3.385509e-05', b'0.0005520786', b'3.385509e-05']
 
-    print(f"Starting {command_str=}")
+    # print(f"Starting {command_str=}")
     with subprocess.Popen(
         [command_str], shell=USE_SHELL, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     ) as proc:
@@ -617,8 +617,8 @@ def read_tabix(
         # print(f"Final skipped {stdout=}")
         proc.wait()
 
-    if proc_out:
-        print(f"Successfully finished {command_str=}")
+    # if proc_out:
+    #     print(f"Successfully finished {command_str=}")
 
     if not proc_out and raise_error:
         print(f"No tabix data for target {command_str=}\n")

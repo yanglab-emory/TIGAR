@@ -247,7 +247,8 @@ def main():
     # else:
     # print("Using multiprocessing")
     res = Parallel(n_jobs=args.thread)(delayed(thread_process)(num) for num in range(n_targets))
-
+    import ipdb
+    ipdb.set_trace()
     # with multiprocessing.Pool(args.thread) as pool:
     #     # res = pool.imap(thread_process, range(n_targets))
     #     res = pool.map_async(thread_process, range(n_targets))
