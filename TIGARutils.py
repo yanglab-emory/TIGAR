@@ -507,7 +507,7 @@ def filter_other_line(line: bytes, col_inds):
     # split line into list
     row = line.split(b"\t")
     # filter out unneeded columns
-    if (len(row) > max(col_inds)):
+    if len(row) > max(col_inds):
         line = b"\t".join([row[x] for x in col_inds])
         line += b"" if line.endswith(b"\n") else b"\n"
     else:
@@ -594,17 +594,16 @@ def read_tabix(
             #     ipdb.set_trace()
             if len(line) == 0:
                 break
-            filtered_line = filter_line(line)
-            proc_out += filtered_line
+            proc_out += filter_line(line)
         # read in lines still remaining after subprocess completes
         # stdout, stderr = proc.communicate()
         # ipdb.set_trace()
         # try:
         #     for line2 in stdout.split(b'\n'):
-        for line2 in proc.stdout:
-            if len(line2) == 0:
+        for line in proc.stdout:
+            if len(line) == 0:
                 break
-            proc_out += filter_line(line2)
+            proc_out += filter_line(line)
         # except AttributeError:
         #     # ipdb.set_trace()
         #     # print(f"{command_str=}\n{stderr=}\n{line=}")
@@ -715,16 +714,13 @@ def tabix_query_files(
 
     vals = []
     for path in paths:
-        vals.append(
-            len(
-                subprocess.Popen(
-                    [f"tabix {path} {chrm}:{start}-{end}"],
-                    shell=USE_SHELL,
-                    stdout=subprocess.PIPE,
-                ).stdout.readline()
-            )
-            > 0
-        )
+        with subprocess.Popen(
+            [f"tabix {path} {chrm}:{start}-{end}"],
+            shell=USE_SHELL,
+            stdout=subprocess.PIPE,
+        ) as proc:
+            vals.append(len(proc.stdout.readline()) > 0)
+            proc.terminate()
 
     if USE_SEMAPHORE:
         for semaphore in semaphores.values():
@@ -741,22 +737,26 @@ def call_tabix(path, chrm, start, end, add_command_str=""):
     command_str = " ".join(["tabix", path, regs_str, add_command_str])
     # ["tabix " + path + " " + chrm + ":" + start + "-" + end]
 
-    proc = subprocess.Popen(
-        [command_str], shell=USE_SHELL, stdout=subprocess.PIPE
-    )
-
     proc_out = bytearray()
 
-    # while subprocesses running, read lines into byte array
-    while proc.poll() is None:
-        line = proc.stdout.readline()
-        if len(line) == 0:
-            break
-        proc_out += line
+    with subprocess.Popen(
+        [command_str], shell=USE_SHELL, stdout=subprocess.PIPE
+    ) as proc:
 
-    # read in lines still remaining after subprocess completes
-    for line in proc.stdout:
-        proc_out += line
+        # while subprocesses running, read lines into byte array
+        while proc.poll() is None:
+            line = proc.stdout.readline()
+            if len(line) == 0:
+                break
+            proc_out += line
+
+        # read in lines still remaining after subprocess completes
+        for line in proc.stdout:
+            proc_out += line
+
+        stdout, stderr = proc.communicate()
+        print(f"Final skipped {stdout=}")
+        proc.wait()
 
     return proc_out
 
@@ -768,24 +768,27 @@ def call_tabix_header(path, out="tuple", rename={}):
     # the first column in the vcf file is expected to be parsed as #CHROM;  automatically add that to the rename list
     rename = {**{"#CHROM": "CHROM"}, **rename}
 
-    proc = subprocess.Popen(
-        ["tabix -H " + path], shell=USE_SHELL, stdout=subprocess.PIPE
-    )
-
     proc_out = bytearray()
+    with subprocess.Popen(
+        ["tabix -H " + path], shell=USE_SHELL, stdout=subprocess.PIPE
+    ) as proc:
 
-    # while subprocesses running, read lines into byte array
-    while proc.poll() is None:
-        line = proc.stdout.readline()
-        if len(line) == 0:
-            break
-        # filter out lines starting with ##, which denotes comment in vcf file
-        if not line.startswith(b"##"):
-            proc_out += line
-    # read in lines still remaining after subprocess completes
-    for line in proc.stdout:
-        if not line.startswith(b"##"):
-            proc_out += line
+        # while subprocesses running, read lines into byte array
+        while proc.poll() is None:
+            line = proc.stdout.readline()
+            if len(line) == 0:
+                break
+            # filter out lines starting with ##, which denotes comment in vcf file
+            if not line.startswith(b"##"):
+                proc_out += line
+        # read in lines still remaining after subprocess completes
+        for line in proc.stdout:
+            if not line.startswith(b"##"):
+                proc_out += line
+
+        stdout, stderr = proc.communicate()
+        print(f"Final skipped {stdout=}")
+        proc.wait()
 
     # decode bytes, use pandas to read in, rename columns from dictionary
     header = pd.read_csv(
@@ -844,19 +847,24 @@ def get_header(path, out="tuple", zipped=False, rename={}):
 # for testing on systems without tabix; not currently used by any scripts
 def get_vcf_header(path, out="tuple"):
 
-    proc = subprocess.Popen(
-        ["zgrep -m1 -E 'CHROM' " + path], shell=USE_SHELL, stdout=subprocess.PIPE
-    )
-
     proc_out = bytearray()
-    while proc.poll() is None:
-        line = proc.stdout.readline()
-        if len(line) == 0:
-            break
-        proc_out += line
 
-    for line in proc.stdout:
-        proc_out += line
+    with subprocess.Popen(
+        ["zgrep -m1 -E 'CHROM' " + path], shell=USE_SHELL, stdout=subprocess.PIPE
+    ) as proc:
+
+        while proc.poll() is None:
+            line = proc.stdout.readline()
+            if len(line) == 0:
+                break
+            proc_out += line
+
+        for line in proc.stdout:
+            proc_out += line
+
+        stdout, stderr = proc.communicate()
+        print(f"Final skipped {stdout=}")
+        proc.wait()
 
     header = pd.read_csv(
         StringIO(proc_out.decode("utf-8")), sep="\t", error_bad_lines=False
@@ -1035,23 +1043,28 @@ def get_regions_list(snp_ids):
 # call tabix using regions string
 def call_tabix_regions(path, regs_str, filter_line=lambda x: x):
 
-    proc = subprocess.Popen(
+    proc_out = bytearray()
+
+    with subprocess.Popen(
         ["tabix " + path + " " + regs_str],
         shell=USE_SHELL,
         stdout=subprocess.PIPE,
-    )
-    proc_out = bytearray()
+    ) as proc:
 
-    # process while subprocesses running
-    while proc.poll() is None:
-        line = proc.stdout.readline()
-        if len(line) == 0:
-            break
-        proc_out += filter_line(line)
+        # process while subprocesses running
+        while proc.poll() is None:
+            line = proc.stdout.readline()
+            if len(line) == 0:
+                break
+            proc_out += filter_line(line)
 
-    # leftover lines
-    for line in proc.stdout:
-        proc_out += filter_line(line)
+        # leftover lines
+        for line in proc.stdout:
+            proc_out += filter_line(line)
+
+        stdout, stderr = proc.communicate()
+        print(f"Final skipped {stdout=}")
+        proc.wait()
 
     return proc_out
 
