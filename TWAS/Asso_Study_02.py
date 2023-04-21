@@ -247,14 +247,19 @@ def main():
     # else:
     # print("Using multiprocessing")
     res = Parallel(n_jobs=args.thread)(delayed(thread_process)(num) for num in range(n_targets))
-    import ipdb
-    ipdb.set_trace()
+    # import ipdb
+    # ipdb.set_trace()
     # with multiprocessing.Pool(args.thread) as pool:
     #     # res = pool.imap(thread_process, range(n_targets))
     #     res = pool.map_async(thread_process, range(n_targets))
     #     res = res.get()
     #     pool.close()
     #     pool.join()
+    with open(out_twas_path + ".raw", 'w') as outfile:
+        outfile.write(str(type(res)) + "\n")
+        outfile.write(str(len(res)) + "\n")
+        for val in res:
+            outfile.write(str(val))
 
     pd.DataFrame(res).to_csv(
         out_twas_path, sep="\t", index=None, header=True, mode="w"
