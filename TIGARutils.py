@@ -610,7 +610,7 @@ def read_tabix(
         #     sys.exit()
         # print(f"{stderr=}")
         stdout, stderr = proc.communicate()
-        print(f"Final skipped {stdout=}")
+        # print(f"Final skipped {stdout=}")
         proc.wait()
 
     if proc_out:
@@ -755,7 +755,7 @@ def call_tabix(path, chrm, start, end, add_command_str=""):
             proc_out += line
 
         stdout, stderr = proc.communicate()
-        print(f"Final skipped {stdout=}")
+        # print(f"Final skipped {stdout=}")
         proc.wait()
 
     return proc_out
@@ -787,7 +787,7 @@ def call_tabix_header(path, out="tuple", rename={}):
                 proc_out += line
 
         stdout, stderr = proc.communicate()
-        print(f"Final skipped {stdout=}")
+        # print(f"Final skipped {stdout=}")
         proc.wait()
 
     # decode bytes, use pandas to read in, rename columns from dictionary
@@ -863,7 +863,7 @@ def get_vcf_header(path, out="tuple"):
             proc_out += line
 
         stdout, stderr = proc.communicate()
-        print(f"Final skipped {stdout=}")
+        # print(f"Final skipped {stdout=}")
         proc.wait()
 
     header = pd.read_csv(
@@ -1063,7 +1063,7 @@ def call_tabix_regions(path, regs_str, filter_line=lambda x: x):
             proc_out += filter_line(line)
 
         stdout, stderr = proc.communicate()
-        print(f"Final skipped {stdout=}")
+        # print(f"Final skipped {stdout=}")
         proc.wait()
 
     return proc_out
