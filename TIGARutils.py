@@ -367,16 +367,20 @@ def read_gene_annot_exp(
     annot_path=None,
     cols=["CHROM", "GeneStart", "GeneEnd", "TargetID", "GeneName"],
     col_inds=[0, 1, 2, 3, 4],
-    dtype={
-        "CHROM": object,
-        "GeneStart": np.int64,
-        "GeneEnd": np.int64,
-        "TargetID": object,
-        "GeneName": object,
-    },
+    dtype=None,
     **kwargs,
 ):
-
+    dtype = (
+        {
+            "CHROM": object,
+            "GeneStart": np.int64,
+            "GeneEnd": np.int64,
+            "TargetID": object,
+            "GeneName": object,
+        }
+        if dtype is None
+        else dtype
+    )
     # set the path
     path = geneexp_path if geneexp_path is not None else annot_path
 
