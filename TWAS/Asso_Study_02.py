@@ -255,11 +255,9 @@ def main():
     #     res = res.get()
     #     pool.close()
     #     pool.join()
-    with open(out_twas_path + ".raw", 'w') as outfile:
-        outfile.write(str(type(res)) + "\n")
-        outfile.write(str(len(res)) + "\n")
-        for val in res:
-            outfile.write(str(val))
+    import pickle
+    with open(out_twas_path + ".pkl", 'wb') as outfile:
+        pickle.dump(res, outfile)
 
     pd.DataFrame(res).to_csv(
         out_twas_path, sep="\t", index=None, header=True, mode="w"
