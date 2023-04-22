@@ -255,9 +255,10 @@ def main():
     #     res = res.get()
     #     pool.close()
     #     pool.join()
-    import pickle
-    with open(out_twas_path + ".pkl", 'wb') as outfile:
-        pickle.dump(res, outfile)
+    # import pickle
+    # with open(out_twas_path + ".pkl", 'wb') as outfile:
+    #     pickle.dump(res, outfile)
+    res = [r for r in res if r is not None]
 
     pd.DataFrame(res).to_csv(
         out_twas_path, sep="\t", index=None, header=True, mode="w"
