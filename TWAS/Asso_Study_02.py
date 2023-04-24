@@ -227,11 +227,8 @@ def main():
         import cProfile
         import pstats
 
-        def profile_func():
-            return [thread_process(num) for num in range(min(n_targets, 4))]
-
         with cProfile.Profile() as pr:
-            res = profile_func()
+            res = thread_process(0)
 
         stats = pstats.Stats(pr)
         stats.sort_stats(pstats.SortKey.TIME)
