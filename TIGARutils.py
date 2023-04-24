@@ -1056,23 +1056,26 @@ def get_ld_data(path, snp_ids):
 def get_ld_matrix(MCOV, return_diag=False):
     MCOV = MCOV.copy()
 
+    # TODO: optimize this
     MCOV["COV"] = MCOV["COV"].apply(
         lambda x: np.fromstring(x, dtype=np.float32, sep=",")
     )
+    # MCOV["COV"] = MCOV["COV"].str.split(",")
 
     inds = MCOV.index
     n_inds = inds.size
     V_upper = np.zeros((n_inds, n_inds))
 
+    # TODO: optimize this, quadratic :(
     for i in range(n_inds):
-        cov_i = MCOV.COV.loc[inds[i]]
+        cov_i = MCOV.COV.at[inds[i]]
         N = cov_i.size
 
         for j in range(i, n_inds):
             if inds[j] - inds[i] < N:
                 V_upper[i, j] = cov_i[inds[j] - inds[i]]
-            else:
-                V_upper[i, j] = 0
+            # else:
+            #     V_upper[i, j] = 0
 
     snp_Var = V_upper.diagonal()
     V = V_upper + V_upper.T - np.diag(snp_Var)

@@ -193,6 +193,7 @@ def main():
             return None
 
         # get the snp variance and covariance matrix
+        MCOV.to_csv("MCOV_test.csv")
         snp_sd, V_cov = tg.get_ld_matrix(MCOV)
 
         ZW = ZW[ZW.snpID.isin(MCOV.snpID)]
