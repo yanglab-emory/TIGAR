@@ -1054,7 +1054,8 @@ def get_ld_data(path, snp_ids):
 
 
 def get_ld_matrix(MCOV, return_diag=False):
-    MCOV = MCOV.copy()
+    # FIXME: Is this necessary?
+    # MCOV = MCOV.copy()
 
     # TODO: optimize this
     MCOV["COV"] = MCOV["COV"].apply(
@@ -1067,13 +1068,16 @@ def get_ld_matrix(MCOV, return_diag=False):
     V_upper = np.zeros((n_inds, n_inds))
 
     # TODO: optimize this, quadratic :(
-    for i in range(n_inds):
-        cov_i = MCOV.COV.at[inds[i]]
+    for ii, idx_i in enumerate(inds):
+        # cov_i = MCOV.COV.at[inds[i]]  # Faster than .loc or .iloc
+        # cov_i = MCOV.COV.at[i]
+        cov_i = MCOV.COV.at[idx_i]
         N = cov_i.size
 
         for j in range(i, n_inds):
             if inds[j] - inds[i] < N:
-                V_upper[i, j] = cov_i[inds[j] - inds[i]]
+                # V_upper[i, j] = cov_i[inds[j] - inds[i]]
+                V_upper[i, j] = cov_i[j - i]
             # else:
             #     V_upper[i, j] = 0
 
