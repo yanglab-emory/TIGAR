@@ -3,8 +3,6 @@
 ###################################################################
 # Import packages needed
 import argparse
-import multiprocessing
-import subprocess
 import sys
 
 from time import time
@@ -14,7 +12,6 @@ import pandas as pd
 
 from scipy.stats import chi2
 from joblib import Parallel, delayed
-import threading
 
 
 def get_pval(z):
@@ -58,7 +55,6 @@ def main():
     start_time = time()
 
     ###############################################################
-    # parse input arguments
     parser = argparse.ArgumentParser(description="Asso Study 02")
     parser.add_argument("--TIGAR_dir", type=str)
     parser.add_argument("--gene_anno", type=str, dest="annot_path")
@@ -67,10 +63,15 @@ def main():
     parser.add_argument("--Zscore", type=str, dest="z_path")
     parser.add_argument("--LD", type=str, dest="ld_path")
     parser.add_argument("--window", type=float)
-    parser.add_argument("--weight_threshold", type=float, help="Weight threshold to include SNP in TWAS")
-    parser.add_argument("--test_stat", type=str, help="specify 'FUSION', 'SPrediXcan', or 'both': Zscore test statistic to use")
+    parser.add_argument(
+        "--weight_threshold", type=float, help="Weight threshold to include SNP in TWAS"
+    )
+    parser.add_argument(
+        "--test_stat",
+        type=str,
+        help="specify 'FUSION', 'SPrediXcan', or 'both': Zscore test statistic to use",
+    )
     parser.add_argument("--thread", type=int)
-    # parser.add_argument("--no-multiprocess", default=True, action="store_false")
     parser.add_argument("--out_dir", type=str)
     parser.add_argument("--out_twas_file", type=str)
 
@@ -106,7 +107,6 @@ def main():
 
     tg.print_args(args)
 
-
     print("Reading gene annotation file.")
     # Gene, TargetID, n_targets = tg.read_gene_annot_exp(args.annot_path, args.chrm)
     Gene, TargetID, n_targets = tg.read_gene_annot_exp(**args.__dict__)
@@ -116,24 +116,13 @@ def main():
     weight_info = tg.weight_file_info(**args.__dict__)
     zscore_info = tg.zscore_file_info(**args.__dict__)
 
-    # PREP OUTPUT - print output headers to files
-    # print("Creating file: " + out_twas_path + "\n")
-    # out_cols = ["CHROM", "GeneStart", "GeneEnd", "TargetID", "GeneName", "n_snps"]
-    # if args.test_stat == "both":
-    #     out_cols += ["FUSION_Z", "FUSION_PVAL", "SPred_Z", "SPred_PVAL"]
-    # else:
-    #     out_cols += ["Zscore", "PVALUE"]
-
     @tg.error_handler
     def thread_process(num):
         target = TargetID[num]
         print("num=" + str(num) + "\nTargetID=" + target)
-        # Gene_Info = Gene.iloc[[num]].reset_index(drop=True)
         Result = Gene.iloc[num].copy()  # .reset_index(drop=True)
 
         # get start and end positions to tabix
-        # start = str(max(int(Gene_Info.GeneStart.iloc[0]) - args.window, 0))
-        # end = str(int(Gene_Info.GeneEnd.iloc[0]) + args.window)
         start = str(max(int(Result.GeneStart) - args.window, 0))
         end = str(int(Result.GeneEnd) + args.window)
 
@@ -149,18 +138,15 @@ def main():
             return None
 
         # read in weight data for target, filtered by weight_threshold
-        # print("Reading weight data")
-        Weight = tg.read_tabix(start, end, target=target, semaphore_key="w", **weight_info)
+        Weight = tg.read_tabix(
+            start, end, target=target, semaphore_key="w", **weight_info
+        )
 
         # read in Zscore data
-        # print("Reading sumstats data")
         Zscore = tg.read_tabix(start, end, semaphore_key="z", **zscore_info)
 
         # get flipped snpIDs
-        # print("Reading SNP data")
         Zscore["snpIDflip"] = tg.get_snpIDs(Zscore, flip=True)
-
-        # print("Calculating heritability")
         snp_overlap = np.intersect1d(Weight.snpID, Zscore[["snpID", "snpIDflip"]])
 
         if not snp_overlap.size:
@@ -195,7 +181,6 @@ def main():
         snp_search_ids = ZW.snpID.values
 
         # Read in reference covariance matrix file by snpID
-        # print("Reading cov data")
         MCOV = tg.get_ld_data(args.ld_path, snp_search_ids)
 
         if MCOV.empty:
@@ -207,7 +192,6 @@ def main():
             return None
 
         # get the snp variance and covariance matrix
-        # print("Calculating LD mat")
         snp_sd, V_cov = tg.get_ld_matrix(MCOV)
 
         ZW = ZW[ZW.snpID.isin(MCOV.snpID)]
@@ -217,15 +201,15 @@ def main():
         print("Running TWAS.\nN SNPs=" + n_snps)
 
         ### create output dataframe
-        # Result = Gene_Info.copy()
-        # Result = pd.DataFrame([Gene_Info])
         Result["n_snps"] = n_snps
 
         ### calculate zscore(s), pvalue(s)
         get_zscore_args = [V_cov, ZW.ES.values, ZW.Zscore.values, snp_sd]
 
         if args.test_stat == "both":
-            Result["FUSION_Z"], Result["FUSION_PVAL"] = get_fusion_zscore(*get_zscore_args)
+            Result["FUSION_Z"], Result["FUSION_PVAL"] = get_fusion_zscore(
+                *get_zscore_args
+            )
 
             Result["SPred_Z"], Result["SPred_PVAL"] = get_spred_zscore(*get_zscore_args)
 
@@ -234,39 +218,17 @@ def main():
                 args.test_stat, get_zscore_args
             )
 
-        # write to file
-        # Result.to_csv(out_twas_path, sep="\t", index=None, header=None, mode="a")
-
         print("Target TWAS completed.\n")
         return Result
 
     print("Starting TWAS for " + str(n_targets) + " target genes.\n")
-    # if args.no_multiprocess:
-    #     print("Not using multiprocessing")
-    #     res = [thread_process(num) for num in range(n_targets)]
-    # else:
-    # print("Using multiprocessing")
-    res = Parallel(n_jobs=args.thread)(delayed(thread_process)(num) for num in range(n_targets))
-    # import ipdb
-    # ipdb.set_trace()
-    # with multiprocessing.Pool(args.thread) as pool:
-    #     # res = pool.imap(thread_process, range(n_targets))
-    #     res = pool.map_async(thread_process, range(n_targets))
-    #     res = res.get()
-    #     pool.close()
-    #     pool.join()
-    # import pickle
-    # with open(out_twas_path + ".pkl", 'wb') as outfile:
-    #     pickle.dump(res, outfile)
+    res = Parallel(n_jobs=args.thread)(
+        delayed(thread_process)(num) for num in range(n_targets)
+    )
     res = [r for r in res if r is not None]
 
-    pd.DataFrame(res).to_csv(
-        out_twas_path, sep="\t", index=None, header=True, mode="w"
-    )
-    # pool = multiprocessing.Pool(args.thread)
-    # pool.imap(thread_process,[num for num in range(n_targets)])
-    # pool.close()
-    # pool.join()
+    # write to file
+    pd.DataFrame(res).to_csv(out_twas_path, sep="\t", index=None, header=True, mode="w")
     print("Done.")
 
     ###############################################################

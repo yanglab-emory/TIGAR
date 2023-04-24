@@ -11,7 +11,6 @@ import traceback
 
 from io import StringIO
 from itertools import groupby
-import threading
 
 import pandas as pd
 import numpy as np
@@ -51,8 +50,6 @@ import numpy as np
 
 #########################################################
 
-semaphores = {key: threading.Semaphore(1) for key in ["geno", "gwas", "w", "z", "ld"]}
-USE_SEMAPHORE = False
 USE_SHELL = True
 
 # used to catch exceptions that don't require a traceback
@@ -174,8 +171,6 @@ def ped_startup(ped_path, pedinfo_path):
     ped_sampleid = pd.read_csv(ped_path, sep="\t", usecols=["IND_ID"])[
         "IND_ID"
     ].drop_duplicates()
-
-    # ped_info = {'path':ped_path, 'file_cols':ped_header, 'cols':ped_cols, 'dtype': {x:object for x in ped_cols}, 'col_inds':tuple(sorted([ped_header.index(x) for x in ped_cols]))}
 
     return ped_sampleid, ped_cols, n_pheno, pheno, cov
 
@@ -354,12 +349,6 @@ def zscore_file_info(z_path, chrm, **kwargs):
     }
 
 
-# def bgw_weight_cols_dtype(file_cols, add_cols=[], drop_cols=[], get_id=True, ret_dict=True, ind_namekey=True, **kwargs):
-# 	return get_cols_dtype(file_cols,
-# 		cols=['CHROM','POS','REF','ALT','Trans','PCP','beta'],
-# 		add_cols=add_cols, drop_cols=drop_cols,
-# 		get_id=get_id, ret_dict=ret_dict, ind_namekey=ind_namekey)
-
 # read in annotation file or gene expression file
 def read_gene_annot_exp(
     chrm=None,
@@ -406,7 +395,6 @@ def read_gene_annot_exp(
                 .reset_index(drop=True)
                 .astype(dtype)
             )
-            # Gene.columns = [cols[i] for i in Gene.columns]
 
         if Gene.empty:
             raise SystemExit(
@@ -423,7 +411,6 @@ def read_gene_annot_exp(
                 .reset_index(drop=True)
                 .astype(dtype)
             )
-            # Gene.columns = [cols[i] for i in Gene.columns]
 
     Gene = optimize_cols(Gene)
 
@@ -431,9 +418,6 @@ def read_gene_annot_exp(
     n_targets = TargetID.size
 
     return Gene, TargetID, n_targets
-
-
-## line filter functions for read_tabix
 
 
 def filter_vcf_line(line: bytes, bformat, col_inds, split_multi_GT):
@@ -488,19 +472,11 @@ def filter_weight_line(line: bytes, btarget: bytes, target_ind, col_inds):
     :return: bytes string
     """
     # split line into list
-    # import ipdb
     row = line.split(b"\t")
     # check if row is for correct target
-    # if (len(row) > max(col_inds)) and row[target_ind].startswith(btarget):
-    # if len(row) < target_ind:
-    #     print(row)
-    #     ipdb.set_trace([])
     if (len(row) > max(col_inds)) and (row[target_ind].startswith(btarget)):
-        # try:
         line = b"\t".join([row[x] for x in col_inds])
         line += b"" if line.endswith(b"\n") else b"\n"
-        # except:
-        #     ipdb.set_trace()
         return line
     else:
         return b""
@@ -516,9 +492,6 @@ def filter_other_line(line: bytes, col_inds):
         line += b"" if line.endswith(b"\n") else b"\n"
     else:
         line = b""
-    # except:
-    #     import ipdb
-    #     ipdb.set_trace()
     return line
 
 
@@ -538,7 +511,6 @@ def read_tabix(
     target=None,
     weight_threshold=0,
     raise_error=True,
-    semaphore_key=None,
     **kwargs,
 ):
 
@@ -576,56 +548,26 @@ def read_tabix(
     # initialize bytearray
     proc_out = bytearray()
 
-    if semaphore_key is not None and USE_SEMAPHORE:
-        semaphores[semaphore_key].acquire()
-
-    # import ipdb
-
-    # tabix /home/jupyter/gcs_data/pipe/work/53/321e6d4c0b9d4c7edd95512fecd782/out/DPR_CHR19/CHR19_DPR_train_eQTLweights.txt.gz 19:34754566.0-36758079.0
-    # giving the line [b'6', b'3.385509e-05', b'0.0005520786', b'3.385509e-05']
-
-    # print(f"Starting {command_str=}")
     with subprocess.Popen(
         [command_str], shell=USE_SHELL, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     ) as proc:
-
-        # TODO: Maybe just do `for line in proc.stdout:`
         # while subprocesses running, read lines into byte array
         while proc.poll() is None:
-            # ipdb.set_trace()
             line = proc.stdout.readline()
-            # if (len(line.split(b'\t')) != 11) and (semaphore_key == 'w'):
-            #     ipdb.set_trace()
             if len(line) == 0:
                 break
             proc_out += filter_line(line)
         # read in lines still remaining after subprocess completes
-        # stdout, stderr = proc.communicate()
-        # ipdb.set_trace()
-        # try:
-        #     for line2 in stdout.split(b'\n'):
         for line in proc.stdout:
             if len(line) == 0:
                 break
             proc_out += filter_line(line)
-        # except AttributeError:
-        #     # ipdb.set_trace()
-        #     # print(f"{command_str=}\n{stderr=}\n{line=}")
-        #     sys.exit()
-        # print(f"{stderr=}")
-        stdout, stderr = proc.communicate()
-        # print(f"Final skipped {stdout=}")
+        _stdout, _stderr = proc.communicate()
         proc.wait()
-
-    # if proc_out:
-    #     print(f"Successfully finished {command_str=}")
 
     if not proc_out and raise_error:
         print(f"No tabix data for target {command_str=}\n")
         raise NoTargetDataError
-
-    if semaphore_key is not None and USE_SEMAPHORE:
-        semaphores[semaphore_key].release()
 
     # read data into dataframe
     df = pd.read_csv(
@@ -653,8 +595,6 @@ def read_tabix(
     # weight file handling
     if genofile_type == "weight":
         ## figure out a way to handle target ids with decimal places when both files dont necessarily have those
-        # if not np.all(df['TargetID'] == target):
-        # partial_targetids = np.unique(df['TargetID'])
 
         # VC_TWAS uses ES = b + beta
         if not "ES" in cols:
@@ -711,10 +651,6 @@ def tabix_query_files(
     paths = [
         path for path in [geno_path, gwas_path, w_path, z_path] if path is not None
     ]
-    # reg_str = ' ' + chrm + ':' + start + '-' + end
-    if USE_SEMAPHORE:
-        for semaphore_key in ["geno", "gwas", "w", "z"]:
-            semaphores[semaphore_key].acquire()
 
     vals = []
     for path in paths:
@@ -726,10 +662,6 @@ def tabix_query_files(
             vals.append(len(proc.stdout.readline()) > 0)
             proc.terminate()
 
-    if USE_SEMAPHORE:
-        for semaphore in semaphores.values():
-            semaphore.release()
-
     return np.all(vals)
 
 
@@ -737,9 +669,7 @@ def tabix_query_files(
 def call_tabix(path, chrm, start, end, add_command_str=""):
 
     regs_str = chrm + ":" + start + "-" + end
-
     command_str = " ".join(["tabix", path, regs_str, add_command_str])
-    # ["tabix " + path + " " + chrm + ":" + start + "-" + end]
 
     proc_out = bytearray()
 
@@ -758,8 +688,7 @@ def call_tabix(path, chrm, start, end, add_command_str=""):
         for line in proc.stdout:
             proc_out += line
 
-        stdout, stderr = proc.communicate()
-        # print(f"Final skipped {stdout=}")
+        _stdout, _stderr = proc.communicate()
         proc.wait()
 
     return proc_out
@@ -790,8 +719,7 @@ def call_tabix_header(path, out="tuple", rename={}):
             if not line.startswith(b"##"):
                 proc_out += line
 
-        stdout, stderr = proc.communicate()
-        # print(f"Final skipped {stdout=}")
+        _stdout, _stderr = proc.communicate()
         proc.wait()
 
     # decode bytes, use pandas to read in, rename columns from dictionary
@@ -866,8 +794,7 @@ def get_vcf_header(path, out="tuple"):
         for line in proc.stdout:
             proc_out += line
 
-        stdout, stderr = proc.communicate()
-        # print(f"Final skipped {stdout=}")
+        _stdout, _stderr = proc.communicate()
         proc.wait()
 
     header = pd.read_csv(
@@ -934,9 +861,6 @@ def get_cols_dtype(
 
     # cols set up
     cols = cols + add_cols
-
-    # if type == 'vcf':
-    #     cols.insert(4, 'snpID')
 
     if get_id:
         if "snpID" in file_cols:
@@ -1066,8 +990,7 @@ def call_tabix_regions(path, regs_str, filter_line=lambda x: x):
         for line in proc.stdout:
             proc_out += filter_line(line)
 
-        stdout, stderr = proc.communicate()
-        # print(f"Final skipped {stdout=}")
+        _stdout, _stderr = proc.communicate()
         proc.wait()
 
     return proc_out
@@ -1097,11 +1020,7 @@ def get_ld_regions_data(regs_str, path, snp_ids, ld_cols, ld_cols_ind):
 def get_ld_data(path, snp_ids):
 
     # get columns names, indices for ld file
-    if USE_SEMAPHORE:
-        semaphores["ld"].acquire()
     ld_cols, ld_cols_ind = get_ld_cols(path)
-    if USE_SEMAPHORE:
-        semaphores["ld"].release()
 
     # format tabix regions from snp_ids; 'chrm:start-end'
     regs_lst = list(get_ld_regions_list(snp_ids))
@@ -1115,7 +1034,6 @@ def get_ld_data(path, snp_ids):
 
     except OSError:
         # argument may be too long for OS; if so try subset instead of getting all regions at once
-        # print('Subseting regions to tabix.')
         n = 2500
         while n:
             try:
