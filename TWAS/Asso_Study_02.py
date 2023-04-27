@@ -196,7 +196,6 @@ def main():
         n_snps = str(ZW.snpID.size)
 
         # get the snp variance and covariance matrix
-        MCOV.to_csv("MCOV_test.csv")
         snp_sd, V_cov = tg.get_ld_matrix(MCOV)
 
         print("Running TWAS.\nN SNPs=" + n_snps)
