@@ -1054,32 +1054,51 @@ def get_ld_data(path, snp_ids):
 
 
 def get_ld_matrix(MCOV, return_diag=False):
-    # FIXME: Is this necessary?
-    # MCOV = MCOV.copy()
-
-    # TODO: optimize this
     MCOV["COV"] = MCOV["COV"].apply(
         lambda x: np.fromstring(x, dtype=np.float32, sep=",")
     )
-    # MCOV["COV"] = MCOV["COV"].str.split(",")
 
     inds = MCOV.index
     n_inds = inds.size
-    V_upper = np.zeros((n_inds, n_inds))
 
-    # TODO: optimize this, quadratic :(
+    # Note: optimized (by about 25x 😎)
+    V_upper = np.zeros((n_inds, n_inds))
+    # get the actual snp_inds as well instead of lookup
     for ii, idx_i in enumerate(inds):
-        # cov_i = MCOV.COV.at[inds[i]]  # Faster than .loc or .iloc
-        # cov_i = MCOV.COV.at[i]
-        cov_i = MCOV.COV.at[idx_i]
+        cov_i = MCOV.COV.at[idx_i]  # .at is faster than .loc
         N = cov_i.size
 
-        for j in range(i, n_inds):
-            if inds[j] - inds[i] < N:
-                # V_upper[i, j] = cov_i[inds[j] - inds[i]]
-                V_upper[i, j] = cov_i[j - i]
-            # else:
-            #     V_upper[i, j] = 0
+        possible_jj = slice(ii, n_inds)  # Instead of loop, slice
+        possible_idx_j = inds[possible_jj]  # These are the snp_inds at j
+        idxs_j_minus_i = possible_idx_j - idx_i  # This is inds[j] - inds[i], as below
+        # Get the *valid* indices, those less than N (0-indexed)
+        valid_jj = np.where(idxs_j_minus_i < N)[0]
+
+        # Add back the ii to make it start at ii, get the VALID cov_i[inds[j] - inds[i]]
+        V_upper[ii, valid_jj + ii] = cov_i[idxs_j_minus_i[valid_jj]]
+
+    # original
+    # V_upper = np.zeros((n_inds, n_inds))
+    # for i in range(n_inds):
+    #     cov_i = MCOV.COV.loc[inds[i]]
+    #     N = cov_i.size
+    #
+    #     for j in range(i, n_inds):
+    #         if inds[j] - inds[i] < N:
+    #             V_upper[i, j] = cov_i[inds[j] - inds[i]]
+    #         else:
+    #             V_upper[i, j] = 0
+
+    # Partially optimized
+    # V_upper_new = np.zeros((n_inds, n_inds))
+    # for ii, idx_i in enumerate(inds):
+    #     cov_i = MCOV.COV.at[idx_i]
+    #     N = cov_i.size
+    #
+    #     for jj, idx_j in enumerate(inds[ii:]):
+    #         jj += ii
+    #         if idx_j - idx_i < N:
+    #             V_upper_new[ii, jj] = cov_i[idx_j - idx_i]
 
     snp_Var = V_upper.diagonal()
     V = V_upper + V_upper.T - np.diag(snp_Var)
