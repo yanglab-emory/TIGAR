@@ -74,7 +74,6 @@ def main():
     parser.add_argument("--thread", type=int)
     parser.add_argument("--out_dir", type=str)
     parser.add_argument("--out_twas_file", type=str)
-    parser.add_argument("--profile", action="store_true", help="Time-profile code")
 
     args = parser.parse_args()
 
@@ -224,23 +223,9 @@ def main():
         return Result
 
     print("Starting TWAS for " + str(n_targets) + " target genes.\n")
-    if args.profile:
-        import cProfile
-        import pstats
-
-        with cProfile.Profile() as pr:
-            res = thread_process(0)
-
-        stats = pstats.Stats(pr)
-        stats.sort_stats(pstats.SortKey.TIME)
-        stats.print_stats()
-
-        stats.dump_stats(filename=f'{out_twas_path}.prof')
-
-    else:
-        res = Parallel(n_jobs=args.thread)(
-            delayed(thread_process)(num) for num in range(n_targets)
-        )
+    res = Parallel(n_jobs=args.thread)(
+        delayed(thread_process)(num) for num in range(n_targets)
+    )
     res = [r for r in res if r is not None]
 
     # write to file
