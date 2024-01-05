@@ -516,13 +516,31 @@ def read_tabix(start, end, sampleID, chrm, path, file_cols, col_inds, cols, dtyp
 	return df
 
 
+def tabix_query_file(path, reg_str):
+	proc = subprocess.Popen(['tabix '+path+reg_str+' | head -n1 | cut -c 1-5'],
+		shell=True, stdout=subprocess.PIPE, bufsize=1)
+	try:
+		outs, err = proc.communicate(timeout=15)
+		ret_val = len(outs) > 1
+	except TimeoutExpired:
+		proc.kill()
+		outs, errs = proc.communicate()
+		ret_val = len(outs) > 1
+	except:
+		proc.kill()
+		ret_val = False
+	finally:
+		proc.kill()
+	
+	return ret_val
+
+
 def tabix_query_files(start, end, chrm, geno_path=None, gwas_path=None, w_path=None, z_path=None, **kwargs):
 	paths = [path for path in [geno_path, gwas_path, w_path, z_path] if path is not None]
 	reg_str = ' ' + chrm + ':' + start + '-' + end
+
 	# for each path test if length of first line != 0
-	return np.all([len(subprocess.Popen(['tabix '+path+reg_str],
-		shell=True, stdout=subprocess.PIPE,
-		bufsize=1).stdout.readline()) > 0  for path in paths])
+	return np.all([tabix_query_file(path, reg_str)  for path in paths])
 
 
 # Call tabix, read in lines into byte array
