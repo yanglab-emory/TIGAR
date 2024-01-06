@@ -464,6 +464,9 @@ def read_tabix(start, end, sampleID, chrm, path, file_cols, col_inds, cols, dtyp
 		header=None,
 		names=cols,
 		dtype=dtype)
+	
+	# kill process
+	proc.kill()
 
 	# filter out rows where all sampleID values are nan
 	if len(sampleID):
@@ -530,8 +533,9 @@ def tabix_query_file(path, reg_str):
 		proc.kill()
 		ret_val = False
 	finally:
+		# kill process
 		proc.kill()
-	
+
 	return ret_val
 
 
@@ -569,6 +573,9 @@ def call_tabix(path, chrm, start, end, add_command_str = ''):
 	# read in lines still remaining after subprocess completes
 	for line in proc.stdout:
 		proc_out += line
+	
+	# kill process
+	proc.kill()
 
 	return proc_out
 
@@ -606,6 +613,9 @@ def call_tabix_header(path, out='tuple', rename={}):
 		StringIO(proc_out.decode('utf-8')),
 		sep='\t',
 		error_bad_lines=False).rename(columns=rename)
+	
+	# kill process
+	proc.kill()
 
 	if out=='tuple':
 		return tuple(header)
@@ -682,7 +692,10 @@ def get_vcf_header(path, out='tuple'):
 	header = pd.read_csv(
 		StringIO(proc_out.decode('utf-8')),
 		sep='\t',
-		error_bad_lines=False).rename(columns={'#CHROM':'CHROM'})   
+		error_bad_lines=False).rename(columns={'#CHROM':'CHROM'})
+	
+	# kill process
+	proc.kill()   
 
 	if out=='tuple':
 		return tuple(header)
@@ -868,6 +881,9 @@ def call_tabix_regions(path, regs_str, filter_line = lambda x:x ):
 	# leftover lines
 	for line in proc.stdout:
 		proc_out += filter_line(line)
+
+	# kill process
+	proc.kill()
 
 	return proc_out
 
