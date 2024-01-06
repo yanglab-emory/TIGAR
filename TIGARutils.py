@@ -464,6 +464,9 @@ def read_tabix(start, end, sampleID, chrm, path, file_cols, col_inds, cols, dtyp
 		header=None,
 		names=cols,
 		dtype=dtype)
+	
+	# kill process
+	proc.kill()
 
 	# filter out rows where all sampleID values are nan
 	if len(sampleID):
@@ -516,13 +519,32 @@ def read_tabix(start, end, sampleID, chrm, path, file_cols, col_inds, cols, dtyp
 	return df
 
 
+def tabix_query_file(path, reg_str):
+	proc = subprocess.Popen(['tabix '+path+reg_str+' | head -n1 | cut -c 1-5'],
+		shell=True, stdout=subprocess.PIPE, bufsize=1)
+	try:
+		outs, err = proc.communicate(timeout=15)
+		ret_val = len(outs) > 1
+	except TimeoutExpired:
+		proc.kill()
+		outs, errs = proc.communicate()
+		ret_val = len(outs) > 1
+	except:
+		proc.kill()
+		ret_val = False
+	finally:
+		# kill process
+		proc.kill()
+
+	return ret_val
+
+
 def tabix_query_files(start, end, chrm, geno_path=None, gwas_path=None, w_path=None, z_path=None, **kwargs):
 	paths = [path for path in [geno_path, gwas_path, w_path, z_path] if path is not None]
 	reg_str = ' ' + chrm + ':' + start + '-' + end
+
 	# for each path test if length of first line != 0
-	return np.all([len(subprocess.Popen(['tabix '+path+reg_str],
-		shell=True, stdout=subprocess.PIPE,
-		bufsize=1).stdout.readline()) > 0  for path in paths])
+	return np.all([tabix_query_file(path, reg_str)  for path in paths])
 
 
 # Call tabix, read in lines into byte array
@@ -551,6 +573,9 @@ def call_tabix(path, chrm, start, end, add_command_str = ''):
 	# read in lines still remaining after subprocess completes
 	for line in proc.stdout:
 		proc_out += line
+	
+	# kill process
+	proc.kill()
 
 	return proc_out
 
@@ -588,6 +613,9 @@ def call_tabix_header(path, out='tuple', rename={}):
 		StringIO(proc_out.decode('utf-8')),
 		sep='\t',
 		error_bad_lines=False).rename(columns=rename)
+	
+	# kill process
+	proc.kill()
 
 	if out=='tuple':
 		return tuple(header)
@@ -664,7 +692,10 @@ def get_vcf_header(path, out='tuple'):
 	header = pd.read_csv(
 		StringIO(proc_out.decode('utf-8')),
 		sep='\t',
-		error_bad_lines=False).rename(columns={'#CHROM':'CHROM'})   
+		error_bad_lines=False).rename(columns={'#CHROM':'CHROM'})
+	
+	# kill process
+	proc.kill()   
 
 	if out=='tuple':
 		return tuple(header)
@@ -850,6 +881,9 @@ def call_tabix_regions(path, regs_str, filter_line = lambda x:x ):
 	# leftover lines
 	for line in proc.stdout:
 		proc_out += filter_line(line)
+
+	# kill process
+	proc.kill()
 
 	return proc_out
 
