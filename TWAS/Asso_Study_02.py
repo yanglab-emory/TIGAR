@@ -119,7 +119,7 @@ Output TWAS results file: {out_path}
 	test_stat_str = 'FUSION and SPrediXcan' if args.test_stat=='both' else args.test_stat,
 	out_path = out_twas_path))
 
-# tg.print_args(args)
+tg.print_args(args)
 
 ###############################################################
 ### Read in gene annotation 

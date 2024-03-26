@@ -23,7 +23,7 @@ start_time = time()
 
 ###############################################################
 # parse input arguments
-parser = argparse.ArgumentParser(description='Asso Study 02')
+parser = argparse.ArgumentParser(description='BGW-TWAS Association Study')
 
 # Specify tool directory
 parser.add_argument('--TIGAR_dir', type=str)
@@ -34,6 +34,9 @@ parser.add_argument('--gene_list', type=str, dest='annot_path')
 # # chromosome number
 # parser.add_argument('--chr', type=str, dest='chrm')
 
+# use target dir (ie, weight files will be in [weight_prefix]/[target]/ instead of [weight_prefix]])
+parser.add_argument('--target_dir', type=int, dest='target_dir', default=0)
+
 # Weight file path
 parser.add_argument('--weight_prefix', type=str, dest='w_path_pre')
 parser.add_argument('--weight_suffix', type=str, dest='w_path_suf')
@@ -41,8 +44,8 @@ parser.add_argument('--weight_suffix', type=str, dest='w_path_suf')
 # GWAS Z score file path
 parser.add_argument('--Zscore', type=str, dest='z_path', default='')
 
-parser.add_argument('--Zscore_prefix', type=str, dest='z_path_pre',default='')
-parser.add_argument('--Zscore_suffix', type=str, dest='z_path_suf',default='')
+parser.add_argument('--Zscore_prefix', type=str, dest='z_path_pre', default='')
+parser.add_argument('--Zscore_suffix', type=str, dest='z_path_suf', default='')
 
 
 # Reference covariance file path
@@ -57,13 +60,13 @@ parser.add_argument('--log_file', type=str, default='')
 # parser.add_argument('--window',type=float)
 
 # Weight threshold to include SNP in TWAS
-parser.add_argument('--weight_threshold',type=float, default=0)
+parser.add_argument('--weight_threshold', type=float, default=0)
 
 # specify 'FUSION', 'SPrediXcan', or 'both': Zscore test statistic to use
 parser.add_argument('--test_stat', type=str, default='both')
 
 # Number of threads
-parser.add_argument('--thread',type=int, default=1)
+parser.add_argument('--thread', type=int, default=1)
 
 # Output dir
 parser.add_argument('--out_dir', type=str)
@@ -148,9 +151,12 @@ def get_burden_zscore(test_stat, get_zscore_args):
 
 
 def bgw_weight_file_info(w_path, weight_threshold=0, add_cols=[], drop_cols=['ID'], **kwargs):
+	# cols=['CHROM','POS','REF','ALT','Trans','PCP','beta'],
+	# got_header=tg.get_header(w_path, zipped=False, rename={'#CHR':'CHROM','CHR':'CHROM','CPP':'PCP'})
+	# print(got_header)
 	info_dict = tg.get_cols_dtype(
-		tg.get_header(w_path, zipped=False), 
-		cols=['CHROM','POS','REF','ALT','Trans','PCP','beta'], 
+		tg.get_header(w_path, zipped=False, rename={'#CHR':'CHROM','CHR':'CHROM','CPP':'PCP','Beta':'BETA'}), 
+		cols=['CHROM','POS','REF','ALT','Trans','PCP','BETA'], 
 		add_cols=add_cols, 
 		drop_cols=drop_cols, 
 		get_id=True,  
@@ -167,7 +173,8 @@ def bgw_weight_file_info(w_path, weight_threshold=0, add_cols=[], drop_cols=['ID
 def read_bgw_weight(w_path, weight_threshold=0, **kwargs):
 	# ensure file at w_path exists
 	if not os.path.isfile(w_path):
-		print('No valid weight file for target.\n')
+		print('No valid weight file for target at: ' + w_path + '\n')
+		# print('No valid weight file for target.\n')
 		raise tg.NoTargetDataError
 
 	# get weight info
@@ -201,8 +208,8 @@ def read_bgw_weight(w_path, weight_threshold=0, **kwargs):
 	Weight = Weight.drop_duplicates(['snpID'], keep='first').reset_index(drop=True)
 
 	# get ES column
-	Weight['ES'] = Weight['PCP'] * Weight['beta']
-	Weight = Weight.drop(columns=['PCP','beta'])
+	Weight['ES'] = Weight['PCP'] * Weight['BETA']
+	Weight = Weight.drop(columns=['PCP','BETA'])
 
 	if weight_threshold:
 		# filter out weights below threshold
@@ -314,11 +321,13 @@ def get_multi_chrm_ld_matrix(MCOV, return_diag=False):
 
 out_twas_path = args.out_dir + '/' + args.out_twas_file
 
+# cis-eQTL weight file: {w_path_pre}[target]{w_path_suf}
+
 print(
 '''********************************
 Input Arguments
 Gene annotation file specifying genes for TWAS: {annot_path}
-cis-eQTL weight file: {w_path_pre}[target]{w_path_suf}
+cis-eQTL weight file: {in_w_dir}/[target]{w_path_suf}
 GWAS summary statistics Z-score file: {in_z_path}
 Reference LD genotype covariance file: {ld_path_pre}[chr]{ld_path_suf}
 SNP weight inclusion threshold: {weight_threshold}
@@ -329,9 +338,11 @@ Output TWAS results file: {out_path}
 ********************************'''.format(
 	**args.__dict__,
 	test_stat_str = 'FUSION and SPrediXcan' if args.test_stat=='both' else args.test_stat,
+	in_w_dir = args.w_path_pre + '/[target]' if args.target_dir else args.w_path_pre,
 	in_z_path = args.z_path_pre + '[CHRM]' + args.z_path_suf if args.z_path == '' else args.z_path,
 	out_path = out_twas_path))
 
+	# in_w_dir = args.w_path_pre if not args.target_dir else args.w_path_pre + '/[target]',
 # tg.print_args(args)
 
 ###############################################################
@@ -368,7 +379,11 @@ def thread_process(num):
 	print('num=' + str(num) + '\nTargetID=' + target)
 
 	# read weight file
-	w_path = args.w_path_pre + target + args.w_path_suf
+	if not args.target_dir:
+		w_path = args.w_path_pre + '/' + target + args.w_path_suf
+	else:
+		w_path = args.w_path_pre + '/' + target + '/' + target + args.w_path_suf
+
 	Weight = read_bgw_weight(w_path, **args.__dict__)
 
 	# get start and end positions to tabix, per chromosome
@@ -377,13 +392,18 @@ def thread_process(num):
 	# read in Zscore files
 	if args.z_path is not '':
 		Zscore = read_bgw_zscore(args.z_path, Weight.snpID.values)
+		# print(Weight.snpID.values)
+		# print(Zscore)
 	else:
 		Zscore = pd.concat([read_bgw_zscore(z_path(chrm), Weight[Weight.CHROM == chrm].snpID.values) for chrm in np.unique(Weight.CHROM)]).reset_index(drop=True)
+		# print(Zscore)
+		# print(z_path(chrm))
 
 	snp_overlap = np.intersect1d(Weight.snpID, Zscore[['snpID','snpIDflip']])
-
+	# print(Weight)
+	# print(Zscore)
 	if not snp_overlap.size:
-		print('No overlapping test SNPs that have magnitude of cis-eQTL weights greater than threshold value and with GWAS Zscore for TargetID: ' + target + '.\n')
+		print('No overlapping test SNPs that have magnitude of cis-eQTL weights greater than threshold value and with GWAS Zscore for TargetID: ' + target + '\n')
 		return None
 
 	# filter out non-matching snpID rows

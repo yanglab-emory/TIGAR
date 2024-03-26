@@ -153,13 +153,13 @@ elif [[ "$asso"x == "2"x ]];then
 
     # Check Zscore file
     if [ ! -f "${Zscore}" ] ; then
-        echo Error: Gene expression file ${Zscore} does not exist or is empty. >&2
+        echo Error: Zscore file ${Zscore} does not exist or is empty. >&2
         exit 1
     fi
 
     # Check weight file and tabix weight file
     if [ ! -f "${weight}" ] ; then
-        echo Error: Gene expression file ${weight} does not exist or is empty. >&2
+        echo Error: Weight file ${weight} does not exist or is empty. >&2
         exit 1
     fi
 
