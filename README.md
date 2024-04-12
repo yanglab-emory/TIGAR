@@ -139,7 +139,7 @@ Example input files provided under `./ExampleData/` are generated artificially. 
 |   1   | 100 | rs1 |  C  |  T  |   .  |  PASS  |   .  |  GT:DS | 0/0:0.01 |    ...   |
 
 - Sorted by chromosome and base pair position, bgzipped by `bgzip`, and tabixed by `tabix`
-- **The chromosome numers in the CHROM column should not start with "chr"**
+- **The values in the CHROM column should not start with "chr"**
 - Example tabix command for a VCF file: `tabix -f -p vcf *.vcf.gz`.
 - First 9 columns are Chromosome number, Base pair position, Variant ID, Reference allele, Alternative allele, Quality score, Filter status, Variant information, Genotype data format
 - Genotype data starts from the 10th column. Each column denotes the genotype data per sample.
