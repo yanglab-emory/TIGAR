@@ -13,7 +13,7 @@
 
 ---
 
-![TIGAR framework flowchart including TWAS steps of training gene expression prediction models from reference data, predicting GReX with individual-level GWAS data, and testing gene-based association with both individual-level and summary-level GWAS data.](TIGAR_flow.png?raw=true)
+![TIGAR framework flowchart including TWAS steps of training gene expression prediction models from reference data, predicting GReX with individual-level GWAS data, and testing gene-based association with both individual-level and summary-level GWAS data.](TIGAR_framework.png?raw=true)
 
 ---
 
