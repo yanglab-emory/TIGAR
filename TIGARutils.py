@@ -520,7 +520,7 @@ def read_tabix(start, end, sampleID, chrm, path, file_cols, col_inds, cols, dtyp
 
 
 def tabix_query_file(path, reg_str):
-	proc = subprocess.Popen(['tabix '+path+reg_str+' | head -n1 | cut -c 1-5'],
+	proc = subprocess.Popen(['tabix '+path+reg_str+' | head -n1 '],
 		shell=True, stdout=subprocess.PIPE, bufsize=1)
 	try:
 		outs, err = proc.communicate(timeout=15)
