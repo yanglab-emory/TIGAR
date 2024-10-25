@@ -33,12 +33,13 @@ plot_data$TargetID <- do.call(rbind, strsplit(plot_data$TargetID, '.', fixed=TRU
 
 # NOTE: labels may not show up in plot viewing window-check the output file
 
-# plotting; label some significant genes
-id_genes <- c('MMRN1','MAPK8IP1P2')
+# label these genes are labeled
+id_genes <- c('MMRN1','MAPK8IP1P2','GPNMB','MAPT','PLEKHN1','PRR26')
 
 plot_data$label_text <- plot_data$GeneName
 plot_data[with(plot_data, !(GeneName %in% id_genes)), 'label_text'] <- ''
 
+# only label significant genes
 p1 <- manhattan_plot(plot_data); p1
 p1 + facet_grid(dataset ~ .)
 
@@ -46,15 +47,7 @@ ggsave('manplot_1-1.pdf', p1) # ggsave will automatically format the output base
 ggsave('manplot_1-2.png', p1 + facet_grid(dataset ~ .)) # example: facet by 'dataset' column
 ggsave('manplot_1-3.jpg', p1, width=4.5, height=6.5) # example specify height
 
-
-# plotting; label some significant genes and nonsig
-id_genes <- c('MMRN1','MAPK8IP1P2','GPNMB','MAPT','PLEKHN1','PRR26')
-
-plot_data$label_text <- plot_data$GeneName
-plot_data[with(plot_data, !(GeneName %in% id_genes)), 'label_text'] <- ''
-
-data <- plot_data
-
+# label all nonsig and significant genes
 p2 <- manhattan_plot(plot_data, label_nonsig=TRUE); p2
 p2 + facet_grid(dataset ~ .)
 
