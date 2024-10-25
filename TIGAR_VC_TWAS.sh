@@ -105,7 +105,15 @@ fi
 if [ ! -f "${genofile}" ]; then
     echo Error: Training genotype file ${genofile} does not exist or is empty. >&2
     exit 1
+  # check chromosome column to see if it starts with "chr"; will cause "No tabix data" error for all genes
+  startswithchr=`zgrep -E '^#' -v ${genofile} | head -n10 | grep -E '^chr' -c`
+  # warn but don't stop job?
+  if ((startswithchr != 0)); then 
+    echo Error: A check of the first 10 non-header lines in your genotype file shows that CHROM column values seem to start with \"chr\"! >&2
+    exit 1
+  fi    
 fi
+
 
 # Check training sample ID file
 if [ ! -f "${test_sampleID_file}" ]; then

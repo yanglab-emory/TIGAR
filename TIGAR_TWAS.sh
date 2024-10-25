@@ -44,7 +44,7 @@ do
     case "$1" in
         --asso|-asso) asso=$2; shift 2;;
         --gene_exp|-gene_exp) gene_exp=$2; shift 2;;
-		--gene_anno|-gene_anno) gene_anno=$2; shift 2;;
+				--gene_anno|-gene_anno) gene_anno=$2; shift 2;;
         --PED|-PED) PED=$2; shift 2;;
         --PED_info|-PED_info) PED_info=$2; shift 2;;
         --method|-method) method=$2; shift 2;;
@@ -85,6 +85,7 @@ else
 fi
 
 ############# TWAS 
+
 
 ## make output directory
 mkdir -p ${out_dir}
