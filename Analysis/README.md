@@ -7,6 +7,14 @@ These scripts require additional packages not used by the main TIGAR tool and ar
 
 ---
 
+![Manhattan plot with several labeled significant genes.](manplot_1-2.png?raw=true)
+
+---
+
+![Manhattan plot with several labeled significant and non-significant genes.](manplot_2-2.png?raw=true)
+
+---
+
 - [Software Setup](#software-setup)
 - [Manhattan Plots](#manhattan-plots)
 

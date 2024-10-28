@@ -1,10 +1,10 @@
 #!/usr/bin/env Rscript
 options(stringsAsFactors=FALSE)
 
-source('manhattan_plot.R')
-
-
 TIGAR_dir <- './TIGAR/'
+out_dir <- paste0(TIGAR_dir, 'Analysis/')
+
+source(paste0(TIGAR_dir, 'Analysis/manhattan_plot.R'))
 
 
 # data is output from all chromosomes from two different datasets 
@@ -43,17 +43,17 @@ plot_data[with(plot_data, !(GeneName %in% id_genes)), 'label_text'] <- ''
 p1 <- manhattan_plot(plot_data); p1
 p1 + facet_grid(dataset ~ .)
 
-ggsave('manplot_1-1.pdf', p1) # ggsave will automatically format the output based on file extension
-ggsave('manplot_1-2.png', p1 + facet_grid(dataset ~ .)) # example: facet by 'dataset' column
-ggsave('manplot_1-3.jpg', p1, width=4.5, height=6.5) # example specify height
+ggsave(paste0(out_dir, 'manplot_1-1.pdf'), p1) # ggsave will automatically format the output based on file extension
+ggsave(paste0(out_dir, 'manplot_1-2.png'), p1 + facet_grid(dataset ~ .)) # example: facet by 'dataset' column
+ggsave(paste0(out_dir, 'manplot_1-3.jpg'), p1, width=4.5, height=6.5) # example specify height
 
 # label all nonsig and significant genes
 p2 <- manhattan_plot(plot_data, label_nonsig=TRUE); p2
 p2 + facet_grid(dataset ~ .)
 
-ggsave('manplot_2-1.pdf', p2) # ggsave will automatically format the output based on file extension
-ggsave('manplot_2-2.png', p2 + facet_grid(dataset ~ .)) # example: facet by 'dataset' column
-ggsave('manplot_2-3.jpg', p2, width=4.5, height=6.5) # example specify height
+ggsave(paste0(out_dir, 'manplot_2-1.pdf'), p2) # ggsave will automatically format the output based on file extension
+ggsave(paste0(out_dir, 'manplot_2-2.png'), p2 + facet_grid(dataset ~ .)) # example: facet by 'dataset' column
+ggsave(paste0(out_dir, 'manplot_2-3.jpg'), p2, width=4.5, height=6.5) # example specify height
 
 
 ## example: drop most significant gene (if it is much, much more significant than other genes)
