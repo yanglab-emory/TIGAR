@@ -4,6 +4,7 @@
 # import packages needed
 import argparse
 import operator
+import os
 import multiprocessing
 import subprocess
 import sys
@@ -21,55 +22,70 @@ start_time=time()
 # parse input arguments
 parser = argparse.ArgumentParser(description='Prediction')
 
-# Specify tool directory
-parser.add_argument('--TIGAR_dir', type=str)
-
-# eQTL weight file path
-parser.add_argument('--weight', type=str, dest='w_path')
-
-# Test sampleID path
-parser.add_argument('--test_sampleID', type=str, dest='sampleid_path')
-
-# Specified chromosome number
-parser.add_argument('--chr', type=str, dest='chrm')
-
-# Test genotype file path
-parser.add_argument('--genofile', type=str, dest='geno_path')
-
-# Specified input file type (vcf or dosages)
-parser.add_argument('--genofile_type', type=str)
-
-# 'DS' or 'GT' for VCF genotype file
-parser.add_argument('--format', type=str, dest='data_format')
-
-# window
-parser.add_argument('--window', type=int)
-
-# Gene annotation file path
-parser.add_argument('--gene_anno', type=str, dest='annot_path')
-
-# number of thread
-parser.add_argument('--thread', type=int)
-
-# missing rate: threshold for excluding SNPs with too many missing values
-parser.add_argument('--missing_rate', type=float)
-
-# Threshold of difference of maf between training data and testing data
-parser.add_argument('--maf_diff', type=float)
-
-# file paths
-parser.add_argument('--out_pred_file', type=str)
-
-# output dir
-parser.add_argument('--out_dir', type=str)
+parser.add_argument('--chr', type=str, dest='chrm', 
+	choices=[str(i + 1) for i in range(22)],
+	required=True, 
+	help='chromosome number')
+parser.add_argument('--format', type=str, dest='data_format', choices=['GT', 'DS'], default='GT')
+parser.add_argument('--gene_anno', type=str, dest='annot_path', required=True)
+parser.add_argument('--genofile', type=str, dest='geno_path', required=True)
+parser.add_argument('--genofile_type', type=str, choices=['vcf', 'dosage'], 
+	help='filetype of genofile (vcf, dosages)')
+parser.add_argument('--log_file', type=str, default='')
+parser.add_argument('--maf_diff', type=float, default=0.2,
+	help='threshold of max difference in MAF between training data and testing data')
+parser.add_argument('--missing_rate', type=float, default=0.2, 
+	help='missing rate threshold for excluding SNPs with too many missing values (default: 0.2)')
+parser.add_argument('--out_dir', type=str, default=os.getcwd())
+parser.add_argument('--out_pred_file', type=str, default='')
+parser.add_argument('--out_prefix', type=str, default='')
+parser.add_argument('--sub_dir', type=int, choices=[0, 1], default=1)
+parser.add_argument('--test_sampleID', type=str, dest='sampleid_path', required=True)
+parser.add_argument('--thread', type=int, default=1)
+parser.add_argument('--TIGAR_dir', type=str, help='tool directory', 
+	default=os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+parser.add_argument('--weight', type=str, dest='w_path', required=True,
+	help='eQTL weight file path')
+parser.add_argument('--window', type=int, default=1000000, 
+	help='size around gene region for selecting cis-SNPs for fitting gene expression prediction model (default: 1000000 [ie, +-1MB region around gene])')
 
 args = parser.parse_args()
-
 sys.path.append(args.TIGAR_dir)
-
 import TIGARutils as tg
 
-#######################################################################
+#############################################################
+# set output file names
+if not args.out_prefix:
+	args.out_prefix = 'CHR' + args.chrm + '_Pred'
+
+if not args.log_file:
+	args.log_file = args.out_prefix + '_log.txt'
+
+if not args.out_pred_file:
+	args.out_pred_file = args.out_prefix + '_GReX.txt'
+
+# sub-directory in out directory
+if args.sub_dir:
+	out_sub_dir = os.path.join(args.out_dir, 'Pred_CHR' + args.chrm)
+else:
+	out_sub_dir = args.out_dir
+out_sub_dir = tg.get_abs_path(out_sub_dir)
+
+# Check tabix command
+tg.check_tabix()
+
+# Check input files
+tg.check_input_files(args)
+
+# Make output, log directories
+os.makedirs(out_sub_dir, exist_ok=True)
+os.makedirs(os.path.join(args.out_dir, 'logs'), exist_ok=True)
+
+# set stdout to log
+sys.stdout = open(os.path.join(args.out_dir, 'logs', args.log_file), 'w')
+
+
+#############################################################
 # Input Arguments for GReX Prediction
 
 # --chr: Chromosome number need to be specified with respect to the genotype input data
@@ -85,20 +101,9 @@ import TIGARutils as tg
 # --out_dir: Output directory (will be created if not exist)
 
 ###############################################################
-# check input arguments
-if args.genofile_type == 'vcf':
-	if (args.data_format != 'GT') and (args.data_format != 'DS'):
-		raise SystemExit('Please specify the genotype data format used by the vcf file (--format ) as either "GT" or "DS".\n')
-		
-elif args.genofile_type == 'dosage':
-	args.data_format = 'DS'
 
-else:
-	raise SystemExit('Please specify the type input genotype file type (--genofile_type) as either "vcf" or "dosage".\n')
-
-out_pred_path = args.out_dir + '/' + args.out_pred_file
-
-do_maf_diff = 0 if not args.maf_diff else 1
+tmp_pred_path = out_sub_dir + '/temp_' + args.out_pred_file
+out_pred_path = out_sub_dir + '/' + args.out_pred_file
 
 ###############################################################
 # Print input arguments
@@ -121,8 +126,8 @@ Output prediction results file: {out_path}
 ********************************'''.format(
 	**args.__dict__,
 	out_path = out_pred_path,
-	maf_diff_str1 = {0:'Not e', 1:'E'}[do_maf_diff],
-	maf_diff_str2 = {0:'by MAF difference.', 1:'if MAF difference exceeds: |' + str(args.maf_diff) + '|'}[do_maf_diff]))
+	maf_diff_str1 = {0:'Not e', 1:'E'}[args.maf_diff > 0],
+	maf_diff_str2 = {0:'by MAF difference.', 1:'if MAF difference exceeds: |' + str(args.maf_diff) + '|'}[args.maf_diff > 0]))
 
 # tg.print_args(args)
 
@@ -136,15 +141,15 @@ print('Reading gene annotation file.')
 Gene, TargetID, n_targets = tg.read_gene_annot_exp(**args.__dict__)
 
 # get weight file info
-if do_maf_diff:
+if args.maf_diff:
 	weight_info = tg.weight_file_info(add_cols=['MAF'], **args.__dict__)
 else:
 	weight_info = tg.weight_file_info(**args.__dict__)
 
-print('Creating output file: ' + out_pred_path + '\n')
+print('Creating output file: ' + tmp_pred_path + '\n')
 out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName', *sampleID]
 pd.DataFrame(columns=out_cols).to_csv(
-	out_pred_path,
+	tmp_pred_path,
 	sep='\t', 
 	index=None, 
 	header=True, 
@@ -173,7 +178,7 @@ def thread_process(num):
 	print('Getting weight data for target.')
 	Weight = tg.read_tabix(start, end, target=target, **weight_info)
 
-	if do_maf_diff:
+	if args.maf_diff:
 		Weight = Weight[['snpID', 'ES', 'MAF']]
 	else:
 		Weight = Weight[['snpID', 'ES']]
@@ -228,7 +233,7 @@ def thread_process(num):
 		right_on='snpID', 
 		how='inner')
 
-	if do_maf_diff:
+	if args.maf_diff:
 		Pred['diff'] = np.abs(Pred['MAF'].astype('float') - Pred['MAF_test'].astype('float'))
 		
 		Pred = Pred[Pred['diff'] <= args.maf_diff].drop(columns=['MAF','MAF_test','diff']).reset_index(drop=True)
@@ -247,7 +252,7 @@ def thread_process(num):
 	Result = pd.concat([Gene_info, Pred_GReX], axis=1)
 
 	Result.to_csv(
-		out_pred_path,
+		tmp_pred_path,
 		sep='\t',
 		index=None,
 		header=None,
@@ -260,13 +265,18 @@ def thread_process(num):
 if __name__ == '__main__':
 	print('Starting prediction for ' + str(n_targets) + ' target genes.\n')
 	pool = multiprocessing.Pool(args.thread)
-	pool.imap(thread_process,[num for num in range(n_targets)])
+	pool.imap(thread_process, [num for num in range(n_targets)])
 	pool.close()
 	pool.join()
 	print('Done.')
+
+	# sort output
+	tg.sort_tabix_output(tmp_pred_path, out_pred_path, do_tabix=0)
 
 ###############################################################
 # time calculation
 elapsed_sec = time()-start_time
 elapsed_time = tg.format_elapsed_time(elapsed_sec)
 print('Computation time (DD:HH:MM:SS): ' + elapsed_time)
+
+sys.stdout.close()

@@ -4,6 +4,7 @@
 # Import packages needed
 import argparse
 import multiprocessing
+import os
 import subprocess
 import sys
 
@@ -22,51 +23,73 @@ start_time = time()
 # parse input arguments
 parser = argparse.ArgumentParser(description='Asso Study 02')
 
-# Specify tool directory
-parser.add_argument('--TIGAR_dir', type=str)
-
-# Gene annotation file path
-parser.add_argument('--gene_anno', type=str, dest='annot_path')
-
-# chromosome number
-parser.add_argument('--chr', type=str, dest='chrm')
-
-# Weight file path
-parser.add_argument('--weight', type=str, dest='w_path')
-
-# GWAS Z score file path
-parser.add_argument('--Zscore', type=str, dest='z_path')
-
-# Reference covariance file path
-parser.add_argument('--LD', type=str, dest='ld_path')
-
-# window
-parser.add_argument('--window',type=float)
-
-# Weight threshold to include SNP in TWAS
-parser.add_argument('--weight_threshold',type=float)
-
-# specify 'FUSION', 'SPrediXcan', or 'both': Zscore test statistic to use
-parser.add_argument('--test_stat', type=str)
-
-# Number of threads
-parser.add_argument('--thread',type=int)
-
-# Output dir
-parser.add_argument('--out_dir', type=str)
-
-# output file
-parser.add_argument('--out_twas_file', type=str)
+parser.add_argument('--chr', type=str, dest='chrm', 
+	choices=[str(i + 1) for i in range(22)],
+	required=True, 
+	help='chromosome number')
+parser.add_argument('--gene_anno', type=str, dest='annot_path', required=True)
+parser.add_argument('--LD', type=str, dest='ld_path', required=True, 
+	help='path to reference LD SNP genotype covariance matrix file; must be bgzipped and tabixed')
+parser.add_argument('--log_file', type=str, default='')
+parser.add_argument('--out_dir', type=str, default=os.getcwd())
+parser.add_argument('--out_prefix', type=str, default='')
+parser.add_argument('--out_twas_file', type=str, default='')
+parser.add_argument('--sub_dir', type=int, choices=[0, 1], default=1)
+parser.add_argument('--test_stat', type=str, choices=['both','FUSION','SPrediXcan'], default='both', 
+	help='burden Z test statistic to calculate (both [default], FUSION, SPrediXcan)')
+parser.add_argument('--thread', type=int, default=1)
+parser.add_argument('--TIGAR_dir', type=str, help='tool directory', 
+	default=os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+parser.add_argument('--weight', type=str, dest='w_path', required=True, 
+	help='path to SNP weight (eQTL effect size) file; output file _eQTLweights.txt from model training can be used here')
+parser.add_argument('--weight_threshold', type=float, default=0, 
+	help='weight magnitude threshold for SNP inclusion; include only SNPs with magnitude of weight greater than this value when conducting TWAS(default: 0 [all SNPs included])')
+parser.add_argument('--window', type=int, default=1000000, 
+	help='size around gene region for selecting cis-SNPs for fitting gene expression prediction model (default: 1000000 [ie, +-1MB region around gene])')
+parser.add_argument('--Zscore', type=str, dest='z_path', required=True, 
+	help='path to GWAS summary Zscore statistics file')
 
 args = parser.parse_args()
-
 sys.path.append(args.TIGAR_dir)
-
-###############################################################
-## Import TIGAR functions, define other functions
 import TIGARutils as tg
 
+
 def get_pval(z): return np.format_float_scientific(chi2.sf(z**2, 1), precision=15, exp_digits=0)
+
+#############################################################
+# set output file names
+if not args.out_prefix:
+	args.out_prefix = 'CHR' + args.chrm + '_sumstat_TWAS'
+
+if not args.log_file:
+	args.log_file = args.out_prefix + '_log.txt'
+
+if not args.out_twas_file:
+	args.out_twas_file = args.out_prefix + '_assoc.txt'
+
+# sub-directory in out directory
+if args.sub_dir:
+	out_sub_dir = os.path.join(args.out_dir, 'TWAS_CHR' + args.chrm)
+else:
+	out_sub_dir = args.out_dir
+out_sub_dir = tg.get_abs_path(out_sub_dir)
+
+# Check tabix command
+tg.check_tabix()
+
+# Check input files
+tg.check_input_files(args)
+
+# Make output, log directories
+os.makedirs(out_sub_dir, exist_ok=True)
+os.makedirs(os.path.join(args.out_dir, 'logs'), exist_ok=True)
+
+# set stdout to log
+sys.stdout = open(os.path.join(args.out_dir, 'logs', args.log_file), 'w')
+
+
+#############################################################
+## define other functions
 
 def get_V_cor(V_cov):
 	V_cov = V_cov.copy()
@@ -96,9 +119,8 @@ def get_burden_zscore(test_stat, get_zscore_args):
 
 #############################################################
 # Print input arguments to log
-# out_twas_path = args.out_dir + '/CHR' + args.chrm + '_sumstat_assoc.txt'
-
-out_twas_path = args.out_dir + '/' + args.out_twas_file
+tmp_twas_path = out_sub_dir + '/temp_' + args.out_twas_file
+out_twas_path = out_sub_dir + '/' + args.out_twas_file
 
 print(
 '''********************************
@@ -124,7 +146,6 @@ tg.print_args(args)
 ###############################################################
 ### Read in gene annotation 
 print('Reading gene annotation file.')
-# Gene, TargetID, n_targets = tg.read_gene_annot_exp(args.annot_path, args.chrm)
 Gene, TargetID, n_targets = tg.read_gene_annot_exp(**args.__dict__)
 
 # read in headers for Weight and Zscore files; get the indices and dtypes for reading files into pandas
@@ -141,7 +162,7 @@ else:
 	out_cols += ['Zscore','PVALUE']
 
 pd.DataFrame(columns=out_cols).to_csv(
-	out_twas_path,
+	tmp_twas_path,
 	sep='\t',
 	index=None,
 	header=True,
@@ -195,16 +216,6 @@ def thread_process(num):
 	# drop unneeded columns
 	Zscore = Zscore.drop(columns=['CHROM','POS','REF','ALT','snpIDflip'])
 
-	# # filter remaining by snpIDs
-	# snp_overlap = np.intersect1d(Weight.snpID, Zscore.snpID)
-
-	# if not snp_overlap.size:
-	# 	print('No overlapping test SNPs that have magnitude of cis-eQTL weights greater than threshold value and with GWAS Zscore for TargetID: ' + target + '\n')
-	# 	return None
-
-	# Weight = Weight[Weight.snpID.isin(snp_overlap)]
-	# Zscore = Zscore[Zscore.snpID.isin(snp_overlap)]
-
 	# merge Zscore and Weight dataframes on snpIDs
 	ZW = Weight.merge(Zscore[['snpID','Zscore']], 
 		left_on='snpID', 
@@ -234,7 +245,6 @@ def thread_process(num):
 	Result['n_snps'] = n_snps
 
 	### calculate zscore(s), pvalue(s)
-	# get_zscore_args = [V_cov, ZW, snp_sd]
 	get_zscore_args = [V_cov, ZW.ES.values, ZW.Zscore.values, snp_sd]
 
 	if args.test_stat == 'both':
@@ -247,7 +257,7 @@ def thread_process(num):
 
 	# write to file
 	Result.to_csv(
-		out_twas_path,
+		tmp_twas_path,
 		sep='\t',
 		index=None,
 		header=None,
@@ -265,15 +275,14 @@ if __name__ == '__main__':
 	pool.join()
 	print('Done.')
 
+	# sort output
+	tg.sort_tabix_output(tmp_twas_path, out_twas_path, do_tabix=0)
+
 ###############################################################
 # time calculation
 elapsed_sec = time()-start_time
 elapsed_time = tg.format_elapsed_time(elapsed_sec)
 print('Computation time (DD:HH:MM:SS): ' + elapsed_time)
 
-
-
-
-
-
+sys.stdout.close()
 
