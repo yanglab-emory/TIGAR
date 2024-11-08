@@ -196,7 +196,8 @@ elif [[ "$model"x == "DPR"x ]]; then
 
     # used to differentiate intermmediate file folders when sub_dir!=1
     # script deletes DPR_Files_, CV_Files_ directories by default; job_suf prevents issues with deleting a directory used by simultaneous jobs
-    job_suf=${job_suf:-"_CHR"${chr}}
+    # try randomly generated name but fail gracefully
+    job_suf=${job_suf:-"CHR"${chr}"_"${RANDOM}} || job_suf=${job_suf:-"CHR"${chr}}
 
     # sub directory in out directory
     if [[ "$sub_dir"x == "1"x ]];then

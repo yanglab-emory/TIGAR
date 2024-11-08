@@ -20,7 +20,7 @@
 # --chr: Chromosome number need to be specified 
 # --weight: Path for SNP weight (eQTL effect size) file 
 # --Zscore : Path for GWAS summary Zscore statistics
-# --LD : Path for reference LD (SNP genotype covariance matrix) that should be bgzipped and tabixed. Can be generated using our `covar_calculation.py` script
+# --tigar_LD : Path for reference LD (SNP genotype covariance matrix) that should be bgzipped and tabixed. Can be generated using our `covar_calculation.py` script
 # --window: Window size around gene region for selecting cis-SNPs for fitting gene expression prediction model (default 1000000 for +- 1MB region around gene)
 # --weight_threshold : for asso=2, only include SNPs with magnitude of weight greater than the weight_threshold value; default is 0
 # --TIGAR_dir : Specify the directory of TIGAR source code
@@ -28,7 +28,7 @@
 
 ###############################################################
 VARS=`getopt -o "" -a -l \
-asso:,gene_exp:,gene_anno:,PED:,PED_info:,method:,Zscore:,weight:,LD:,chr:,window:,TIGAR_dir:,thread:,weight_threshold:,sub_dir:,out_twas_file:,out_prefix:,log_file:,out_dir:,sampleID:,test_stat:,test_sampleID: \
+asso:,gene_exp:,gene_anno:,PED:,PED_info:,method:,Zscore:,weight:,LD:,tigar_LD:,plink_LD:,chr:,window:,TIGAR_dir:,thread:,weight_threshold:,sub_dir:,out_twas_file:,out_prefix:,log_file:,out_dir:,sampleID:,test_stat:,test_sampleID:,job_suf: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -44,13 +44,15 @@ do
     case "$1" in
         --asso|-asso) asso=$2; shift 2;;
         --gene_exp|-gene_exp) gene_exp=$2; shift 2;;
-				--gene_anno|-gene_anno) gene_anno=$2; shift 2;;
+        --gene_anno|-gene_anno) gene_anno=$2; shift 2;;
         --PED|-PED) PED=$2; shift 2;;
         --PED_info|-PED_info) PED_info=$2; shift 2;;
         --method|-method) method=$2; shift 2;;
         --Zscore|-Zscore) Zscore=$2; shift 2;;
         --weight|-weight) weight=$2; shift 2;;
+        --tigar_LD|-tigar_LD) LD=$2; shift 2;;
         --LD|-LD) LD=$2; shift 2;;
+        --plink_LD|-plink_LD) plink_LD=$2; shift 2;;
         --chr|-chr) chr=$2; shift 2;;
         --window|-window) window=$2; shift 2;;
         --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
@@ -64,6 +66,7 @@ do
         --out_twas_file|-out_twas_file) out_twas_file=$2; shift 2;;
         --log_file|-log_file) log_file=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
+        --job_suf|-job_suf) job_suf=$2; shift 2;;
         --) shift;break;;
         *) echo "Internal error!";exit 1;;
         esac
@@ -74,8 +77,10 @@ thread=${thread:-1}
 window=${window:-$((10**6))}
 method=${method:-'OLS'}
 weight_threshold=${weight_threshold:-0}
-test_stat=${test_stat:-'both'}
 sub_dir=${sub_dir:-1}
+
+# LD=${LD:-0}
+# plink_LD=${plink_LD:-0}
 
 # sub directory in out directory
 if [[ "$sub_dir"x == "1"x ]];then
@@ -139,6 +144,12 @@ elif [[ "$asso"x == "2"x ]];then
     out_prefix=${out_prefix:-CHR${chr}_sumstat_TWAS}
     out_twas_file=${out_twas_file:-${out_prefix}_assoc.txt}
     log_file=${log_file:-${out_prefix}_log.txt}
+    
+    # try randomly generated name but fail gracefully
+    job_suf=${job_suf:-"CHR"${chr}"_"${RANDOM}} || job_suf=${job_suf:-"CHR"${chr}}
+
+    mkdir -p ${out_sub_dir}/TWAS_temp_${job_suf}
+
 
     # Check gene_annotation file
     if [ ! -f "${gene_anno}" ] ; then
@@ -146,10 +157,35 @@ elif [[ "$asso"x == "2"x ]];then
         exit 1
     fi
 
-    # Check LD file
-    if [ ! -f "${LD}" ] ; then
-        echo Error: Reference LD genotype covariance file ${LD} does not exist or is empty. >&2
+    ## check LD input; older tigar versions used LD for tigar_LD
+    tigar_LD=${tigar_LD:-${LD:-0}}
+    plink_LD=${plink_LD:-0}
+
+    # both LD and plink_LD not provided
+    if [[ ((${tigar_LD} == '0')) ]] && [[ ((${plink_LD} == '0')) ]]; then
+        echo Error: No Reference LD genotype covariance file or plink LD path prefix provided >&2
         exit 1
+    # both LD and plink_LD provided
+    elif [[ ! ((${tigar_LD} == '0')) ]] && [[ ! ((${plink_LD} == '0')) ]]; then
+        echo
+        echo Error: Both LD genotype covariance file ${tigar_LD} and plink LD path prefix ${plink_LD} provided but only one can be used >&2
+        exit 1
+    # only LD provided
+    elif [[ ! ((${tigar_LD} == '0')) ]]; then
+        test_stat=${test_stat:-'both'}
+         # check file exists
+        if [ ! -f "${tigar_LD}" ]; then
+            echo Error: Reference LD genotype covariance file ${tigar_LD} does not exist or is empty. >&2
+            exit 1
+        fi
+    # only plink_LD provided  
+    elif [[ ! ((${plink_LD} == '0')) ]]; then
+        test_stat=${test_stat:-'FUSION'}
+        # check file exists
+        if [ ! -f "${plink_LD}.bim" ]; then
+            echo Error: Reference plink file for LD calculation ${plink_LD}.bim does not exist or is empty. >&2
+            exit 1
+        fi
     fi
 
     # Check Zscore file
@@ -173,7 +209,8 @@ elif [[ "$asso"x == "2"x ]];then
     --gene_anno ${gene_anno} \
     --Zscore ${Zscore} \
     --weight ${weight} \
-    --LD ${LD} \
+    --tigar_LD ${tigar_LD} \
+    --plink_LD ${plink_LD} \
     --chr ${chr} \
     --window ${window} \
     --thread ${thread} \
@@ -182,6 +219,7 @@ elif [[ "$asso"x == "2"x ]];then
     --out_dir ${out_sub_dir} \
     --TIGAR_dir ${TIGAR_dir} \
     --out_twas_file ${out_twas_file} \
+    --job_suf ${job_suf} \
     > ${out_dir}/logs/${log_file}
 
 

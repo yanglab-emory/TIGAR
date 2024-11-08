@@ -626,6 +626,37 @@ def call_tabix_header(path, out='tuple', rename={}):
 	return header
 
 
+def merge_ref_z_on_snps(ref_df: pd.DataFrame, z_df: pd.DataFrame, target):
+	# get flipped snpIDs
+	z_df['snpIDflip'] = get_snpIDs(z_df, flip=True)
+
+	snp_overlap = np.intersect1d(ref_df.snpID, z_df[['snpID','snpIDflip']])
+
+	if not snp_overlap.size:
+		print('No overlapping test SNPs that have magnitude of cis-eQTL weights greater than threshold value and with GWAS z_df for TargetID: ' + target + '.\n')
+		raise NoTargetDataError
+
+	# filter out non-matching snpID rows
+	ref_df = ref_df[ref_df.snpID.isin(snp_overlap)]
+	z_df = z_df[np.any(z_df[['snpID','snpIDflip']].isin(snp_overlap), axis=1)].reset_index(drop=True)	
+
+	# if not in ref_df.snpIDs, assumed flipped; if flipped, flip z_df sign
+	flip = np.where(z_df.snpID.isin(ref_df.snpID.values), 1, -1)
+
+	if not np.all(flip == 1):
+		z_df['snpID'] = np.where(flip == 1, z_df.snpID, z_df.snpIDflip)
+		z_df['Zscore'] = flip * z_df['Zscore']
+
+	# merge z_df and ref_df dataframes on snpIDs
+	refz_df = ref_df.merge(z_df[['snpID','Zscore']], 
+		left_on='snpID', 
+		right_on='snpID', 
+		how='inner')
+
+	return refz_df, snp_overlap
+
+
+
 # return human readable elapsed time string 
 def format_elapsed_time(time_secs):
 	val = abs(int(time_secs))
@@ -941,7 +972,13 @@ def get_ld_data(path, snp_ids):
 			else:
 				n = 0
 
-	return cov_data.set_index('row')
+	MCOV = cov_data.set_index('row')
+
+	if MCOV.empty:
+		print('No reference covariance matrix for target SNPs.')
+		raise NoTargetDataError
+
+	return MCOV
 
 
 def get_ld_matrix(MCOV, return_diag=False):
@@ -974,12 +1011,139 @@ def get_ld_matrix(MCOV, return_diag=False):
 		return snp_sd, V
 
 
+def clean_plink_output(target, temp_out_dir, **kwargs):
+	temp_paths = [temp_out_dir + target + x for x in ['_range.txt', '.bed', '.bim', '.fam', '.log', '.nosex', '_snplist.txt', '.ld']]
+	for temp_path in temp_paths:
+		try:
+			os.remove(temp_path)
+		except FileNotFoundError as e:
+			e_info = sys.exc_info()
+			e_type = e_info[0].__name__
+			# don't print traceback info for wrapper
+			e_tracebk = ''.join(traceback.format_tb(e_info[2])[1:])
+	return None
+
+
+def call_PLINK_extract(start_pos, end_pos, target, chrm, temp_out_dir, plink_pre, clean_output, **kwargs):
+
+	out_prefix = temp_out_dir + target
+	range_path = out_prefix + '_range.txt'
+	# os.path.join(temp_out_dir, target + '_range.txt')
+
+	# write to range file
+	with open(range_path, 'w') as rf:
+		rf.write('%s\t%s\t%s\t%s\n' % (chrm, start_pos, end_pos, target))
+
+	cmd = ['plink --bfile ' + plink_pre + ' --keep-allele-order --extract range ' + range_path + ' --make-bed --out ' + out_prefix]
+
+	try:
+		proc = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+
+	except subprocess.CalledProcessError:
+		print('No reference covariance information for target SNPs for TargetID: ' + target + '\n')
+		if clean_output:
+			clean_plink_output(target, temp_out_dir)
+		raise NoTargetDataError
+
+	return None
+
+
+def read_format_ref_bim(target, temp_out_dir, **kwargs):
+
+	target_bim_path = temp_out_dir + target + '.bim'
+
+	col_names = ['CHROM', 'SNP', 'bp', 'POS', 'A1', 'A2']
+	dtypes = {'CHROM': object, 'SNP': object, 'POS': np.int64, 'bp': object, 'A1': object, 'A2': object}
+
+	ref_chunks = pd.read_csv(target_bim_path, sep='\t',
+		low_memory=False,
+		header=None,
+		names=col_names,
+		iterator=True,
+		chunksize=1000,
+		dtype=dtypes)
+
+	target_ref = pd.concat([chunk for chunk in ref_chunks]).reset_index(drop=True)
+
+	if len(target_ref) == 0:
+		print('No reference covariance information for target SNPs for TargetID: ' + target + '\n')
+		if clean_output:
+			clean_target_output(target, temp_out_dir)
+		raise NoTargetDataError
+
+	# format snp IDs in the reference bim file
+	target_ref['snpID'] = tg.get_snpIDs(target_ref, flip=False, ref_str='A1', alt_str='A2')
+
+	target_ref[['CHROM', 'snpID', 'bp', 'POS', 'A1', 'A2']].to_csv(
+			target_bim_path,
+			sep='\t',
+			index=None,
+			header=None,
+			mode='w')
+
+	return target_ref
+
+def get_plink_LD_matrix(target, snp_overlap_ld, temp_out_dir, convert=False, **kwargs):
+
+	out_prefix = temp_out_dir + target
+	target_snplist_path = out_prefix + '_snplist.txt'
+	out_ld_path = out_prefix + '.ld'
+
+	snp_overlap_ld.tofile(target_snplist_path, 
+		sep='\n', format='%s')
+
+	cmd = ["plink --bfile " + out_prefix +
+	" --keep-allele-order" +
+	" --extract " + target_snplist_path +
+	" --r square" +
+	" --out " + out_prefix +
+	" --memory 2000 "]
+
+	try:
+		ld_proc = subprocess.check_call(cmd,
+			stdout=subprocess.PIPE,
+			cwd=temp_out_dir,
+			shell=True)
+
+	except subprocess.CalledProcessError:
+		print('Unable to load reference covariance information for target SNPs for TargetID: ' + target + '\n')
+		raise NoTargetDataError
+
+	ld_chunks = pd.read_csv(out_ld_path, 
+		sep='\t',
+		low_memory=False,
+		header=None,
+		iterator=True,
+		chunksize=1000)
+
+	ld = pd.concat([chunk for chunk in ld_chunks]).reset_index(drop=True)
+
+	# The .ld file is large, delete it after using it.
+	os.remove(out_ld_path)
+
+	# print('Start formatting PRS-CS LD.')
+	V = ld.values
+	# PLINK return nan when all mutually-nonmissing set is homozygous major
+	# We set nan = 0 here 
+	V = np.nan_to_num(V)
+
+	if convert:
+		# PLINK rounds to 6 decimal points, which sometimes makes the correlation matrix become not positive definite
+		# convert it to be positive definite
+		V = pos_def_matrix(V)
+
+	if V.size == 0:
+		print('No reference covariance matrix for target SNPs for TargetID: ' + target + '\n')
+		raise NoTargetDataError
+
+	return V
+
 # return snp ids; join CHROM, POS, REF, ALT columns into : separated string
-def get_snpIDs(df: pd.DataFrame, flip=False):
+def get_snpIDs(df: pd.DataFrame, flip=False, ref_str='REF', alt_str='ALT'):
 	chrms = df['CHROM'].astype('str').values
 	pos = df['POS'].astype('str').values
-	ref = df['REF'].values
-	alt = df['ALT'].values
+	ref = df[ref_str].values
+	alt = df[alt_str].values
 	if flip:
 		return [':'.join(i) for i in zip(chrms,pos,alt,ref)]
 	else:

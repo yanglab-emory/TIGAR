@@ -100,8 +100,8 @@ import TIGARutils as tg
 
 # directory for temporary output files; need to be defined here for some functions
 abs_out_dir = tg.get_abs_path(args.out_dir)
-dpr_file_dir = abs_out_dir + '/DPR_Files' + args.job_suf + '/'
-dpr_file_dir_cv = abs_out_dir + '/CV_Files' + args.job_suf + '/'
+dpr_file_dir = abs_out_dir + '/DPR_temp_' + args.job_suf + '/'
+dpr_file_dir_cv = abs_out_dir + '/CV_temp_' + args.job_suf + '/'
 
 # preps dpr input files, runs DPR, reads in dpr output
 def prep_call_dpr(Bimbam_df, Pheno_df, dpr_file_dir, targetid):
@@ -252,6 +252,8 @@ DPR model: {dpr} - {dpr_type}
 Output Effect-size type: {ES}
 Number of threads: {thread}
 Output directory: {out_dir}
+Temp directories: {dpr_file_dir}
+                  {dpr_file_dir_cv}
 Output training weights file: {out_weight}
 Output training info file: {out_info}
 ********************************'''.format(
@@ -260,7 +262,9 @@ Output training info file: {out_info}
 	cvR2_str1 = {0:'Skipping evaluation of', 1:'Evaluating'}[args.cvR2],
 	cvR2_str2 = {0:'', 1:' with inclusion threshold Avg.CVR2 >' + str(args.cvR2_threshold)}[args.cvR2],
 	out_weight = out_weight_path,
-	out_info = out_info_path))
+	out_info = out_info_path,
+	dpr_file_dir = dpr_file_dir,
+	dpr_file_dir_cv = dpr_file_dir_cv))
 
 # tg.print_args(args)
 

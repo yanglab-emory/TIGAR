@@ -4,6 +4,7 @@
 # Import packages needed
 import argparse
 import multiprocessing
+import os
 import subprocess
 import sys
 
@@ -38,7 +39,10 @@ parser.add_argument('--weight', type=str, dest='w_path')
 parser.add_argument('--Zscore', type=str, dest='z_path')
 
 # Reference covariance file path
-parser.add_argument('--LD', type=str, dest='ld_path')
+parser.add_argument('--tigar_LD', type=str, dest='tigar_ld_path', default='0')
+
+# PLINK file prefix
+parser.add_argument('--plink_LD', type=str, dest='plink_pre', default='0')
 
 # window
 parser.add_argument('--window',type=float)
@@ -58,6 +62,13 @@ parser.add_argument('--out_dir', type=str)
 # output file
 parser.add_argument('--out_twas_file', type=str)
 
+# suffix to directories for intermmediate files
+parser.add_argument('--job_suf', type=str)
+
+# 
+parser.add_argument('--clean_output', type=int, choices=[0, 1], default=1, 
+	help='clean_output (0: keep temp files, 1: remove temp files [default])')
+
 args = parser.parse_args()
 
 sys.path.append(args.TIGAR_dir)
@@ -65,6 +76,7 @@ sys.path.append(args.TIGAR_dir)
 ###############################################################
 ## Import TIGAR functions, define other functions
 import TIGARutils as tg
+
 
 def get_pval(z): return np.format_float_scientific(chi2.sf(z**2, 1), precision=15, exp_digits=0)
 
@@ -83,8 +95,12 @@ def get_spred_zscore(V_cov, w, Z_gwas, snp_sd):
 	Z_twas = snp_sd.dot(w * Z_gwas) / get_z_denom(V_cov, w)
 	return Z_twas, get_pval(Z_twas)
 	
-def get_fusion_zscore(V_cov, w, Z_gwas, snp_sd=None):
+def get_fusion_zscore(V_cov, w, Z_gwas, **kwargs):
 	V_cor = get_V_cor(V_cov)
+	Z_twas = np.vdot(Z_gwas, w) / get_z_denom(V_cor, w)
+	return Z_twas, get_pval(Z_twas)
+
+def get_fusion_zscore_vcor(V_cor, w, Z_gwas, **kwargs):
 	Z_twas = np.vdot(Z_gwas, w) / get_z_denom(V_cor, w)
 	return Z_twas, get_pval(Z_twas)
 
@@ -98,7 +114,24 @@ def get_burden_zscore(test_stat, get_zscore_args):
 # Print input arguments to log
 # out_twas_path = args.out_dir + '/CHR' + args.chrm + '_sumstat_assoc.txt'
 
-out_twas_path = args.out_dir + '/' + args.out_twas_file
+# directory for temporary output files; need to be defined here for some functions
+abs_out_dir = tg.get_abs_path(args.out_dir)
+args.temp_out_dir = abs_out_dir + '/TWAS_temp_' + args.job_suf + '/'
+out_twas_path = abs_out_dir + '/' + args.out_twas_file
+
+
+args.do_plink = (args.tigar_ld_path == '0')
+
+
+# check input arguments
+if (args.do_plink) and (args.test_stat != 'FUSION'):
+		raise SystemExit('Error: User entered --test_stat is' + args.test_stat + '; "both" and "SPrediXcan" are not valid options when using PLINK for LD; the test_stat must be "FUSION". this is the default setting when PLINK LD is specified.\n')
+
+
+
+
+# Reference LD genotype covariance file: {ld_path}
+# PLINK prefix for LD calculation: {plink_pre}
 
 print(
 '''********************************
@@ -107,16 +140,18 @@ Gene annotation file specifying genes for TWAS: {annot_path}
 Chromosome: {chrm}
 cis-eQTL weight file: {w_path}
 GWAS summary statistics Z-score file: {z_path}
-Reference LD genotype covariance file: {ld_path}
+{ld_str}
 Gene training region SNP inclusion window: +-{window}
 SNP weight inclusion threshold: {weight_threshold}
 Test statistic to use: {test_stat_str}
 Number of threads: {thread}
 Output directory: {out_dir}
+Temp directory: {temp_out_dir}
 Output TWAS results file: {out_path}
 ********************************'''.format(
 	**args.__dict__,
 	test_stat_str = 'FUSION and SPrediXcan' if args.test_stat=='both' else args.test_stat,
+	ld_str='PLINK files for reference LD:' + args.plink_pre if args.do_plink else 'Reference TIGAR LD genotype covariance file:' + args.tigar_ld_path,
 	out_path = out_twas_path))
 
 tg.print_args(args)
@@ -172,28 +207,35 @@ def thread_process(num):
 	# read in Zscore data
 	Zscore = tg.read_tabix(start, end, **zscore_info)
 
-	# get flipped snpIDs
-	Zscore['snpIDflip'] = tg.get_snpIDs(Zscore, flip=True)
+	# merge Weight, Zscore file on SNPs with Weight as reference
+	ZW, snp_overlap = tg.merge_ref_z_on_snps(Weight, Zscore, target)
 
-	snp_overlap = np.intersect1d(Weight.snpID, Zscore[['snpID','snpIDflip']])
+	# # get flipped snpIDs
+	# Zscore['snpIDflip'] = tg.get_snpIDs(Zscore, flip=True)
 
-	if not snp_overlap.size:
-		print('No overlapping test SNPs that have magnitude of cis-eQTL weights greater than threshold value and with GWAS Zscore for TargetID: ' + target + '.\n')
-		return None
+	# snp_overlap = np.intersect1d(Weight.snpID, Zscore[['snpID','snpIDflip']])
 
-	# filter out non-matching snpID rows
-	Weight = Weight[Weight.snpID.isin(snp_overlap)]
-	Zscore = Zscore[np.any(Zscore[['snpID','snpIDflip']].isin(snp_overlap), axis=1)].reset_index(drop=True)	
+	# if not snp_overlap.size:
+	# 	print('No overlapping test SNPs that have magnitude of cis-eQTL weights greater than threshold value and with GWAS Zscore for TargetID: ' + target + '.\n')
+	# 	return None
 
-	# if not in Weight.snpIDs, assumed flipped; if flipped, flip Zscore sign
-	flip = np.where(Zscore.snpID.isin(Weight.snpID.values), 1, -1)
+	# # filter out non-matching snpID rows
+	# Weight = Weight[Weight.snpID.isin(snp_overlap)]
+	# Zscore = Zscore[np.any(Zscore[['snpID','snpIDflip']].isin(snp_overlap), axis=1)].reset_index(drop=True)	
 
-	if not np.all(flip == 1):
-		Zscore['snpID'] = np.where(flip == 1, Zscore.snpID, Zscore.snpIDflip)
-		Zscore['Zscore'] = flip * Zscore['Zscore']
+	# # if not in Weight.snpIDs, assumed flipped; if flipped, flip Zscore sign
+	# flip = np.where(Zscore.snpID.isin(Weight.snpID.values), 1, -1)
 
-	# drop unneeded columns
-	Zscore = Zscore.drop(columns=['CHROM','POS','REF','ALT','snpIDflip'])
+	# if not np.all(flip == 1):
+	# 	Zscore['snpID'] = np.where(flip == 1, Zscore.snpID, Zscore.snpIDflip)
+	# 	Zscore['Zscore'] = flip * Zscore['Zscore']
+
+	# # drop unneeded columns
+	# Zscore = Zscore.drop(columns=['CHROM','POS','REF','ALT','snpIDflip'])
+
+	# # don't need flipy column for TIGAR LD files, only for plink
+	# if args.tigar_ld_path:
+	# 	Zscore = Zscore.drop(columns=['snpIDflip'])
 
 	# # filter remaining by snpIDs
 	# snp_overlap = np.intersect1d(Weight.snpID, Zscore.snpID)
@@ -205,29 +247,54 @@ def thread_process(num):
 	# Weight = Weight[Weight.snpID.isin(snp_overlap)]
 	# Zscore = Zscore[Zscore.snpID.isin(snp_overlap)]
 
-	# merge Zscore and Weight dataframes on snpIDs
-	ZW = Weight.merge(Zscore[['snpID','Zscore']], 
-		left_on='snpID', 
-		right_on='snpID', 
-		how='inner')
+	# # merge Zscore and Weight dataframes on snpIDs
+	# ZW = Weight.merge(Zscore[['snpID','Zscore']], 
+	# 	left_on='snpID', 
+	# 	right_on='snpID', 
+	# 	how='inner')
 
-	snp_search_ids = ZW.snpID.values
+	if args.do_plink:
+		
+		try:
+			print('call_PLINK_extract')
+			plink_extract_target = tg.call_PLINK_extract(start, end, target, **args.__dict__)
 
-	# Read in reference covariance matrix file by snpID
-	MCOV = tg.get_ld_data(args.ld_path, snp_search_ids)
+			print('read_format_ref_bim')
+			target_ref = tg.read_format_ref_bim(target, **args.__dict__)
 
-	if MCOV.empty:
-	  print('No reference covariance information for target SNPs for TargetID: ' + target + '\n')
-	  return None
+			# filter again, with target_ref this time
+			print('merge on snps')
+			ZW, snp_overlap_ld = tg.merge_ref_z_on_snps(target_ref, ZW, target)
 
-	# get the snp variance and covariance matrix
-	snp_sd, V_cov = tg.get_ld_matrix(MCOV)
+			# get reference covariance matrix
+			print('VCOR')
+			V_cor = tg.get_plink_LD_matrix(target, snp_overlap_ld, **args.__dict__)
 
-	ZW = ZW[ZW.snpID.isin(MCOV.snpID)]
-	ZW = ZW.drop_duplicates(['snpID'], keep='first').reset_index(drop=True)
+			# get_zscore_args = [V_cov, ZW.ES.values, ZW.Zscore.values, snp_sd]
+			zscore_args = {'V_cor': V_cor, 'w': ZW.ES.values, 'Z_gwas': ZW.Zscore.values}
+		except Exception as e:
+			raise e
+		finally:
+			tg.clean_plink_output(target, **args.__dict__)
+
+	else:
+		snp_search_ids = ZW.snpID.values
+
+		# Read in reference covariance matrix file by snpID
+		MCOV = tg.get_ld_data(args.tigar_ld_path, snp_search_ids)
+
+		# get the snp variance and covariance matrix
+		snp_sd, V_cov = tg.get_ld_matrix(MCOV)
+
+		ZW = ZW[ZW.snpID.isin(MCOV.snpID)]
+		ZW = ZW.drop_duplicates(['snpID'], keep='first').reset_index(drop=True)
+		
+		zscore_args = {'V_cov': V, 'w': ZW.ES.values, 'Z_gwas': ZW.Zscore.values, 'snp_sd': snp_sd}
+
 	n_snps = str(ZW.snpID.size)
 
 	print('Running TWAS.\nN SNPs=' + n_snps)
+
 
 	### create output dataframe
 	Result = Gene_Info.copy()
@@ -235,15 +302,19 @@ def thread_process(num):
 
 	### calculate zscore(s), pvalue(s)
 	# get_zscore_args = [V_cov, ZW, snp_sd]
-	get_zscore_args = [V_cov, ZW.ES.values, ZW.Zscore.values, snp_sd]
 
-	if args.test_stat == 'both':
-		Result['FUSION_Z'], Result['FUSION_PVAL'] = get_fusion_zscore(*get_zscore_args)
-
-		Result['SPred_Z'], Result['SPred_PVAL'] = get_spred_zscore(*get_zscore_args)
-
+	if args.do_plink:
+		# PLINK LD: FUSION Zscore from V_cor
+		Result['TWAS_Zscore'], Result['PVALUE'] = get_fusion_zscore_vcor(**zscore_args)
 	else:
-		Result['TWAS_Zscore'], Result['PVALUE'] = get_burden_zscore(args.test_stat, get_zscore_args)
+		# TIGAR LD
+		if args.test_stat == 'both':
+			# FUSION Zscore from V_cov
+			Result['FUSION_Z'], Result['FUSION_PVAL'] = get_fusion_zscore(**zscore_args)
+			Result['SPred_Z'], Result['SPred_PVAL'] = get_spred_zscore(**zscore_args)
+		else: 
+			# FUSION Zscore from V_cov
+			Result['TWAS_Zscore'], Result['PVALUE'] = get_fusion_zscore(args.test_stat, **zscore_args)
 
 	# write to file
 	Result.to_csv(
