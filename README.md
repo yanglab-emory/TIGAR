@@ -460,6 +460,13 @@ ${TIGAR_dir}/TIGAR_Model_Train.sh \
 - `CHR${chr}_${model}_GeneInfo.txt` is the file storing information about the fitted gene expression imputation model per gene (per row), including gene annotation (`CHROM GeneStart GeneEnd TargetID GeneName`), sample size, number of SNPs used in the model training (`n_snp`), number of SNPs with non-zero eQTL effect sizes (`n_effect_snp`), imputation R2 by 5-fold cross validation (`CVR2`), imputation R2 using all given training samples (`TrainR2`)
 - `CHR${chr}_${model}_train_log.txt` is the file storing all log messages for model training.
 
+#### Include the following commands in the front of your shell job script to avoid Python exhausting the resources in your cluster
+``` bash
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+```
 
 ### 2. Predict GReX
 Predict GReX value with given variant weights (eQTL effect sizes) from trained gene expression imputation models and individual-level genotype data of test samples
