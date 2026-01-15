@@ -44,7 +44,7 @@ do
     case "$1" in
         --asso|-asso) asso=$2; shift 2;;
         --gene_exp|-gene_exp) gene_exp=$2; shift 2;;
-		--gene_anno|-gene_anno) gene_anno=$2; shift 2;;
+				--gene_anno|-gene_anno) gene_anno=$2; shift 2;;
         --PED|-PED) PED=$2; shift 2;;
         --PED_info|-PED_info) PED_info=$2; shift 2;;
         --method|-method) method=$2; shift 2;;
@@ -85,6 +85,7 @@ else
 fi
 
 ############# TWAS 
+
 
 ## make output directory
 mkdir -p ${out_dir}
@@ -153,13 +154,13 @@ elif [[ "$asso"x == "2"x ]];then
 
     # Check Zscore file
     if [ ! -f "${Zscore}" ] ; then
-        echo Error: Gene expression file ${Zscore} does not exist or is empty. >&2
+        echo Error: Zscore file ${Zscore} does not exist or is empty. >&2
         exit 1
     fi
 
     # Check weight file and tabix weight file
     if [ ! -f "${weight}" ] ; then
-        echo Error: Gene expression file ${weight} does not exist or is empty. >&2
+        echo Error: Weight file ${weight} does not exist or is empty. >&2
         exit 1
     fi
 
