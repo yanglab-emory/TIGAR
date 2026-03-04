@@ -59,6 +59,9 @@ parser.add_argument('--log_file', type=str, default='')
 # window
 # parser.add_argument('--window',type=float)
 
+# Filter to use only cis- or trans- snps
+parser.add_argument('--snp_type', type=str, choices=['both','cis','trans'], default='both')
+
 # Weight threshold to include SNP in TWAS
 parser.add_argument('--weight_threshold', type=float, default=0)
 
@@ -170,7 +173,7 @@ def bgw_weight_file_info(w_path, weight_threshold=0, add_cols=[], drop_cols=['ID
 		**info_dict}
 
 
-def read_bgw_weight(w_path, weight_threshold=0, **kwargs):
+def read_bgw_weight(w_path, snp_type='both', weight_threshold=0, **kwargs):
 	# ensure file at w_path exists
 	if not os.path.isfile(w_path):
 		print('No valid weight file for target at: ' + w_path + '\n')
@@ -211,8 +214,12 @@ def read_bgw_weight(w_path, weight_threshold=0, **kwargs):
 	Weight['ES'] = Weight['PCP'] * Weight['BETA']
 	Weight = Weight.drop(columns=['PCP','BETA'])
 
+	# filter cis- or trans- only
+	if not snp_type == 'both':
+		Weight = Weight[Weight.Trans == {'cis':0, 'trans':1}[snp_type]]
+
+	# filter out weights below threshold
 	if weight_threshold:
-		# filter out weights below threshold
 		Weight = Weight[operator.gt(np.abs(Weight['ES']), weight_threshold)].reset_index(drop=True)
 
 	if Weight.empty:
@@ -331,19 +338,22 @@ cis-eQTL weight file: {in_w_dir}/[target]{w_path_suf}
 GWAS summary statistics Z-score file: {in_z_path}
 Reference LD genotype covariance file: {ld_path_pre}[chr]{ld_path_suf}
 SNP weight inclusion threshold: {weight_threshold}
+Using {snp_type_str} SNPs for analysis
 Test statistic to use: {test_stat_str}
 Number of threads: {thread}
 Output directory: {out_dir}
 Output TWAS results file: {out_path}
 ********************************'''.format(
 	**args.__dict__,
+	snp_type_str = 'cis- and trans-' if args.test_stat=='both' else args.snp_type + '-',
 	test_stat_str = 'FUSION and SPrediXcan' if args.test_stat=='both' else args.test_stat,
 	in_w_dir = args.w_path_pre + '/[target]' if args.target_dir else args.w_path_pre,
 	in_z_path = args.z_path_pre + '[CHRM]' + args.z_path_suf if args.z_path == '' else args.z_path,
 	out_path = out_twas_path))
 
+
 	# in_w_dir = args.w_path_pre if not args.target_dir else args.w_path_pre + '/[target]',
-# tg.print_args(args)
+tg.print_args(args)
 
 ###############################################################
 ### Read in gene annotation 
