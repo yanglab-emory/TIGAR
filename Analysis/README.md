@@ -91,7 +91,7 @@ If no dataframe column exists for any optional column, the `manhattan_plot()` ar
 
 Values in the optional `label_fill`, `label_col`, and `label_seg_col` columns must valid colors (ie, aesthetic values that ggplot2 can handle directly). 
 
-Possible Issues:
+#### Possible Issues:
 - If `label_seg_col` is not a column in your dataframe but `label_col` is, `label_seg_col` will be set to `label_col`.
 
 - It is not expected that `sig_level` values differ much between facets. However, however if they DO the ylimits for the labels still depends on the numeric `sig_level` argument (default: 2.5e-6) value NOT the `sig_level` dataframe column.
