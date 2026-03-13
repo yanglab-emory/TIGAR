@@ -85,11 +85,11 @@ plot1 + facet_grid(TWAStype ~ .)
 
 Optional columns to add to dataframe: `sig_level`, `label_fill`, `label_col`, and `label_seg_col`. 
 
+Values in the optional `label_fill`, `label_col`, and `label_seg_col` columns must valid colors (ie, aesthetic values that ggplot2 can handle directly). 
+
 If no dataframe column exists for any optional column, the `manhattan_plot()` argument of the same name is used. Dataframe values override arguments provided to `manhattan_plot()`. 
 - Example 1: if `sig_level=2.5e-6` but your all values in your dataframe `sig_level` column are `0.5` then `0.5` will be used for plotting the horizontal line (but not for setting the ylimits on labels (see below)). 
 - Example 2: If `label_col='black'` but your dataframe `label_col` column sets all values to `red` your labels will be red.
-
-Values in the optional `label_fill`, `label_col`, and `label_seg_col` columns must valid colors (ie, aesthetic values that ggplot2 can handle directly). 
 
 #### Possible Issues:
 - If `label_seg_col` is not a column in your dataframe but `label_col` is, `label_seg_col` will be set to `label_col`.
