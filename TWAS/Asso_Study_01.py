@@ -25,28 +25,28 @@ start_time = time()
 parser = argparse.ArgumentParser(description='Asso Study 01')
 
 # Specify tool directory
-parser.add_argument('--TIGAR_dir' ,type=str)
+parser.add_argument('--TIGAR_dir', type=str)
 
 # Gene annotation and Expression level file
-parser.add_argument('--gene_exp' ,type=str ,dest='geneexp_path')
+parser.add_argument('--gene_exp', type=str, dest='geneexp_path')
 
 # PED file path 
-parser.add_argument('--PED' ,type=str ,dest='ped_path')
+parser.add_argument('--PED', type=str, dest='ped_path')
 
 # Association Information file path
-parser.add_argument('--PED_info' ,type=str ,dest='pedinfo_path')
+parser.add_argument('--PED_info', type=str, dest='pedinfo_path')
 
 # Method to use for regression
-parser.add_argument('--method' ,type=str)
+parser.add_argument('--method', type=str)
 
 # number of thread
-parser.add_argument('--thread' ,type=int)
+parser.add_argument('--thread', type=int)
 
 # output dir
-parser.add_argument('--out_dir' ,type=str)
+parser.add_argument('--out_dir', type=str)
 
 # output file
-parser.add_argument('--out_twas_file' ,type=str)
+parser.add_argument('--out_twas_file', type=str)
 
 
 args = parser.parse_args()
