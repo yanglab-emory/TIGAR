@@ -15,39 +15,79 @@ from itertools import groupby
 import pandas as pd
 import numpy as np
 #########################################################
-## FUNCTIONS:
+## Functions:
 
+# get_abs_path
+# check_tabix
+# check_input_files
 # error_handler
-
-# calc_maf
+# empty_df_handler
+# ped_startup
+# sampleid_startup
+# sampleid_startup
+# gwas_file_info
+# bgw_weight_file_info
+# weight_file_info
+# zscore_file_info
+# bgw_weight_cols_dtype
+# read_gene_annot_exp
+# filter_vcf_line
+# filter_weight_line
+# filter_other_line
+# read_tabix
+# tabix_query_files
 # call_tabix
 # call_tabix_header
 # format_elapsed_time
 # get_header
-
+# get_vcf_header
+# get_cols_dtype
 # exp_cols_dtype
 # genofile_cols_dtype
 # weight_cols_dtype
 # zscore_cols_dtype
 # gwas_cols_dtype
 # MCOV_cols_dtype
-
-## Handling covariance files:
-# ld_cols
+# get_ld_cols
 # get_ld_regions_list
+# get_regions_list
 # call_tabix_regions
 # get_ld_regions_data
 # get_ld_data
 # get_ld_matrix
-
 # get_snpIDs
+# flip_snpIDs
 # optimize_cols
 # reformat_sample_vals
-# reformat_vcf
-# check_prep_vcf
 # substr_in_strarray
+# handle_missing
+# row_maf_impute
+# calc_maf
+# calc_p_hwe
+# prep_p_HWE
+# HWE
+# center
+# print_args
+# sort_tabix_output
 
 #########################################################
+# returns absolute path
+def get_abs_path(x): return os.path.abspath(os.path.expanduser(os.path.expandvars(x)))
+
+TIGAR_dir = get_abs_path(os.path.dirname( __file__ ))
+
+
+def check_tabix():
+	try:
+		subprocess.check_call(['which','tabix'], stdout=subprocess.DEVNULL)
+	except:
+		raise SystemExit('Error: Required tool TABIX is not available.\n')
+
+
+def check_input_files(args):
+	for key, value in args.__dict__.items():
+		if key.endswith('path') and (not os.path.isfile(value)) and (not 'out' in key):
+			raise SystemExit('Error: file "' + value + '" does not exist.\n')
 
 # used to catch exceptions that dont require a traceback
 class NoTargetDataError(Exception):
@@ -101,10 +141,6 @@ def fatal_error_handler(func):
 			sys.stdout.flush()
 
 	return wrapper
-
-
-# returns absolute path
-def get_abs_path(x): return os.path.abspath(os.path.expanduser(os.path.expandvars(x)))
 
 
 # wrapper for genotype functions; adds error handling for when an empty dataframe is read in during concatenation
@@ -210,7 +246,7 @@ def sampleid_startup(chrm=None, genofile_type=None, data_format=None, sampleid_p
 	if not sampleID.size:
 		raise SystemExit('There are no overlapped sample IDs in the input files.')
 
-	print('Running job for ' + str(sampleID.size) + ' matched sampleIDs.')
+	print('Running job for ' + str(sampleID.size) + ' matched sampleIDs.\n')
 
 	## return values
 	return_lst = [sampleID, sampleID.size]
@@ -413,7 +449,6 @@ def filter_other_line(line: bytes, col_inds):
 	line = b'\t'.join([row[x] for x in col_inds])
 	line += b'' if line.endswith(b'\n') else b'\n'
 	return line
-
 
 def read_tabix(start, end, sampleID, chrm, path, file_cols, col_inds, cols, dtype, genofile_type=None, data_format=None, target_ind=5, target=None, weight_threshold=0, raise_error=True, **kwargs):
 
@@ -941,7 +976,9 @@ def get_ld_data(path, snp_ids):
 			else:
 				n = 0
 
-	return cov_data.set_index('row')
+	cov_data = cov_data.drop_duplicates(['snpID'], keep='first').set_index('row')
+
+	return cov_data
 
 
 def get_ld_matrix(MCOV, return_diag=False):
@@ -1081,7 +1118,7 @@ def calc_maf(df: pd.DataFrame, sampleID, maf, filter=True, op=operator.gt, filte
 	sample_MAF = np.apply_along_axis(row_maf_impute, 1, vals)
 
 	# re combine dataframe (faster than editing in place)
-	df = pd.concat([df.drop(columns=sampleID), pd.DataFrame(sample_MAF, columns=[*sampleID, 'MAF'])], axis=1)	
+	df = pd.concat([df.drop(columns=sampleID), pd.DataFrame(sample_MAF, columns=[*sampleID, 'MAF'])], axis=1)
 
 	if filter:
 		df = df[op(df.MAF, maf)].reset_index(drop=True)
@@ -1233,3 +1270,25 @@ def print_args(args):
 		else:
 			print('args.', key, ' = ', value, sep='')
 	print('\n')
+
+# 
+def sort_tabix_output(temp_file, out_file, tabix_str='-b2 -e2 -S1', do_sort=1, do_tabix=1):
+	try:
+		out_dir = get_abs_path(os.path.dirname(out_file))
+
+		call_args = [
+			TIGAR_dir + '/sort_tabix_output.sh', 
+			get_abs_path(temp_file), 
+			get_abs_path(out_file), 
+			tabix_str, str(do_sort), str(do_tabix)]
+
+		subprocess.check_call(
+			call_args,
+			cwd=out_dir,
+			stdout=subprocess.DEVNULL,
+			stderr=subprocess.DEVNULL)
+
+	except subprocess.CalledProcessError as err:
+		raise err
+
+
