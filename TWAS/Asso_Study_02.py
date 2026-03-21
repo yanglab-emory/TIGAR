@@ -40,6 +40,9 @@ parser.add_argument('--Zscore', type=str, dest='z_path')
 # Reference covariance file path
 parser.add_argument('--LD', type=str, dest='ld_path')
 
+# Reference covariance file type (TIGAR, or plink)
+parser.add_argument('--LD_type', type=str, dest='ld_type')
+
 # window
 parser.add_argument('--window',type=float)
 
@@ -79,12 +82,15 @@ def get_V_cor(V_cov):
 def get_z_denom(V, w):
 	return np.sqrt(np.linalg.multi_dot([w, V, w]))
 
-def get_spred_zscore(V_cov, w, Z_gwas, snp_sd):
+def get_spred_zscore(V_cov, w, Z_gwas, V_type, snp_sd):
 	Z_twas = snp_sd.dot(w * Z_gwas) / get_z_denom(V_cov, w)
 	return Z_twas, get_pval(Z_twas)
 	
-def get_fusion_zscore(V_cov, w, Z_gwas, snp_sd=None):
-	V_cor = get_V_cor(V_cov)
+def get_fusion_zscore(V, w, Z_gwas, V_type, snp_sd=None):
+	if V_type == 'cov':
+		V_cor = get_V_cor(V)
+	else:
+		V_cor = V
 	Z_twas = np.vdot(Z_gwas, w) / get_z_denom(V_cor, w)
 	return Z_twas, get_pval(Z_twas)
 
@@ -100,6 +106,14 @@ def get_burden_zscore(test_stat, get_zscore_args):
 
 out_twas_path = args.out_dir + '/' + args.out_twas_file
 
+# check input arguments
+if args.ld_type == 'TIGAR':
+	print('Using TIGAR-generated LD file.')
+
+elif (args.ld_type == 'plink') and (args.test_stat != 'FUSION'):
+	raise SystemExit('The test statistic (--test_stat) must be "FUSION" in order to use the plink LD type (--LD_type plink); change test statistic or use TIGAR-generated LD reference covariance file.\n')
+
+
 print(
 '''********************************
 Input Arguments
@@ -108,6 +122,7 @@ Chromosome: {chrm}
 cis-eQTL weight file: {w_path}
 GWAS summary statistics Z-score file: {z_path}
 Reference LD genotype covariance file: {ld_path}
+Reference LD genotype covariance file type: {ld_type}
 Gene training region SNP inclusion window: +-{window}
 SNP weight inclusion threshold: {weight_threshold}
 Test statistic to use: {test_stat_str}
@@ -135,10 +150,12 @@ zscore_info = tg.zscore_file_info(**args.__dict__)
 # PREP OUTPUT - print output headers to files
 print('Creating file: ' + out_twas_path + '\n')
 out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName','n_snps']
-if args.test_stat == 'both':
+if (args.test_stat == 'both'):
 	out_cols += ['FUSION_Z','FUSION_PVAL','SPred_Z','SPred_PVAL']
-else:
-	out_cols += ['Zscore','PVALUE']
+elif (args.test_stat == 'SPrediXcan'):
+	out_cols += ['SPred_Z','SPred_PVAL']
+elif (args.test_stat == 'FUSION'):
+	out_cols += ['FUSION_Z','FUSION_PVAL']
 
 pd.DataFrame(columns=out_cols).to_csv(
 	out_twas_path,
@@ -195,35 +212,25 @@ def thread_process(num):
 	# drop unneeded columns
 	Zscore = Zscore.drop(columns=['CHROM','POS','REF','ALT','snpIDflip'])
 
-	# # filter remaining by snpIDs
-	# snp_overlap = np.intersect1d(Weight.snpID, Zscore.snpID)
-
-	# if not snp_overlap.size:
-	# 	print('No overlapping test SNPs that have magnitude of cis-eQTL weights greater than threshold value and with GWAS Zscore for TargetID: ' + target + '\n')
-	# 	return None
-
-	# Weight = Weight[Weight.snpID.isin(snp_overlap)]
-	# Zscore = Zscore[Zscore.snpID.isin(snp_overlap)]
-
 	# merge Zscore and Weight dataframes on snpIDs
 	ZW = Weight.merge(Zscore[['snpID','Zscore']], 
 		left_on='snpID', 
 		right_on='snpID', 
 		how='inner')
 
-	snp_search_ids = ZW.snpID.values
+	snp_search_ids = ZW.snpID
 
 	# Read in reference covariance matrix file by snpID
-	MCOV = tg.get_ld_data(args.ld_path, snp_search_ids)
+	if (args.ld_type == 'TIGAR'):
+		snp_sd, V, ld_snp_ids = tg.tigar_ld(args.ld_path, snp_search_ids.values, return_ld_snp_ids=True, pos_def_fix=True)
+		V_type = 'cov'
 
-	if MCOV.empty:
-	  print('No reference covariance information for target SNPs for TargetID: ' + target + '\n')
-	  return None
+	else:
+		snp_sd = None
+		V, ld_snp_ids = tg.plink_ld(args.ld_path, snp_search_ids, args.out_dir + '/', target, pos_def_fix=True)
+		V_type = 'corr'
 
-	# get the snp variance and covariance matrix
-	snp_sd, V_cov = tg.get_ld_matrix(MCOV)
-
-	ZW = ZW[ZW.snpID.isin(MCOV.snpID)]
+	ZW = ZW[ZW.snpID.isin(ld_snp_ids)]
 	ZW = ZW.drop_duplicates(['snpID'], keep='first').reset_index(drop=True)
 	n_snps = str(ZW.snpID.size)
 
@@ -235,15 +242,20 @@ def thread_process(num):
 
 	### calculate zscore(s), pvalue(s)
 	# get_zscore_args = [V_cov, ZW, snp_sd]
-	get_zscore_args = [V_cov, ZW.ES.values, ZW.Zscore.values, snp_sd]
+	get_zscore_args = [V, ZW.ES.values, ZW.Zscore.values, V_type, snp_sd]
 
-	if args.test_stat == 'both':
-		Result['FUSION_Z'], Result['FUSION_PVAL'] = get_fusion_zscore(*get_zscore_args)
+	if (args.ld_type == 'TIGAR'):
 
-		Result['SPred_Z'], Result['SPred_PVAL'] = get_spred_zscore(*get_zscore_args)
+		if (args.test_stat == 'both'):
+			Result['FUSION_Z'], Result['FUSION_PVAL'] = get_fusion_zscore(*get_zscore_args)
+
+			Result['SPred_Z'], Result['SPred_PVAL'] = get_spred_zscore(*get_zscore_args)
+
+		else:
+			Result['TWAS_Zscore'], Result['PVALUE'] = get_burden_zscore(args.test_stat, get_zscore_args)
 
 	else:
-		Result['TWAS_Zscore'], Result['PVALUE'] = get_burden_zscore(args.test_stat, get_zscore_args)
+		Result['FUSION_Z'], Result['FUSION_PVAL'] = get_fusion_zscore(*get_zscore_args)
 
 	# write to file
 	Result.to_csv(

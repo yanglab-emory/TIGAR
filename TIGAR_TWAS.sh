@@ -20,7 +20,8 @@
 # --chr: Chromosome number need to be specified 
 # --weight: Path for SNP weight (eQTL effect size) file 
 # --Zscore : Path for GWAS summary Zscore statistics
-# --LD : Path for reference LD (SNP genotype covariance matrix) that should be bgzipped and tabixed. Can be generated using our `covar_calculation.py` script
+# --LD : Path for reference LD (SNP genotype covariance matrix) that should be bgzipped and tabixed. Can be generated using by TIGAR
+#  --LD_type : type of LD file to use for LD calculations (TIGAR or plink)
 # --window: Window size around gene region for selecting cis-SNPs for fitting gene expression prediction model (default 1000000 for +- 1MB region around gene)
 # --weight_threshold : for asso=2, only include SNPs with magnitude of weight greater than the weight_threshold value; default is 0
 # --TIGAR_dir : Specify the directory of TIGAR source code
@@ -28,7 +29,7 @@
 
 ###############################################################
 VARS=`getopt -o "" -a -l \
-asso:,gene_exp:,gene_anno:,PED:,PED_info:,method:,Zscore:,weight:,LD:,chr:,window:,TIGAR_dir:,thread:,weight_threshold:,sub_dir:,out_twas_file:,out_prefix:,log_file:,out_dir:,sampleID:,test_stat:,test_sampleID: \
+asso:,gene_exp:,gene_anno:,PED:,PED_info:,method:,Zscore:,weight:,LD:,chr:,window:,TIGAR_dir:,thread:,weight_threshold:,sub_dir:,out_twas_file:,out_prefix:,log_file:,in_dir:,out_dir:,sampleID:,test_stat:,test_sampleID:,LD_type: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -51,6 +52,7 @@ do
         --Zscore|-Zscore) Zscore=$2; shift 2;;
         --weight|-weight) weight=$2; shift 2;;
         --LD|-LD) LD=$2; shift 2;;
+				--LD_type|-LD_type) LD_type=$2; shift 2;;
         --chr|-chr) chr=$2; shift 2;;
         --window|-window) window=$2; shift 2;;
         --TIGAR_dir|-TIGAR_dir) TIGAR_dir=$2; shift 2;;
@@ -64,6 +66,7 @@ do
         --out_twas_file|-out_twas_file) out_twas_file=$2; shift 2;;
         --log_file|-log_file) log_file=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
+				--in_dir|-in_dir) in_dir=$2; shift 2;;
         --) shift;break;;
         *) echo "Internal error!";exit 1;;
         esac
@@ -76,6 +79,16 @@ method=${method:-'OLS'}
 weight_threshold=${weight_threshold:-0}
 test_stat=${test_stat:-'both'}
 sub_dir=${sub_dir:-1}
+LD_type=${LD_type:-0}
+
+# check if user submitted in_dir
+if [[ "$in_dir"x != ""x ]];then
+	# if yes, check if in_dir var ends with a backslash
+  if [[ "$in_dir"x != */x ]];then
+  	# if it doesn't, add backslash
+    in_dir=$in_dir"/"
+  fi
+fi
 
 # sub directory in out directory
 if [[ "$sub_dir"x == "1"x ]];then
@@ -100,20 +113,20 @@ if [[ "$asso"x == "1"x ]];then
     log_file=${log_file:-${out_prefix}_log.txt}
 
     # Check gene expression file
-    if [ ! -f "${gene_exp}" ] ; then
-        echo Error: Gene expression file ${gene_exp} does not exist or is empty. >&2
+    if [ ! -f "${in_dir}${gene_exp}" ] ; then
+        echo Error: Gene expression file ${in_dir}${gene_exp} does not exist or is empty. >&2
         exit 1
     fi
 
     # Check PED file
-    if [ ! -f "${PED}" ] ; then
-        echo Error: PED file ${PED} does not exist or is empty. >&2
+    if [ ! -f "${in_dir}${PED}" ] ; then
+        echo Error: PED file ${in_dir}${PED} does not exist or is empty. >&2
         exit 1
     fi
 
     # Check PED_info file
-    if [ ! -f "${PED_info}" ] ; then
-        echo Error: PED information file ${PED_info} does not exist or is empty. >&2
+    if [ ! -f "${in_dir}${PED_info}" ] ; then
+        echo Error: PED information file ${in_dir}${PED_info} does not exist or is empty. >&2
         exit 1
     fi
 
@@ -122,10 +135,10 @@ if [[ "$asso"x == "1"x ]];then
         chmod 755  ${TIGAR_dir}/TWAS/Asso_Study_01.py
     fi
 
-    ${TIGAR_dir}/TWAS/Asso_Study_01.py \
-    --gene_exp ${gene_exp} \
-    --PED ${PED} \
-    --PED_info ${PED_info} \
+    python ${TIGAR_dir}/TWAS/Asso_Study_01.py \
+    --gene_exp ${in_dir}${gene_exp} \
+    --PED ${in_dir}${PED} \
+    --PED_info ${in_dir}${PED_info} \
     --method ${method} \
     --thread ${thread} \
     --TIGAR_dir ${TIGAR_dir} \
@@ -141,26 +154,37 @@ elif [[ "$asso"x == "2"x ]];then
     log_file=${log_file:-${out_prefix}_log.txt}
 
     # Check gene_annotation file
-    if [ ! -f "${gene_anno}" ] ; then
-        echo Error: Gene annotation file ${gene_anno} does not exist or is empty. >&2
+    if [ ! -f "${in_dir}${gene_anno}" ] ; then
+        echo Error: Gene annotation file ${in_dir}${gene_anno} does not exist or is empty. >&2
         exit 1
     fi
 
     # Check LD file
-    if [ ! -f "${LD}" ] ; then
-        echo Error: Reference LD genotype covariance file ${LD} does not exist or is empty. >&2
+    if [[ "$LD_type"x == "TIGAR"x ]];then
+	    if [ ! -f "${in_dir}${LD}" ] ; then
+	        echo Error: Reference LD genotype covariance file ${in_dir}${LD} does not exist or is empty. >&2
+	        exit 1
+	    fi
+
+	  elif [[ "$LD_type"x == "plink"x ]];then
+	    if [ ! -f "${in_dir}${LD}.bed" ] ; then
+	        echo Error: Reference LD genotype covariance file ${in_dir}${LD}.bed does not exist or is empty. >&2
+	        exit 1
+	    fi
+	  else
+        echo Error: Must specify LD_type. >&2
         exit 1
-    fi
+	  fi
 
     # Check Zscore file
-    if [ ! -f "${Zscore}" ] ; then
-        echo Error: Zscore file ${Zscore} does not exist or is empty. >&2
+    if [ ! -f "${in_dir}${Zscore}" ] ; then
+        echo Error: Gene expression file ${in_dir}${Zscore} does not exist or is empty. >&2
         exit 1
     fi
 
     # Check weight file and tabix weight file
-    if [ ! -f "${weight}" ] ; then
-        echo Error: Weight file ${weight} does not exist or is empty. >&2
+    if [ ! -f "${in_dir}${weight}" ] ; then
+        echo Error: Gene expression file ${in_dir}${weight} does not exist or is empty. >&2
         exit 1
     fi
 
@@ -170,10 +194,11 @@ elif [[ "$asso"x == "2"x ]];then
 
     ## TWAS
     python ${TIGAR_dir}/TWAS/Asso_Study_02.py \
-    --gene_anno ${gene_anno} \
-    --Zscore ${Zscore} \
-    --weight ${weight} \
-    --LD ${LD} \
+    --gene_anno ${in_dir}${gene_anno} \
+    --Zscore ${in_dir}${Zscore} \
+    --weight ${in_dir}${weight} \
+    --LD ${in_dir}${LD} \
+    --LD_type ${LD_type} \
     --chr ${chr} \
     --window ${window} \
     --thread ${thread} \
@@ -189,4 +214,6 @@ fi
 
 echo "Completed TWAS."
 
-# ALSO TRY MOVING FINAL TWAS FILE DIRECTLY TO OUT DIRECTORY INSTEAD OF HAVING A WHOLE FOLDER FOR 1 FILE?
+## ALSO TRY MOVING FINAL TWAS FILE DIRECTLY TO OUT DIRECTORY INSTEAD OF HAVING A WHOLE FOLDER FOR 1 FILE?
+
+

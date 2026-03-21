@@ -19,7 +19,7 @@
 
 #######################################################################
 VARS=`getopt -o "" -a -l \
-TIGAR_dir:,gene_anno:,GWAS_result:,weight:,sample_size:,weight_threshold:,LD:,chr:,window:,thread:,sub_dir:,log_file:,out_dir: \
+TIGAR_dir:,gene_anno:,GWAS_result:,weight:,sample_size:,weight_threshold:,LD:,chr:,window:,thread:,sub_dir:,log_file:,in_dir:,out_dir: \
 -- "$@"`
 
 if [ $? != 0 ]
@@ -46,6 +46,7 @@ do
         --sub_dir|-sub_dir) sub_dir=$2; shift 2;;
         --log_file|-log_file) log_file=$2; shift 2;;
         --out_dir|-out_dir) out_dir=$2; shift 2;;
+				--in_dir|-in_dir) in_dir=$2; shift 2;;
         --) shift;break;;
         *) echo "Internal error!";exit 1;;
         esac
@@ -58,6 +59,15 @@ log_file=${log_file:-CHR${chr}_VCTWAS_sum_log.txt}
 
 # sub_dir: whether to use subdirectory inside out_dir for output files
 sub_dir=${sub_dir:-1}
+
+# check if user submitted in_dir
+if [[ "$in_dir"x != ""x ]];then
+	# if yes, check if in_dir var ends with a backslash
+  if [[ "$in_dir"x != */x ]];then
+  	# if it doesn't, add backslash
+    in_dir=$in_dir"/"
+  fi
+fi
 
 #### Create output directory if not existed
 mkdir -p ${out_dir}
@@ -80,20 +90,20 @@ if [ ! -x "$(command -v tabix)" ]; then
 fi
 
 # Check weight file 
-if [ ! -f "${weight}" ] ; then
-    echo Error: Training genotype file ${weight} does not exist or is empty. >&2
+if [ ! -f "${in_dir}${weight}" ] ; then
+    echo Error: Training genotype file ${in_dir}${weight} does not exist or is empty. >&2
     exit 1
 fi
 
 # Check gwas result file
-if [ ! -f "${GWAS_result}" ] ; then
-    echo Error: eQTL weight file ${GWAS_result} does not exist or is empty. >&2
+if [ ! -f "${in_dir}${GWAS_result}" ] ; then
+    echo Error: eQTL weight file ${in_dir}${GWAS_result} does not exist or is empty. >&2
     exit 1
 fi
 
 # Check gene annotation file
-if [ ! -f "${gene_anno}" ] ; then
-    echo Error: eQTL weight file ${gene_anno} does not exist or is empty. >&2
+if [ ! -f "${in_dir}${gene_anno}" ] ; then
+    echo Error: eQTL weight file ${in_dir}${gene_anno} does not exist or is empty. >&2
     exit 1
 fi
 
@@ -104,12 +114,12 @@ fi
 
 python ${TIGAR_dir}/VC_TWAS/VC_TWAS_summary.py \
 --TIGAR_dir ${TIGAR_dir} \
---gene_anno ${gene_anno} \
---GWAS_result ${GWAS_result} \
---weight ${weight} \
+--gene_anno ${in_dir}${gene_anno} \
+--GWAS_result ${in_dir}${GWAS_result} \
+--weight ${in_dir}${weight} \
 --sample_size ${sample_size} \
 --weight_threshold ${weight_threshold} \
---LD ${LD} \
+--LD ${in_dir}${LD} \
 --chr ${chr} \
 --window ${window} \
 --thread ${thread} \

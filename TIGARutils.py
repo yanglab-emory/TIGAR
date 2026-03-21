@@ -56,7 +56,7 @@ class NoTargetDataError(Exception):
 # wrapper for thread_process functions; adds error catching/logging for failed targets
 def error_handler(func):
 	@functools.wraps(func)
-	def wrapper(num, *args, **kwargs):     
+	def wrapper(num, *args, **kwargs):	 
 		try:
 			return func(num, *args, **kwargs)
 
@@ -79,7 +79,7 @@ def error_handler(func):
 
 def fatal_error_handler(func):
 	@functools.wraps(func)
-	def wrapper(num, *args, **kwargs):     
+	def wrapper(num, *args, **kwargs):	 
 		try:
 			return func(num, *args, **kwargs)
 
@@ -110,7 +110,7 @@ def get_abs_path(x): return os.path.abspath(os.path.expanduser(os.path.expandvar
 # wrapper for genotype functions; adds error handling for when an empty dataframe is read in during concatenation
 def empty_df_handler(func):
 	@functools.wraps(func)
-	def wrapper(num, *args, **kwargs):     
+	def wrapper(num, *args, **kwargs):	 
 		try:
 			return func(num, *args, **kwargs)
 
@@ -747,7 +747,7 @@ def get_cols_dtype(file_cols, cols, sampleid=None, genofile_type=None, add_cols=
 	cols = cols + add_cols
 
 	# if type == 'vcf':
-	#     cols.insert(4, 'snpID')
+	#	 cols.insert(4, 'snpID')
 
 	if get_id:
 		if ('snpID' in file_cols):
@@ -972,6 +972,39 @@ def get_ld_matrix(MCOV, return_diag=False):
 
 	else:
 		return snp_sd, V
+
+
+def tigar_ld(path, snp_ids, return_diag=False, return_ld_snp_ids=False, pos_def_fix=True):
+
+	MCOV = get_ld_data(path, snp_ids)
+
+	if MCOV.empty:
+		print('No reference covariance information for target SNPs')
+		raise NoTargetDataError
+
+	ld_snp_ids = MCOV.snpID
+
+	if return_diag:
+		snp_sd, V, snp_Var = get_ld_matrix(MCOV, return_diag)
+
+		if pos_def_fix:
+			V = pos_def_matrix(V)
+
+		if return_ld_snp_ids:
+			return snp_sd, V, snp_Var, ld_snp_ids
+		else:
+			return snp_sd, V, snp_Var
+
+	else: 
+		snp_sd, V = get_ld_matrix(MCOV, return_diag)
+
+		if pos_def_fix:
+			V = pos_def_matrix(V)
+
+		if return_ld_snp_ids:
+			return snp_sd, V, ld_snp_ids
+		else:
+			return snp_sd, V
 
 
 # return snp ids; join CHROM, POS, REF, ALT columns into : separated string
@@ -1233,3 +1266,92 @@ def print_args(args):
 		else:
 			print('args.', key, ' = ', value, sep='')
 	print('\n')
+
+
+
+
+
+#------------------
+def pos_def_matrix(mat):
+	""" convert the input matrix to the cloest positive definite matrix"""
+	# Make sure the ld is positive definite matrix
+	_, s, v = np.linalg.svd(mat)
+	h = np.dot(v.T, np.dot(np.diag(s), v))
+	mat_pos_def = (mat+h)/2
+
+	return mat_pos_def
+
+
+def plink_ld(plink_prefix, snp_search_ids, plink_out_dir, target, pos_def_fix=True):
+
+	## will need to make sure plink files used for LD do not contain duplicate snpIDs or will have to find someway to filter those out and change the correlation matrix
+
+	target_snps_pth = os.path.join(plink_out_dir, target + '_snps.txt')
+	out_ld_pth = os.path.join(plink_out_dir, target + '_out_ld')
+	
+	snp_search_ids.to_csv(
+		target_snps_pth,
+		sep='\t',
+		index=None,
+		header=None,
+		mode='w')
+
+	# call plink
+	try:
+		plink_call_args = ['plink', 
+			'--noweb',
+			'--allow-no-sex',
+			'--bfile', plink_prefix, 
+			'--keep-allele-order',
+			'--extract', target_snps_pth,
+			'--r', 'square',
+			'--out', out_ld_pth,
+			'--show-tags', 'all' ]
+
+		subprocess.check_call(
+			plink_call_args,
+			cwd=plink_out_dir,
+			stdout=subprocess.DEVNULL)
+
+	except subprocess.CalledProcessError as err:
+		raise err
+
+	finally:
+		os.remove(target_snps_pth)
+
+	# read in LD output
+	try:
+		# read in snp list first, if error dont bother with ld
+		ld_snp_ids = pd.read_csv(out_ld_pth + '.tags.list',
+			low_memory=False,
+			header=0,
+			delim_whitespace=True, usecols=[0])['SNP']
+
+		ld_chunks = pd.read_csv(out_ld_pth + '.ld',
+			# sep='\t',
+			low_memory=False,
+			header=None,
+			iterator=True,
+			chunksize=1000,
+			delim_whitespace=True)
+
+		ld = pd.concat([chunk for chunk in ld_chunks]).reset_index(drop=True)
+
+	finally:
+		os.remove(out_ld_pth + '.ld')
+		os.remove(out_ld_pth + '.log')
+		os.remove(out_ld_pth + '.nosex')
+		os.remove(out_ld_pth + '.tags.list')
+
+	# PLINK returns nan when all mutually-nonmissing set is homozygous major
+	# set nan = 0
+	V = ld.fillna(0)
+
+	if pos_def_fix:
+		# PLINK rounds to 6 decimal points, which sometimes makes the correlation matrix become not positive definite
+		# convert it to be positive definite
+		V = pos_def_matrix(V)	
+
+	return V, ld_snp_ids
+
+
