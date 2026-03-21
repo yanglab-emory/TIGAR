@@ -99,6 +99,7 @@ fi
 
 ############# TWAS 
 
+
 ## make output directory
 mkdir -p ${out_dir}
 mkdir -p ${out_dir}/logs
