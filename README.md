@@ -52,10 +52,10 @@
 
 ## Software Setup
 
-### 1. Install BGZIP, TABIX, Python 3.5, and the following Python libraries
+### 1. Install BGZIP, TABIX, Python 3.9, and the following Python libraries
 - [BGZIP](http://www.htslib.org/doc/bgzip.html) 
 - [TABIX](http://www.htslib.org/doc/tabix.html) 
-- Python 3.5 modules/libraries:
+- Python 3.9 modules/libraries:
 	- [pandas](https://pandas.pydata.org/)
 	- [numpy](https://numpy.org/)
 	- [scipy](https://www.scipy.org/)
@@ -69,7 +69,7 @@
 - Installation:
 ```bash
 # create the environment tigarenv
-conda create --name tigarenv python=3.5 pandas numpy scipy scikit-learn statsmodels
+conda create --name tigarenv python=3.9 pandas numpy scipy scikit-learn statsmodels
 # deactivate the conda environment
 conda deactivate
 ```
@@ -78,7 +78,7 @@ conda deactivate
 # activate the environment
 conda activate tigarenv
 # set the PYTHONPATH
-export PYTHONPATH=${CONDA_PREFIX}/lib/python3.5/site-packages/:$PYTHONPATH
+export PYTHONPATH=${CONDA_PREFIX}/lib/python3.9/site-packages/:$PYTHONPATH
 ```
 After running TIGAR use `conda deactivate` to deactivate the conda environment.
 
@@ -92,7 +92,7 @@ python3 -m pip install --user virtualenv
 # cd to preferred install_directory
 cd ${install_dir}
 # create the virtual environment tigarenv in the current directory
-python3 -m virtualenv tigarenv --python=python3.5
+python3 -m virtualenv tigarenv --python=python3.9
 # activate the environment
 source ${install_dir}/tigarenv/bin/activate
 # install the packages
@@ -106,7 +106,7 @@ deactivate
 # activate the environment
 source ${install_dir}/tigarenv/bin/activate
 # set the PYTHONPATH
-PYTHONPATH=${install_dir}/tigarenv/lib/python3.5/site-packages/:$PYTHONPATH
+PYTHONPATH=${install_dir}/tigarenv/lib/python3.9/site-packages/:$PYTHONPATH
 ```
 After running TIGAR use `deactivate` to deactivate the environment.
 
