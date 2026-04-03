@@ -78,7 +78,7 @@ sys.path.append(args.TIGAR_dir)
 import TIGARutils as tg
 
 
-def get_pval(z): return np.format_float_scientific(chi2.sf(z**2, 1), precision=15, exp_digits=0)
+def pval(z): return np.format_float_scientific(chi2.sf(z**2, 1), precision=15, exp_digits=0)
 
 def get_V_cor(V_cov):
 	V_cov = V_cov.copy()
@@ -88,27 +88,27 @@ def get_V_cor(V_cov):
 	V_cor[V_cov == 0] = 0
 	return V_cor
 
-def get_z_denom(V, w):
+def zscore_denom(V, w):
 	return np.sqrt(np.linalg.multi_dot([w, V, w]))
 
-def get_spred_zscore(V_cov, w, Z_gwas, snp_sd):
-	Z_twas = snp_sd.dot(w * Z_gwas) / get_z_denom(V_cov, w)
-	return Z_twas, get_pval(Z_twas)
+def spred_zscore(V_cov, w, Z_gwas, snp_sd):
+	Z_twas = snp_sd.dot(w * Z_gwas) / zscore_denom(V_cov, w)
+	return Z_twas, pval(Z_twas)
 	
-def get_fusion_zscore(V_cov, w, Z_gwas, **kwargs):
+def fusion_zscore(V_cov, w, Z_gwas, **kwargs):
 	V_cor = get_V_cor(V_cov)
-	Z_twas = np.vdot(Z_gwas, w) / get_z_denom(V_cor, w)
-	return Z_twas, get_pval(Z_twas)
+	Z_twas = np.vdot(Z_gwas, w) / zscore_denom(V_cor, w)
+	return Z_twas, pval(Z_twas)
 
-def get_fusion_zscore_vcor(V_cor, w, Z_gwas, **kwargs):
-	Z_twas = np.vdot(Z_gwas, w) / get_z_denom(V_cor, w)
-	return Z_twas, get_pval(Z_twas)
+def fusion_zscore_vcor(V_cor, w, Z_gwas, **kwargs):
+	Z_twas = np.vdot(Z_gwas, w) / zscore_denom(V_cor, w)
+	return Z_twas, pval(Z_twas)
 
-def get_burden_zscore(test_stat, get_zscore_args):
+def burden_zscore(test_stat, get_zscore_args):
 	if test_stat =='FUSION':
-		return get_fusion_zscore(*get_zscore_args)
+		return fusion_zscore(*get_zscore_args)
 	if test_stat == 'SPrediXcan':
-		return get_spred_zscore(*get_zscore_args)
+		return spred_zscore(*get_zscore_args)
 
 #############################################################
 # Print input arguments to log
@@ -148,10 +148,12 @@ Number of threads: {thread}
 Output directory: {out_dir}
 Temp directory: {temp_out_dir}
 Output TWAS results file: {out_path}
+Clean output: {clean_str}
 ********************************'''.format(
 	**args.__dict__,
 	test_stat_str = 'FUSION and SPrediXcan' if args.test_stat=='both' else args.test_stat,
 	ld_str='PLINK files for reference LD:' + args.plink_pre if args.do_plink else 'Reference TIGAR LD genotype covariance file:' + args.tigar_ld_path,
+	clean_str = bool(args.clean_output),
 	out_path = out_twas_path))
 
 tg.print_args(args)
@@ -173,7 +175,9 @@ out_cols = ['CHROM','GeneStart','GeneEnd','TargetID','GeneName','n_snps']
 if args.test_stat == 'both':
 	out_cols += ['FUSION_Z','FUSION_PVAL','SPred_Z','SPred_PVAL']
 else:
-	out_cols += ['Zscore','PVALUE']
+	# out_cols += ['Zscore','PVALUE']
+	test_stat_str = 'SPred' if args.test_stat == 'SPrediXcan' else 'FUSION'
+	out_cols += [test_stat_str + x for x in ['_Z', '_PVAL']]
 
 pd.DataFrame(columns=out_cols).to_csv(
 	out_twas_path,
@@ -254,7 +258,6 @@ def thread_process(num):
 	# 	how='inner')
 
 	if args.do_plink:
-		
 		try:
 			print('call_PLINK_extract')
 			plink_extract_target = tg.call_PLINK_extract(start, end, target, **args.__dict__)
@@ -272,8 +275,10 @@ def thread_process(num):
 
 			# get_zscore_args = [V_cov, ZW.ES.values, ZW.Zscore.values, snp_sd]
 			zscore_args = {'V_cor': V_cor, 'w': ZW.ES.values, 'Z_gwas': ZW.Zscore.values}
+
 		except Exception as e:
 			raise e
+
 		finally:
 			tg.clean_plink_output(target, **args.__dict__)
 
@@ -289,7 +294,7 @@ def thread_process(num):
 		ZW = ZW[ZW.snpID.isin(MCOV.snpID)]
 		ZW = ZW.drop_duplicates(['snpID'], keep='first').reset_index(drop=True)
 		
-		zscore_args = {'V_cov': V, 'w': ZW.ES.values, 'Z_gwas': ZW.Zscore.values, 'snp_sd': snp_sd}
+		zscore_args = {'V_cov': V_cov, 'w': ZW.ES.values, 'Z_gwas': ZW.Zscore.values, 'snp_sd': snp_sd}
 
 	n_snps = str(ZW.snpID.size)
 
@@ -305,16 +310,16 @@ def thread_process(num):
 
 	if args.do_plink:
 		# PLINK LD: FUSION Zscore from V_cor
-		Result['TWAS_Zscore'], Result['PVALUE'] = get_fusion_zscore_vcor(**zscore_args)
+		Result['FUSION_Z'], Result['FUSION_PVAL'] = fusion_zscore_vcor(**zscore_args)
 	else:
 		# TIGAR LD
 		if args.test_stat == 'both':
 			# FUSION Zscore from V_cov
-			Result['FUSION_Z'], Result['FUSION_PVAL'] = get_fusion_zscore(**zscore_args)
-			Result['SPred_Z'], Result['SPred_PVAL'] = get_spred_zscore(**zscore_args)
+			Result['FUSION_Z'], Result['FUSION_PVAL'] = fusion_zscore(**zscore_args)
+			Result['SPred_Z'], Result['SPred_PVAL'] = spred_zscore(**zscore_args)
 		else: 
 			# FUSION Zscore from V_cov
-			Result['TWAS_Zscore'], Result['PVALUE'] = get_fusion_zscore(args.test_stat, **zscore_args)
+			Result['TWAS_Zscore'], Result['PVALUE'] = fusion_zscore(args.test_stat, **zscore_args)
 
 	# write to file
 	Result.to_csv(

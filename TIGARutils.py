@@ -647,8 +647,15 @@ def merge_ref_z_on_snps(ref_df: pd.DataFrame, z_df: pd.DataFrame, target):
 		z_df['snpID'] = np.where(flip == 1, z_df.snpID, z_df.snpIDflip)
 		z_df['Zscore'] = flip * z_df['Zscore']
 
+	# prevent duplicate column names
+	try:
+		keep_cols = list(set(Zscore.columns) - set(['CHROM', 'POS', 'REF', 'ALT']))
+	except:
+		keep_cols = Zscore.columns
+		pass
+
 	# merge z_df and ref_df dataframes on snpIDs
-	refz_df = ref_df.merge(z_df[['snpID','Zscore']], 
+	refz_df = ref_df.merge(z_df[keep_cols], 
 		left_on='snpID', 
 		right_on='snpID', 
 		how='inner')
@@ -762,12 +769,16 @@ def get_cols_dtype(file_cols, cols, sampleid=None, genofile_type=None, add_cols=
 		'GeneName': object,
 		'GeneStart': np.int64,
 		'ID': object,
+		'LRT': np.float64,
 		'MAF': np.float64,
 		'PCP': np.float64,
 		'POS': np.int64,
+		'pval_LRT': np.float64,
 		'QUAL': object,
+		'Rank': np.float64,
 		'REF': object,
 		'SE': np.float64,
+		'SE_beta': np.float64,
 		'snpID': object,
 		'TargetID': object,
 		'Trans': np.int64,
@@ -790,7 +801,11 @@ def get_cols_dtype(file_cols, cols, sampleid=None, genofile_type=None, add_cols=
 	cols = [x for x in cols if (x not in drop_cols)]
 
 	# create output
-	col_inds = tuple(sorted([file_cols.index(x) for x in cols]))
+	try:
+		col_inds = tuple(sorted([file_cols.index(x) for x in cols]))
+	except ValueError as e:
+		print('Error: ' + str(list(set(cols) - set(file_cols)))+ ' Not in file cols')
+		raise e
 
 	if ind_namekey:
 		# return dtype dict with keys as column names
@@ -1012,7 +1027,9 @@ def get_ld_matrix(MCOV, return_diag=False):
 
 
 def clean_plink_output(target, temp_out_dir, **kwargs):
-	temp_paths = [temp_out_dir + target + x for x in ['_range.txt', '.bed', '.bim', '.fam', '.log', '.nosex', '_snplist.txt', '.ld']]
+	path_sufs = ['_range.txt', '.bed', '.bim', '.fam', '.log', '.nosex', '_snplist.txt', '.ld', '_merge_list.txt', '.missnp', '-merge.fam']
+	temp_paths = [temp_out_dir + target + x for x in path_sufs]
+	temp_paths += [temp_out_dir + target + '_CHR' + str(chrm) + x for chrm in list(range(1,23)) for x in path_sufs]
 	for temp_path in temp_paths:
 		try:
 			os.remove(temp_path)
@@ -1024,9 +1041,16 @@ def clean_plink_output(target, temp_out_dir, **kwargs):
 	return None
 
 
-def call_PLINK_extract(start_pos, end_pos, target, chrm, temp_out_dir, plink_pre, clean_output, **kwargs):
+
+def call_PLINK_extract(start_pos, end_pos, target, chrm, plink_pre, temp_out_dir, clean_output, do_plink_per_chrm=False, set_var_ids=False, **kwargs):
 
 	out_prefix = temp_out_dir + target
+
+	if do_plink_per_chrm:
+		out_prefix += '_CHR' + str(chrm)
+
+	set_var_ids_str = '--set-missing-var-ids @:#:\$1:\$2' if set_var_ids else ''
+
 	range_path = out_prefix + '_range.txt'
 	# os.path.join(temp_out_dir, target + '_range.txt')
 
@@ -1034,7 +1058,35 @@ def call_PLINK_extract(start_pos, end_pos, target, chrm, temp_out_dir, plink_pre
 	with open(range_path, 'w') as rf:
 		rf.write('%s\t%s\t%s\t%s\n' % (chrm, start_pos, end_pos, target))
 
-	cmd = ['plink --bfile ' + plink_pre + ' --keep-allele-order --extract range ' + range_path + ' --make-bed --out ' + out_prefix]
+	cmd = ['plink --bfile ' + plink_pre + ' --keep-allele-order --extract range ' + range_path + ' --make-bed ' + set_var_ids_str + ' --out ' + out_prefix]
+
+	try:
+		proc = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+
+	except subprocess.CalledProcessError:
+		print('No reference covariance information for target SNPs for TargetID: ' + target + ', CHRM' + str(chrm) + '\n')
+		if clean_output:
+			clean_plink_output(target, temp_out_dir)
+		raise NoTargetDataError
+
+	return None
+
+
+def call_PLINK_extract_ranges(target_ranges, target, plink_pre, temp_out_dir, clean_output, set_var_ids=False, **kwargs):
+
+	out_prefix = temp_out_dir + target
+
+	# A2 is reference allele for PLINK
+	set_var_ids_str = '--set-missing-var-ids @:#:\$2:\$1' if set_var_ids else ''
+
+	range_path = out_prefix + '_range.txt'
+
+	# write to range file
+	with open(range_path, 'w') as rf:
+		for x in target_ranges:
+			rf.write(x + '\n')
+
+	cmd = ['plink --bfile ' + plink_pre + ' --keep-allele-order --extract range ' + range_path + ' --make-bed ' + set_var_ids_str + ' --out ' + out_prefix]
 
 	try:
 		proc = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
@@ -1046,6 +1098,8 @@ def call_PLINK_extract(start_pos, end_pos, target, chrm, temp_out_dir, plink_pre
 		raise NoTargetDataError
 
 	return None
+
+
 
 
 def read_format_ref_bim(target, temp_out_dir, **kwargs):
@@ -1064,6 +1118,7 @@ def read_format_ref_bim(target, temp_out_dir, **kwargs):
 		dtype=dtypes)
 
 	target_ref = pd.concat([chunk for chunk in ref_chunks]).reset_index(drop=True)
+	target_ref = target_ref.drop(columns=['SNP', 'bp'])
 
 	if len(target_ref) == 0:
 		print('No reference covariance information for target SNPs for TargetID: ' + target + '\n')
@@ -1072,7 +1127,7 @@ def read_format_ref_bim(target, temp_out_dir, **kwargs):
 		raise NoTargetDataError
 
 	# format snp IDs in the reference bim file
-	target_ref['snpID'] = tg.get_snpIDs(target_ref, flip=False, ref_str='A1', alt_str='A2')
+	target_ref['snpID'] = get_snpIDs(target_ref, flip=False, ref_str='A2', alt_str='A1')
 
 	target_ref[['CHROM', 'snpID', 'bp', 'POS', 'A1', 'A2']].to_csv(
 			target_bim_path,
@@ -1082,6 +1137,7 @@ def read_format_ref_bim(target, temp_out_dir, **kwargs):
 			mode='w')
 
 	return target_ref
+
 
 def get_plink_LD_matrix(target, snp_overlap_ld, temp_out_dir, convert=False, **kwargs):
 
