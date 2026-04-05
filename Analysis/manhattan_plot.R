@@ -4,6 +4,7 @@ options(stringsAsFactors=FALSE)
 ## load packages
 library(ggplot2)
 library(ggrepel)
+library(ggnewscale)
 
 ## modify dataframe to be in correct format
 	## required columns: 'CHROM', 'POS', 'Pvalue', 'label_text'
@@ -21,6 +22,9 @@ library(ggrepel)
 #		p1 + facet_grid(dataset ~ .)
 
 
+# values in the optional label_fill, label_col, and label_seg_col columns must valid colors (ie, aesthetic values that ggplot2 can handle directly)
+
+
 
 ## function to do the manhattan plot
 manhattan_plot <- function(
@@ -28,7 +32,7 @@ manhattan_plot <- function(
 		data, 
 	## genes:
 		nonsig_colors=c('#44B5AD','#3A948E','#36807A','#2f615d'), # color for non-sig genes
-		nonsig_label_color= '#C5E063', # color for non-sig. genes with labels
+		nonsig_label_color='#C5E063', # color for non-sig. genes with labels
 		label_nonsig=FALSE, # by default never color/label non-significant genes
 		sig_color='#FD923F', # color for sig. genes without labels
 		sig_label_color='#D92B26', # color for sig. genes with labels
@@ -44,8 +48,8 @@ manhattan_plot <- function(
 		theme=theme_bw(), # ggplot2 theme (can use custom theme)
 		plot_bg_col=NULL, # background color if different from theme
 		# panel_border=NULL,#element_blank(), # ggplot panel border (default: blank)
-		panel_border=element_rect(fill=NA, colour='#333333', size=0.175),
-		strip_background=element_rect(colour='black', size=0.175),
+		panel_border=element_rect(fill=NA, colour='#333333', linewidth=0.175),
+		strip_background=element_rect(colour='black', linewidth=0.175),
 		text_size=10, # text size
 	## point labelling:
 		geom_label_size=2, # label text size
@@ -56,6 +60,7 @@ manhattan_plot <- function(
 		segment_size=0.2, # line from label to point
 		label_force=2, # force of repulsion between overlapping text labels
 		point_padding=1e-06, # padding around genes
+		max_overlaps=10, # maximum number of overlaps
 		seed=NA, # optional seed for generating label positions
 		max_iter=15000 # number of iterations to use to generate label positions
 	){
@@ -86,14 +91,49 @@ manhattan_plot <- function(
 			mplot_data <- rbind(mplot_data, temp)
 		}
 	}
+
 	# set min, max values for axes
 	min_x <- min(mplot_data$plotPos)
 	max_x <- max(mplot_data$plotPos)
 	max_y <- max(-log10(mplot_data$Pvalue))
-	# all empty label_text column if it's not in the dataframe
-	if ( !('label_text' %in% colnames(mplot_data)) ) {
-		mplot_data$label_text <- ''
+
+
+	orig_mplot_cols <- colnames(mplot_data)
+	# if no  sig_lvl column (which can differ for later faceting)
+	# CAVEAT: don't expect sig levels to be too different;
+	# however if they are the ylimits for the labels depends on the numeric sig_level value NOT the sig_level column in the used by the dataframe
+	if ( !('sig_level' %in% orig_mplot_cols) ) {
+		mplot_data$sig_level <- sig_level
 	}
+
+	# all empty label_text column if it's not in the dataframe
+	if ( !('label_text' %in% orig_mplot_cols) ) {
+		mplot_data$label_text <- ''
+	} else {
+		# fix all-blank labels
+		# assume labels that consist only of blankspaces should be empty strings;
+		# geom_label_repel will NOT add labels for these but they will be colored sig_label_color instead of sig_color because the the check is based on string being non-empty
+		mplot_data$label_text <- sub('^\\s*$', '', mplot_data$label_text)
+	}
+
+	# if no label_fill column (which can differ for later faceting)
+	if ( !('label_fill' %in% orig_mplot_cols) ) {
+		mplot_data$label_fill <- label_fill
+	}
+
+	# if no label_col column (which can differ for later faceting)
+	if ( !('label_col' %in% orig_mplot_cols) ) {
+		mplot_data$label_col <- label_col
+	}
+
+	# if no label_col column (which can differ for later faceting); if label_col was in the original cols, set the segment color to this column
+	if ( !('label_seg_col' %in% orig_mplot_cols) ) {
+		if ('label_col' %in% orig_mplot_cols) {
+			mplot_data$label_seg_col <- mplot_data$label_col			
+		} else {
+			mplot_data$label_seg_col <- label_seg_col
+		}
+	}	
 
 	# plot
 	# different initial plot based on whether label_nonsig is true
@@ -101,20 +141,28 @@ manhattan_plot <- function(
 			p <- ggplot(data=mplot_data, 
 						aes(x=plotPos, y=-log10(Pvalue), label=label_text)) + 
 				# non-sig. genes without labels:
-				geom_point(data=subset(mplot_data, Pvalue >= sig_level & nchar(label_text) == 0),
+				geom_point(
+					data=subset(mplot_data, Pvalue >= sig_level & nchar(label_text) == 0),
 					aes(x=plotPos, y=-log10(Pvalue), color=factor(CHROM)),
+					show.legend=FALSE,
 					size=1, alpha=point_alpha) + 
-				scale_color_manual(values=rep(nonsig_colors, 22)) + 
+				scale_color_manual(values=rep(nonsig_colors, length(chr_vec))) + 
 				# non-sig. genes with labels:
-				geom_point(data=subset(mplot_data, Pvalue >= sig_level & nchar(label_text) > 0),
+				geom_point(
+					data=subset(mplot_data, Pvalue >= sig_level & nchar(label_text) > 0),
 					aes(x=plotPos, y=-log10(Pvalue)), 
 					color=nonsig_label_color,
 					size=1.5, alpha=1) +
 				# add labels
-				geom_label_repel(data=subset(mplot_data, Pvalue >= sig_level & label_text!=''), 
+				new_scale_color() +
+				geom_label_repel(
+					aes(color=label_col,
+						fill=label_fill,
+						segment.color=label_seg_col
+					),
+					data=subset(mplot_data, Pvalue >= sig_level & label_text != ''), 
 					min.segment.length=min_segment_length,
 					segment.size=segment_size,
-					segment.color=label_seg_col,
 					box.padding=1.1,
 					size=geom_label_size, 
 					alpha=1,
@@ -124,31 +172,45 @@ manhattan_plot <- function(
 					force=label_force,
 					point.padding=point_padding,
 					max.iter=max_iter,
-					colour=label_col,
-					fill=label_fill,
-					seed=seed)
+					max.overlaps=max_overlaps,
+					seed=seed) +
+				scale_color_identity() +
+				guides(color='none') 
 		} else {
 			p <- ggplot(data=mplot_data, 
 						aes(x=plotPos, y=-log10(Pvalue), label=label_text)) + 
 				# non-sig. genes:
-				geom_point(data=subset(mplot_data, Pvalue >= sig_level),
+				geom_point(
+					data=subset(mplot_data, Pvalue >= sig_level),
 					aes(x=plotPos, y=-log10(Pvalue), color=factor(CHROM)),
+					show.legend=FALSE,
 					size=1, alpha=point_alpha) + 
 				scale_color_manual(values=rep(nonsig_colors, 22))
 		}
 
 	p <- p +
 		# sig. genes
-		geom_point(data=subset(mplot_data, Pvalue < sig_level),
-			aes(x=plotPos, y=-log10(Pvalue), fill=factor(CHROM)),
+		geom_point(
+			data=subset(mplot_data, Pvalue < sig_level),
+			aes(x=plotPos, y=-log10(Pvalue)),
 			size=ifelse(subset(mplot_data, Pvalue < sig_level)$label_text=='', 1.25, 1.5),
 			color=ifelse(subset(mplot_data, Pvalue < sig_level)$label_text=='', sig_color, sig_label_color),
 			alpha=ifelse(subset(mplot_data, Pvalue < sig_level)$label_text=='', point_alpha, 1)) +
+		# significance level line
+		geom_hline(
+			aes(yintercept=-log10(sig_level)), 
+			linetype=sig_linetype, 
+			linewidth=sig_line_size, 
+			color=sig_level_line_col) +		
 		# add labels
-		geom_label_repel(data=subset(mplot_data, Pvalue < sig_level), 
+		new_scale_color() +
+		geom_label_repel(
+			aes(color=label_col,
+				fill=label_fill,
+				segment.color=label_seg_col),
+			data=subset(mplot_data, Pvalue < sig_level), 
 			min.segment.length=min_segment_length,
 			segment.size=segment_size,
-			segment.color=label_seg_col,
 			box.padding=1.1,
 			size=geom_label_size, 
 			alpha=1,
@@ -157,20 +219,16 @@ manhattan_plot <- function(
 			force=label_force,
 			point.padding=point_padding,
 			max.iter=max_iter,
-			colour=label_col,
-			fill=label_fill,
+			max.overlaps=max_overlaps,
 			seed=seed) +
-		# significance level line
-		geom_hline(yintercept=-log10(sig_level), 
-			linetype=sig_linetype, 
-			size=sig_line_size, 
-			color=sig_level_line_col) +
-		# remove legend
+		scale_fill_identity() +		
+		scale_color_identity() +
 		guides(color='none', fill='none') + 
 		# set axes titles
-		labs(x='Chromosome', y=bquote(-"log"[10]("p-value"))) + 
+		labs(x='Chromosome', y=bquote(-'log'[10]('p-value'))) + 
 		# x-axis labels, breaks
-		scale_x_continuous(breaks=x_axis_chr_breaks, 
+		scale_x_continuous(
+			breaks=x_axis_chr_breaks, 
 			labels=x_axis_chr_labels, 
 			expand=c(0.01, 0)) + 
 		# don't clip to extent of plot panel
