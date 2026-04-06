@@ -298,19 +298,24 @@ def get_multi_chrm_ld_matrix(MCOV, return_diag=False):
 	MCOV['COV'] =  MCOV['COV'].apply(lambda x:np.fromstring(x, dtype=np.float32, sep=','))
 
 	inds = MCOV.index
-	r_inds = MCOV.row
 	n_inds = inds.size
 	V_upper = np.zeros((n_inds, n_inds))
-	
-	for i in range(n_inds):
-		cov_i = MCOV.COV.loc[inds[i]]
+
+	for ii, idx_i in enumerate(inds):
+		cov_i = MCOV.COV.at[idx_i]
 		N = cov_i.size
-		
-		for j in range(i,n_inds):
-			if (MCOV.CHROM[i] == MCOV.CHROM[j]) and (r_inds[j] - r_inds[i] < N):
-				V_upper[i,j] = cov_i[(r_inds[j] - r_inds[i])]
-			else:
-				V_upper[i,j] = 0
+
+		# index of last row with matching chrom
+		last_chrm_ind = np.where(MCOV.CHROM == MCOV.CHROM.at[idx_i])[0][-1]
+
+		# n_chrm_inds = chrm_jj.size
+		possible_jj = slice(ii, last_chrm_ind + 1)
+		possible_idx_j = inds[possible_jj]  # These are the snp_inds at j
+		idxs_j_minus_i = possible_idx_j - idx_i # This is inds[j] - inds[i], as below
+		# Get the *valid* indices, those less than N (0-indexed)
+		valid_jj = np.where(idxs_j_minus_i < N)[0]
+
+		V_upper[ii, valid_jj + ii] = cov_i[idxs_j_minus_i[valid_jj]]
 
 	snp_Var = V_upper.diagonal()
 	V = V_upper + V_upper.T - np.diag(snp_Var)
@@ -321,6 +326,7 @@ def get_multi_chrm_ld_matrix(MCOV, return_diag=False):
 
 	else:
 		return snp_sd, V
+
 
 #############################################################
 # Print input arguments to log
@@ -441,7 +447,11 @@ def thread_process(num):
 
 	if MCOV.empty:
 		print('No reference covariance information for target SNPs for TargetID: ' + target + '\n')
-		return None	
+		return None
+
+	# set index
+	MCOV.index = MCOV.row
+	MCOV = MCOV.drop(columns='row')
 
 	# get the snp variance and covariance matrix
 	snp_sd, V_cov = get_multi_chrm_ld_matrix(MCOV)
