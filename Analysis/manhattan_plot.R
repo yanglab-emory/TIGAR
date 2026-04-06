@@ -48,8 +48,8 @@ manhattan_plot <- function(
 		theme=theme_bw(), # ggplot2 theme (can use custom theme)
 		plot_bg_col=NULL, # background color if different from theme
 		# panel_border=NULL,#element_blank(), # ggplot panel border (default: blank)
-		panel_border=element_rect(fill=NA, colour='#333333', linewidth=0.175),
-		strip_background=element_rect(colour='black', linewidth=0.175),
+		panel_border=element_rect(fill=NA, colour='#333333', linewidth=0.175), # panel border
+		strip_background=element_rect(colour='black', linewidth=0.175), # strip background (facets)
 		text_size=10, # text size
 	## point labelling:
 		geom_label_size=2, # label text size
@@ -133,7 +133,25 @@ manhattan_plot <- function(
 		} else {
 			mplot_data$label_seg_col <- label_seg_col
 		}
-	}	
+	}
+
+
+	# all empty label_text column if it's not in the dataframe
+	if ( !('sig_color' %in% orig_mplot_cols) ) {
+		mplot_data$sig_color <- ''
+
+		# for non-labeled sig genes
+		mplot_data$sig_color <- sig_color
+
+		# for labeled sig_genes; match label_col if that's a column in the original dataframe
+		if ( 'label_col' %in% orig_mplot_cols ) {
+			mplot_data[mplot_data$Pvalue < sig_level & mplot_data$label_text!='', 'sig_color'] <- 
+			mplot_data[mplot_data$Pvalue < sig_level & mplot_data$label_text!='', 'label_col']
+		} else {
+			mplot_data[mplot_data$Pvalue < sig_level & mplot_data$label_text!='', 'sig_color'] <- sig_label_color			
+		}
+
+	}
 
 	# plot
 	# different initial plot based on whether label_nonsig is true
@@ -190,12 +208,15 @@ manhattan_plot <- function(
 
 	p <- p +
 		# sig. genes
+		new_scale_color() +
 		geom_point(
 			data=subset(mplot_data, Pvalue < sig_level),
-			aes(x=plotPos, y=-log10(Pvalue)),
+			aes(x=plotPos, y=-log10(Pvalue), color=sig_color),
 			size=ifelse(subset(mplot_data, Pvalue < sig_level)$label_text=='', 1.25, 1.5),
-			color=ifelse(subset(mplot_data, Pvalue < sig_level)$label_text=='', sig_color, sig_label_color),
+			# color=ifelse(subset(mplot_data, Pvalue < sig_level)$label_text=='', sig_color, sig_label_color),
 			alpha=ifelse(subset(mplot_data, Pvalue < sig_level)$label_text=='', point_alpha, 1)) +
+		scale_color_identity() +
+		# guides(color='none') +
 		# significance level line
 		geom_hline(
 			aes(yintercept=-log10(sig_level)), 
