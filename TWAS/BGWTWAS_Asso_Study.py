@@ -73,6 +73,9 @@ parser.add_argument('--log_file', type=str, default='')
 # window
 # parser.add_argument('--window',type=float)
 
+# Filter to use only cis- or trans- snps
+parser.add_argument('--snp_type', type=str, choices=['both','cis','trans'], default='both')
+
 # Weight threshold to include SNP in TWAS
 parser.add_argument('--weight_threshold', type=float, default=0)
 
@@ -233,7 +236,7 @@ def bgw_weight_file_info(w_path, weight_threshold=0, add_cols=[], drop_cols=['ID
 		**info_dict}
 
 
-def read_bgw_weight(w_path, weight_threshold=0, **kwargs):
+def read_bgw_weight(w_path, snp_type='both', weight_threshold=0, **kwargs):
 	# ensure file at w_path exists
 	if not os.path.isfile(w_path):
 		print('No valid weight file for target at: ' + w_path + '\n')
@@ -274,8 +277,12 @@ def read_bgw_weight(w_path, weight_threshold=0, **kwargs):
 	Weight['ES'] = Weight['PCP'] * Weight['BETA']
 	Weight = Weight.drop(columns=['PCP','BETA'])
 
+	# filter cis- or trans- only
+	if not snp_type == 'both':
+		Weight = Weight[Weight.Trans == {'cis':0, 'trans':1}[snp_type]]
+
+	# filter out weights below threshold
 	if weight_threshold:
-		# filter out weights below threshold
 		Weight = Weight[operator.gt(np.abs(Weight['ES']), weight_threshold)].reset_index(drop=True)
 
 	if Weight.empty:
@@ -354,19 +361,24 @@ def get_multi_chrm_ld_matrix(MCOV, return_diag=False):
 	MCOV['COV'] =  MCOV['COV'].apply(lambda x:np.fromstring(x, dtype=np.float32, sep=','))
 
 	inds = MCOV.index
-	r_inds = MCOV.row
 	n_inds = inds.size
 	V_upper = np.zeros((n_inds, n_inds))
-	
-	for i in range(n_inds):
-		cov_i = MCOV.COV.loc[inds[i]]
+
+	for ii, idx_i in enumerate(inds):
+		cov_i = MCOV.COV.at[idx_i]
 		N = cov_i.size
-		
-		for j in range(i,n_inds):
-			if (MCOV.CHROM[i] == MCOV.CHROM[j]) and (r_inds[j] - r_inds[i] < N):
-				V_upper[i,j] = cov_i[(r_inds[j] - r_inds[i])]
-			else:
-				V_upper[i,j] = 0
+
+		# index of last row with matching chrom
+		last_chrm_ind = np.where(MCOV.CHROM == MCOV.CHROM.at[idx_i])[0][-1]
+
+		# n_chrm_inds = chrm_jj.size
+		possible_jj = slice(ii, last_chrm_ind + 1)
+		possible_idx_j = inds[possible_jj]  # These are the snp_inds at j
+		idxs_j_minus_i = possible_idx_j - idx_i # This is inds[j] - inds[i], as below
+		# Get the *valid* indices, those less than N (0-indexed)
+		valid_jj = np.where(idxs_j_minus_i < N)[0]
+
+		V_upper[ii, valid_jj + ii] = cov_i[idxs_j_minus_i[valid_jj]]
 
 	snp_Var = V_upper.diagonal()
 	V = V_upper + V_upper.T - np.diag(snp_Var)
@@ -377,6 +389,7 @@ def get_multi_chrm_ld_matrix(MCOV, return_diag=False):
 
 	else:
 		return snp_sd, V
+
 
 def call_PLINK_merge_2chrms(target, mrg_chrms, temp_out_dir, clean_output=1, **kwargs):
 	file_1_str = temp_out_dir + target + '_CHR' + str(mrg_chrms[0])
@@ -396,11 +409,6 @@ def call_PLINK_merge_2chrms(target, mrg_chrms, temp_out_dir, clean_output=1, **k
 	return None
 
 
-
-
-
-
-
 #############################################################
 # Print input arguments to log
 # out_twas_path = args.out_dir + '/CHR' + args.chrm + '_sumstat_assoc.txt'
@@ -416,6 +424,7 @@ cis-eQTL weight file: {in_w_dir}/[target]{w_path_suf}
 GWAS summary statistics Z-score file: {in_z_path}
 {ld_str}
 SNP weight inclusion threshold: {weight_threshold}
+Using {snp_type_str} SNPs for analysis
 Test statistic to use: {test_stat_str}
 Number of threads: {thread}
 Output directory: {out_dir}
@@ -423,6 +432,7 @@ Output TWAS results file: {out_path}
 Clean output: {clean_str}
 ********************************'''.format(
 	**args.__dict__,
+	snp_type_str = 'cis- and trans-' if args.test_stat=='both' else args.snp_type + '-',
 	test_stat_str = 'FUSION and SPrediXcan' if args.test_stat=='both' else args.test_stat,
 	ld_str='PLINK files for reference LD:' + args.plink_pre_chrm + '[CHRM]' + args.plink_suf if args.do_plink else 'Reference TIGAR LD genotype covariance files:' + args.tigar_ld_path_pre + '[chr]' + args.tigar_ld_path_suf,
 	in_w_dir = args.target_dir + '/[target]' if args.target_dir else args.w_path_pre,
@@ -432,7 +442,7 @@ Clean output: {clean_str}
 
 
 	# in_w_dir = args.w_path_pre if not args.target_dir else args.w_path_pre + '/[target]',
-# tg.print_args(args)
+tg.print_args(args)
 
 ###############################################################
 ### Read in gene annotation 
@@ -609,7 +619,11 @@ def thread_process(num):
 
 		if MCOV.empty:
 			print('No reference covariance information for target SNPs for TargetID: ' + target + '\n')
-			return None	
+			return None
+
+		# set index
+		MCOV.index = MCOV.row
+		MCOV = MCOV.drop(columns='row')
 
 		# get the snp variance and covariance matrix
 		snp_sd, V_cov = get_multi_chrm_ld_matrix(MCOV)
@@ -617,9 +631,9 @@ def thread_process(num):
 		ZW = ZW[ZW.snpID.isin(MCOV.snpID)]
 		ZW = ZW.drop_duplicates(['snpID'], keep='first').reset_index(drop=True)
 
-
 		### calculate zscore(s), pvalue(s)
 		ztest_args = {'V_cov': V_cov, 'w': ZW.ES.values, 'Z_gwas': ZW.Zscore.values, 'snp_sd': snp_sd}
+
 
 	# number of snps
 	n_snps = str(ZW.snpID.size)
