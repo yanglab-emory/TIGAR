@@ -141,7 +141,7 @@ Output reference covariance results file: {out_rc}
 	**args.__dict__,
 	out_rc = out_refcovld_path))
 
-# tg.print_args(args)
+tg.print_args(args)
 
 ###############################################################
 # Read in block information
