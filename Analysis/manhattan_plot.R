@@ -144,11 +144,16 @@ manhattan_plot <- function(
 		mplot_data$sig_color <- sig_color
 
 		# for labeled sig_genes; match label_col if that's a column in the original dataframe
+		# if ( 'label_col' %in% orig_mplot_cols ) {
+		# 	mplot_data[mplot_data$Pvalue < sig_level & mplot_data$label_text!='', 'sig_color'] <- 
+		# 	mplot_data[mplot_data$Pvalue < sig_level & mplot_data$label_text!='', 'label_col']
+		# } else {
+		# 	mplot_data[mplot_data$Pvalue < sig_level & mplot_data$label_text!='', 'sig_color'] <- sig_label_color			
+		# }
 		if ( 'label_col' %in% orig_mplot_cols ) {
-			mplot_data[mplot_data$Pvalue < sig_level & mplot_data$label_text!='', 'sig_color'] <- 
-			mplot_data[mplot_data$Pvalue < sig_level & mplot_data$label_text!='', 'label_col']
+			mplot_data$sig_color <- mplot_data$label_col
 		} else {
-			mplot_data[mplot_data$Pvalue < sig_level & mplot_data$label_text!='', 'sig_color'] <- sig_label_color			
+			mplot_data$sig_color <- sig_label_color			
 		}
 
 	}
