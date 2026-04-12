@@ -158,7 +158,6 @@ manhattan_plot <- function(
 
 	}
 
-
 	# plot
 	# different initial plot based on whether label_nonsig is true
 		if (label_nonsig) {
