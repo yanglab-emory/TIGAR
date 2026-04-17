@@ -798,6 +798,7 @@ python ${TIGAR_dir}/TWAS/BGWTWAS_Asso_Study.py \
 
 
 ## Updates
+- added `--snp_type` option to BGWTWAS to allow filtering to use cis-only, trans-only, or both (default) SNPs
 - added `--missing_rate` option (for excluding SNPs with many missing values) to model training and prediction scripts(default: `0.2`)
 - weight files now automatically sorted and bgzipped/tabixed during training step
 - Removed 'dfply' Python package dependency
