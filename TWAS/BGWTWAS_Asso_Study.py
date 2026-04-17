@@ -351,7 +351,7 @@ Output directory: {out_dir}
 Output TWAS results file: {out_path}
 ********************************'''.format(
 	**args.__dict__,
-	snp_type_str = 'cis- and trans-' if args.test_stat=='both' else args.snp_type + '-',
+	snp_type_str = 'cis- and trans-' if args.snp_type=='both' else args.snp_type + '-',
 	test_stat_str = 'FUSION and SPrediXcan' if args.test_stat=='both' else args.test_stat,
 	in_w_dir = args.w_path_pre + '/[target]' if args.target_dir else args.w_path_pre,
 	in_z_path = args.z_path_pre + '[CHRM]' + args.z_path_suf if args.z_path == '' else args.z_path,
