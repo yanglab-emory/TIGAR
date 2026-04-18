@@ -955,14 +955,14 @@ def get_ld_matrix(MCOV, return_diag=False):
 
 	# get the actual snp_inds as well instead of lookup
 	for ii, idx_i in enumerate(inds):
-		cov_i = MCOV.COV.at[idx_i]  # .at is faster than .loc
+		cov_i = MCOV.COV.iat[ii]  # .at is faster than .loc
 		N = cov_i.size
 
 		possible_jj = slice(ii, n_inds)  # Instead of loop, slice
 		possible_idx_j = inds[possible_jj]  # These are the snp_inds at j
 		idxs_j_minus_i = possible_idx_j - idx_i  # This is inds[j] - inds[i], as below
 		# Get the *valid* indices, those less than N (0-indexed)
-		valid_jj = np.where(idxs_j_minus_i < N)[0]
+		valid_jj = np.where((idxs_j_minus_i >= 0) & (idxs_j_minus_i < N))[0]
 
 		# Add back the ii to make it start at ii, get the VALID cov_i[inds[j] - inds[i]]
 		V_upper[ii, valid_jj + ii] = cov_i[idxs_j_minus_i[valid_jj]]
