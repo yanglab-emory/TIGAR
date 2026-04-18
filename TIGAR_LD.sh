@@ -156,7 +156,7 @@ else
         # # get starting row number for next block
         # start_row=$(( $(zgrep -c $ "${block_path}") + start_row ))
 
-        # number the lines then add bgzipped lines to final output
+        # number the lines then add lines to final output
         nl -nln -s$'\t' -v${start_row} ${block_path} \
             >> ${out_sub_dir}/${out_ld_file}.txt
         # get starting row number for next block
