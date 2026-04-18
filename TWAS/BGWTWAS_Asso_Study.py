@@ -302,18 +302,19 @@ def get_multi_chrm_ld_matrix(MCOV, return_diag=False):
 	V_upper = np.zeros((n_inds, n_inds))
 
 	for ii, idx_i in enumerate(inds):
-		cov_i = MCOV.COV.at[idx_i]
+		# print('ii=' + str(ii) + '; idx_i=' + str(idx_i))
+		cov_i = MCOV.COV.iat[ii]
 		N = cov_i.size
 
 		# index of last row with matching chrom
-		last_chrm_ind = np.where(MCOV.CHROM == MCOV.CHROM.at[idx_i])[0][-1]
+		last_chrm_ind = np.where(MCOV.CHROM == MCOV.CHROM.iat[ii])[0][-1]
 
 		# n_chrm_inds = chrm_jj.size
 		possible_jj = slice(ii, last_chrm_ind + 1)
 		possible_idx_j = inds[possible_jj]  # These are the snp_inds at j
 		idxs_j_minus_i = possible_idx_j - idx_i # This is inds[j] - inds[i], as below
 		# Get the *valid* indices, those less than N (0-indexed)
-		valid_jj = np.where(idxs_j_minus_i < N)[0]
+		valid_jj = np.where((idxs_j_minus_i >= 0) & (idxs_j_minus_i < N))[0]
 
 		V_upper[ii, valid_jj + ii] = cov_i[idxs_j_minus_i[valid_jj]]
 
@@ -326,7 +327,6 @@ def get_multi_chrm_ld_matrix(MCOV, return_diag=False):
 
 	else:
 		return snp_sd, V
-
 
 #############################################################
 # Print input arguments to log
