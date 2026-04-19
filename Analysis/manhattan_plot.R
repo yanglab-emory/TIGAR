@@ -22,7 +22,7 @@ library(ggnewscale)
 #		p1 + facet_grid(dataset ~ .)
 
 
-# values in the optional label_fill, label_col, and label_seg_col columns must valid colors (ie, aesthetic values that ggplot2 can handle directly)
+# values in the optional label_fill, label_color, and label_seg_color columns must valid colors (ie, aesthetic values that ggplot2 can handle directly)
 
 
 
@@ -48,14 +48,14 @@ manhattan_plot <- function(
 		theme=theme_bw(), # ggplot2 theme (can use custom theme)
 		plot_bg_col=NULL, # background color if different from theme
 		# panel_border=NULL,#element_blank(), # ggplot panel border (default: blank)
-		panel_border=element_rect(fill=NA, colour='#333333', linewidth=0.175), # panel border
-		strip_background=element_rect(colour='black', linewidth=0.175), # strip background (facets)
+		panel_border=element_rect(fill=NA, colour='#333333', linewidth=0.175),
+		strip_background=element_rect(colour='black', linewidth=0.175),
 		text_size=10, # text size
 	## point labelling:
 		geom_label_size=2, # label text size
 		label_fill='white', # label background color
-		label_col='black', # label border color
-		label_seg_col='black', # color of line from label to point
+		label_color='black', # label border color
+		label_seg_color='black', # color of line from label to point
 		min_segment_length=0.01, # minimum length of line from label to point
 		segment_size=0.2, # line from label to point
 		label_force=2, # force of repulsion between overlapping text labels
@@ -121,41 +121,36 @@ manhattan_plot <- function(
 		mplot_data$label_fill <- label_fill
 	}
 
-	# if no label_col column (which can differ for later faceting)
-	if ( !('label_col' %in% orig_mplot_cols) ) {
-		mplot_data$label_col <- label_col
+	# if no label_color column (which can differ for later faceting)
+	if ( !('label_color' %in% orig_mplot_cols) ) {
+		mplot_data$label_color <- label_color
 	}
 
-	# if no label_col column (which can differ for later faceting); if label_col was in the original cols, set the segment color to this column
-	if ( !('label_seg_col' %in% orig_mplot_cols) ) {
-		if ('label_col' %in% orig_mplot_cols) {
-			mplot_data$label_seg_col <- mplot_data$label_col			
+	# if no label_color column (which can differ for later faceting); if label_color was in the original cols, set the segment color to this column
+	if ( !('label_seg_color' %in% orig_mplot_cols) ) {
+		if ('label_color' %in% orig_mplot_cols) {
+			mplot_data$label_seg_color <- mplot_data$label_color
 		} else {
-			mplot_data$label_seg_col <- label_seg_col
+			mplot_data$label_seg_color <- label_seg_color
 		}
-	}
+	}	
 
-
-	# all empty label_text column if it's not in the dataframe
+	# if no sig_label_color column (which can differ for later faceting)
 	if ( !('sig_color' %in% orig_mplot_cols) ) {
-		mplot_data$sig_color <- ''
-
-		# for non-labeled sig genes
-		mplot_data$sig_color <- sig_color
-
-		# for labeled sig_genes; match label_col if that's a column in the original dataframe
-		# if ( 'label_col' %in% orig_mplot_cols ) {
-		# 	mplot_data[mplot_data$Pvalue < sig_level & mplot_data$label_text!='', 'sig_color'] <- 
-		# 	mplot_data[mplot_data$Pvalue < sig_level & mplot_data$label_text!='', 'label_col']
-		# } else {
-		# 	mplot_data[mplot_data$Pvalue < sig_level & mplot_data$label_text!='', 'sig_color'] <- sig_label_color			
-		# }
-		if ( 'label_col' %in% orig_mplot_cols ) {
-			mplot_data$sig_color <- mplot_data$label_col
+		if ('label_color' %in% orig_mplot_cols) {
+			mplot_data$sig_color <- mplot_data$label_color
 		} else {
-			mplot_data$sig_color <- sig_label_color			
+			mplot_data$sig_color <- sig_color
 		}
+	}
 
+	# if no sig_label_color column (which can differ for later faceting)
+	if ( !('sig_label_color' %in% orig_mplot_cols) ) {
+		if ('label_color' %in% orig_mplot_cols) {
+			mplot_data$sig_label_color <- mplot_data$label_color
+		} else {
+			mplot_data$sig_label_color <- sig_label_color
+		}
 	}
 
 	# plot
@@ -179,9 +174,9 @@ manhattan_plot <- function(
 				# add labels
 				new_scale_color() +
 				geom_label_repel(
-					aes(color=label_col,
+					aes(color=label_color,
 						fill=label_fill,
-						segment.color=label_seg_col
+						segment.color=label_seg_color
 					),
 					data=subset(mplot_data, Pvalue >= sig_level & label_text != ''), 
 					min.segment.length=min_segment_length,
@@ -212,16 +207,28 @@ manhattan_plot <- function(
 		}
 
 	p <- p +
-		# sig. genes
+		# sig. genes without label
 		new_scale_color() +
 		geom_point(
-			data=subset(mplot_data, Pvalue < sig_level),
+			data=subset(mplot_data, Pvalue < sig_level & label_text == ''),
 			aes(x=plotPos, y=-log10(Pvalue), color=sig_color),
-			size=ifelse(subset(mplot_data, Pvalue < sig_level)$label_text=='', 1.25, 1.5),
-			# color=ifelse(subset(mplot_data, Pvalue < sig_level)$label_text=='', sig_color, sig_label_color),
-			alpha=ifelse(subset(mplot_data, Pvalue < sig_level)$label_text=='', point_alpha, 1)) +
+			size=1.25,
+			alpha=point_alpha) +
 		scale_color_identity() +
-		# guides(color='none') +
+		# sig. genes with label
+		new_scale_color() +
+		geom_point(
+			data=subset(mplot_data, Pvalue < sig_level & label_text != ''),
+			aes(x=plotPos, y=-log10(Pvalue), color=sig_label_color),
+			size=1.5,
+			alpha=1) +
+		scale_color_identity() +
+		# geom_point(
+		# 	data=subset(mplot_data, Pvalue < sig_level),
+		# 	aes(x=plotPos, y=-log10(Pvalue)),
+		# 	size=ifelse(subset(mplot_data, Pvalue < sig_level)$label_text=='', 1.25, 1.5),
+		# 	color=ifelse(subset(mplot_data, Pvalue < sig_level)$label_text=='', sig_color, sig_label_color),
+		# 	alpha=ifelse(subset(mplot_data, Pvalue < sig_level)$label_text=='', point_alpha, 1)) +
 		# significance level line
 		geom_hline(
 			aes(yintercept=-log10(sig_level)), 
@@ -231,9 +238,9 @@ manhattan_plot <- function(
 		# add labels
 		new_scale_color() +
 		geom_label_repel(
-			aes(color=label_col,
+			aes(color=label_color,
 				fill=label_fill,
-				segment.color=label_seg_col),
+				segment.color=label_seg_color),
 			data=subset(mplot_data, Pvalue < sig_level), 
 			min.segment.length=min_segment_length,
 			segment.size=segment_size,
