@@ -51,8 +51,10 @@ manhattan_plot <- function(
 		panel_border=element_rect(fill=NA, colour='#333333', linewidth=0.175),
 		strip_background=element_rect(colour='black', linewidth=0.175),
 		text_size=10, # text size
+		text_face='plain', # font face: ("plain", "italic", "bold", "bold.italic")
 	## point labelling:
 		geom_label_size=2, # label text size
+		label_face='italic', # label font face: ("plain", "italic", "bold", "bold.italic")
 		label_fill='white', # label background color
 		label_color='black', # label border color
 		label_seg_color='black', # color of line from label to point
@@ -154,6 +156,14 @@ manhattan_plot <- function(
 	}
 
 	# plot
+	# adjust font face for y-axis label
+	y_lab <- switch(text_face,
+		plain = bquote(-'log'[10]('p-value')),
+		bold = bquote(bold(-'log'[10]('p-value'))),
+		italic = bquote(italic(-'log'[10]('p-value'))),
+		bold.italic = bquote(bolditalic(-'log'[10]('p-value')))
+		)
+
 	# different initial plot based on whether label_nonsig is true
 		if (label_nonsig) {
 			p <- ggplot(data=mplot_data, 
@@ -183,6 +193,7 @@ manhattan_plot <- function(
 					segment.size=segment_size,
 					box.padding=1.1,
 					size=geom_label_size, 
+					fontface=label_face,
 					alpha=1,
 					# reduce labels covering up other non-sig genes/significance line
 					ylim=c(0.35, 0.85) * -log10(sig_level), 
@@ -246,6 +257,7 @@ manhattan_plot <- function(
 			segment.size=segment_size,
 			box.padding=1.1,
 			size=geom_label_size, 
+			fontface=label_face,
 			alpha=1,
 			ylim=c(-log10(sig_level), max_y),
 			xlim=c(min_x, max_x),
@@ -258,7 +270,7 @@ manhattan_plot <- function(
 		scale_color_identity() +
 		guides(color='none', fill='none') + 
 		# set axes titles
-		labs(x='Chromosome', y=bquote(-'log'[10]('p-value'))) + 
+		labs(x='Chromosome', y=y_lab) + 
 		# x-axis labels, breaks
 		scale_x_continuous(
 			breaks=x_axis_chr_breaks, 
@@ -271,11 +283,11 @@ manhattan_plot <- function(
 		theme +
 		# convenient theme options for a manhattan plot
 		theme(
-			text=element_text(size=text_size),
+			text=element_text(size=text_size, face=text_face),
 			# text=element_text(size=text_size, face='bold'), 
 			# axis.title=element_text(face='bold', size=text_size),
 			axis.text.x=element_text(size=text_size-1, 
-				face='plain', angle=-90, 
+				face=text_face, angle=-90, 
 				vjust=0.5, hjust=0),
 			axis.text.y=element_text(#face='bold', 
 					size=text_size-1),
